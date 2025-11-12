@@ -722,18 +722,22 @@ class MessageRouter:
         qty = payload.get("qty", 0)
         avg = payload.get("avg_entry")
 
-        # CRITICAL: Only process OPEN positions (qty != 0)
-        # Ignore zero-quantity positions from initial sync or position closures
+        # CRITICAL FIX: ALWAYS forward position updates to Panel2, including qty=0 (closes)
+        # Panel2 needs qty=0 messages to detect trade closures and record them to database
+        # Old buggy logic: if qty == 0: return (prevented Panel2 from seeing closes!)
+
+        # Update router state for qty=0 (remove position from state tracking)
         if qty == 0:
             log.debug(f"router.position.closed: symbol={sym}")
-            # Remove from state if it exists
             if self.state:
                 self.state.update_position(sym, 0, None)
-            return
+            # CONTINUE to forward to Panel2 (don't return early!)
 
-        # ADDITIONAL CHECK: Validate position has required data (avoid stale positions)
+        # ADDITIONAL CHECK: Validate OPEN positions have required data (avoid stale positions)
         # Sierra sometimes reports positions without proper price data
-        if avg is None or avg == 0.0:
+        # CRITICAL: Only apply this check to OPEN positions (qty > 0)
+        # Closed positions (qty=0) legitimately have avg=0.0, so skip this check for closes
+        if qty > 0 and (avg is None or avg == 0.0):
             log.warning(
                 "router.position.stale",
                 symbol=sym,
