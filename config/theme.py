@@ -634,4 +634,93 @@ def export_theme_json() -> dict:
     }
 
 
+# ========================================================================
+# Theme Validation
+# ========================================================================
+
+# All theme keys that must be present in every theme mode
+# Extracted from actual usage across the codebase
+_REQUIRED_THEME_KEYS = [
+    # Core colors
+    "ink", "bg_panel", "bg_primary", "bg_secondary", "bg_tertiary",
+    "fg_primary", "fg_muted", "text_primary", "text_dim", "border",
+    # Card/widget styling
+    "card_bg", "card_radius", "cell_border",
+    # PnL colors
+    "pnl_pos_color", "pnl_neg_color", "pnl_neu_color",
+    # Accent colors
+    "accent", "accent_warning", "accent_alert",
+    # Typography
+    "font_family", "font_size", "font_weight",
+    "title_font_size", "title_font_weight",
+    "balance_font_size", "balance_font_weight",
+    "pnl_font_size", "pnl_font_weight",
+    "investing_font_size", "investing_font_weight",
+    # Badge/pill styling
+    "badge_bg_color", "badge_border_color", "badge_text_color",
+    "badge_font_size", "badge_font_weight",
+    "badge_height", "badge_radius", "badge_width", "badge_gap",
+    "pill_font_size", "pill_font_weight", "pill_radius", "pill_text_active_color",
+    # Connection status
+    "conn_status_green", "conn_status_yellow", "conn_status_red",
+    # Graph/chart
+    "grid_color", "sharpe_track_pen", "sharpe_track_bg",
+    # Mode indicators
+    "mode_indicator_live", "mode_indicator_sim",
+    # Misc
+    "glow_color", "glow_blur_radius", "perf_safe",
+    "chip_height", "investing_text_color",
+    "live_dot_fill", "live_dot_border",
+]
+
+
+def validate_theme(theme_dict: dict, theme_name: str) -> list[str]:
+    """
+    Validate that a theme dict contains all required keys.
+
+    Args:
+        theme_dict: Theme dictionary to validate
+        theme_name: Name of theme (for error messages)
+
+    Returns:
+        List of missing keys (empty if valid)
+    """
+    missing = [key for key in _REQUIRED_THEME_KEYS if key not in theme_dict]
+    return missing
+
+
+def validate_all_themes() -> None:
+    """
+    Validate all theme modes have required keys.
+
+    Raises:
+        ValueError: If any theme is missing required keys
+    """
+    themes_to_check = [
+        (DEBUG_THEME, "DEBUG_THEME"),
+        (SIM_THEME, "SIM_THEME"),
+        (LIVE_THEME, "LIVE_THEME"),
+    ]
+
+    all_errors = []
+    for theme_dict, theme_name in themes_to_check:
+        missing = validate_theme(theme_dict, theme_name)
+        if missing:
+            all_errors.append(f"{theme_name} missing {len(missing)} keys: {missing}")
+
+    if all_errors:
+        error_msg = "Theme validation failed:\n  " + "\n  ".join(all_errors)
+        raise ValueError(error_msg)
+
+
+# Run validation at module load time
+# This ensures themes are complete before any UI code runs
+try:
+    validate_all_themes()
+except ValueError as e:
+    # Print error but don't crash - allows app to start with warnings
+    print(f"[THEME WARNING] {e}")
+    print("[THEME WARNING] Some UI elements may use fallback colors")
+
+
 # -------------------- config/theme.py (end)
