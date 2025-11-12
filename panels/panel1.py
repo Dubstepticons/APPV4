@@ -162,6 +162,9 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
         self.current_account: str = ""
         self._active_scope: tuple[str, str] = ("SIM", "")
 
+        # Display mode tracking (initialized to SIM, updated via _on_mode_changed)
+        self._current_display_mode: str = "SIM"
+
         # Legacy compatibility - points to active curve
         self._equity_points: list[tuple[float, float]] = []
 
