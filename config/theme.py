@@ -269,65 +269,65 @@ _BASE_THEME: dict[str, Union[int, float, str, bool]] = {
 # ========================================================================
 DEBUG_THEME: dict[str, Union[int, float, str, bool]] = {
     **_BASE_THEME,
-    # Core palette - Reduced saturation (OKLCH for perceptual uniformity)
-    "ink": "oklch(72% 0 0)",                    # Neutral silver gray
-    "subtle_ink": "oklch(60% 0.02 217)",        # Cool muted gray
-    "fg_primary": "oklch(89% 0.01 220)",        # Light cool gray
-    "fg_muted": "oklch(75% 0.01 220)",          # Medium cool gray
-    "text_primary": "oklch(94% 0.03 201)",      # Very light blue-gray
-    "text_dim": "oklch(37% 0.03 207)",          # Dim blue-gray
+    # Core palette - Reduced saturation
+    "ink": "#C0C0C0",
+    "subtle_ink": "#9CA3AF",
+    "fg_primary": "#E5E7EB",
+    "fg_muted": "#C8CDD3",
+    "text_primary": "#E6F6FF",
+    "text_dim": "#5B6C7A",
     # Backgrounds
-    "bg_primary": "oklch(11% 0 0)",             # Dark charcoal
-    "bg_secondary": "oklch(0% 0 0)",            # Pure black
-    "bg_panel": "oklch(0% 0 0)",                # Pure black
-    "bg_elevated": "oklch(0% 0 0)",             # Pure black
-    "bg_tertiary": "oklch(7% 0.01 240)",        # Very dark blue-tinted
-    "card_bg": "oklch(11% 0.02 225)",           # Dark blue-gray card
+    "bg_primary": "#1E1E1E",
+    "bg_secondary": "#000000",
+    "bg_panel": "#000000",
+    "bg_elevated": "#000000",
+    "bg_tertiary": "#0F0F1A",
+    "card_bg": "#1A1F2E",
     # Borders
-    "border": "oklch(22% 0.03 216)",            # Medium-dark cool gray
+    "border": "#374151",
     "cell_border": "none",
     # Accent / brand
-    "accent": "oklch(60% 0.17 213)",            # Vibrant blue
-    "accent_warning": "oklch(70% 0.18 75)",     # Warm amber
-    "accent_alert": "oklch(50% 0.20 25)",       # Warm red
+    "accent": "#60A5FA",
+    "accent_warning": "#F5B342",
+    "accent_alert": "#C7463D",
     # Connection status (OKLCH)
     "conn_status_green": "oklch(74% 0.21 150)",
     "conn_status_yellow": "oklch(82% 0.19 95)",
     "conn_status_red": "oklch(62% 0.23 25)",
     # Pill widget
-    "pill_text_active_color": "oklch(0% 0 0)",           # Pure black
-    "live_dot_fill": "oklch(60% 0.18 145)",             # Green dot fill
-    "live_dot_border": "oklch(50% 0.18 145)",           # Darker green border
+    "pill_text_active_color": "#000000",
+    "live_dot_fill": "#20B36F",
+    "live_dot_border": "#188E5B",
     # Mode badge
-    "mode_badge_color": "oklch(60% 0.17 213)",          # Vibrant blue
+    "mode_badge_color": "#60A5FA",
     "mode_badge_radius": 12,
     "mode_badge_font_weight": 700,
     "mode_badge_font_size": 16,
     # PnL colors (muted for DEBUG)
-    "pnl_pos_color": "oklch(65% 0.05 140)",             # Near-grayscale green
-    "pnl_neg_color": "oklch(58% 0.05 25)",              # Near-grayscale red
-    "pnl_neu_color": "oklch(77% 0.01 220)",             # Neutral gray
-    "pnl_pos_color_weak": "oklch(60% 0.18 145 / 0.20)", # Green with alpha
-    "pnl_neg_color_weak": "oklch(50% 0.20 25 / 0.20)",  # Red with alpha
-    "pnl_neu_color_weak": "oklch(77% 0.01 220 / 0.35)", # Gray with alpha
+    "pnl_pos_color": "oklch(65% 0.05 140)",  # Near-grayscale green
+    "pnl_neg_color": "oklch(58% 0.05 25)",  # Near-grayscale red
+    "pnl_neu_color": "#C9CDD0",
+    "pnl_pos_color_weak": "rgba(32, 179, 111, 0.20)",
+    "pnl_neg_color_weak": "rgba(199, 70, 61, 0.20)",
+    "pnl_neu_color_weak": "rgba(201, 205, 208, 0.35)",
     # Flash colors
-    "flash_pos_color": "oklch(65% 0.05 140)",           # Near-grayscale green
-    "flash_neg_color": "oklch(58% 0.05 25)",            # Near-grayscale red
-    "flash_neu_color": "oklch(77% 0.01 220)",           # Neutral gray
+    "flash_pos_color": "oklch(65% 0.05 140)",
+    "flash_neg_color": "oklch(58% 0.05 25)",
+    "flash_neu_color": "#C9CDD0",
     # Sharpe bar
-    "sharpe_track_pen": "oklch(100% 0 0 / 0.16)",       # White with alpha
-    "sharpe_track_bg": "oklch(100% 0 0 / 0.10)",        # White with alpha
+    "sharpe_track_pen": "rgba(255,255,255,0.16)",
+    "sharpe_track_bg": "rgba(255,255,255,0.10)",
     # Graph grid
-    "grid_color": "oklch(30% 0 0)",                     # Dark gray grid
+    "grid_color": "#464646",
     # Badge styling (golden amber - analytical)
-    "investing_text_color": "oklch(72% 0 0)",           # Neutral silver
-    "badge_bg_color": "oklch(70% 0.18 75)",             # Warm amber
-    "badge_border_color": "oklch(70% 0.18 75)",         # Warm amber
-    "badge_text_color": "oklch(0% 0 0)",                # Pure black
+    "investing_text_color": "#C0C0C0",
+    "badge_bg_color": "#F5B342",
+    "badge_border_color": "#F5B342",
+    "badge_text_color": "#000000",
     "glow_color": "none",
     # Mode indicator neon colors
-    "mode_indicator_live": "oklch(55% 0.30 25)",        # Neon red for LIVE
-    "mode_indicator_sim": "oklch(75% 0.18 200)",        # Neon cyan for SIM
+    "mode_indicator_live": "#FF0000",  # Neon red for LIVE
+    "mode_indicator_sim": "#00FFFF",  # Neon cyan for SIM
 }
 
 
@@ -338,60 +338,23 @@ LIVE_THEME: dict[str, Union[int, float, str, bool]] = {
     **_BASE_THEME,
     # Typography - Lato for headings
     "heading_font_family": "Lato, Inter, sans-serif",
-    # Core palette (dark mode with gold accents)
-    "ink": "oklch(83% 0.30 50)",                         # Vivid gold text
-    "subtle_ink": "oklch(60% 0.02 217)",                 # Cool muted gray
-    "fg_primary": "oklch(89% 0.01 220)",                 # Light cool gray
-    "fg_muted": "oklch(75% 0.01 220)",                   # Medium cool gray
-    "text_primary": "oklch(94% 0.03 201)",               # Very light blue-gray
-    "text_dim": "oklch(37% 0.03 207)",                   # Dim blue-gray
-    # Backgrounds (pure black for maximum contrast)
-    "bg_primary": "oklch(0% 0 0)",                       # Pure black background
-    "bg_secondary": "oklch(0% 0 0)",                     # Pure black
-    "bg_panel": "oklch(0% 0 0)",                         # Pure black
-    "bg_elevated": "oklch(0% 0 0)",                      # Pure black
-    "bg_tertiary": "oklch(7% 0.01 240)",                 # Very dark blue-tinted
-    "card_bg": "oklch(11% 0.02 225)",                    # Dark blue-gray card
-    # Borders (gold to match text)
-    "border": "oklch(83% 0.30 50)",                      # Vivid gold borders
-    "cell_border": "none",
-    # Accents (vivid for live trading)
-    "accent": "oklch(60% 0.20 213)",                     # Vivid blue
-    "accent_warning": "oklch(75% 0.20 75)",              # Vivid amber
-    "accent_alert": "oklch(60% 0.25 25)",                # Vivid red
-    # Connection status
-    "conn_status_green": "oklch(74% 0.21 150)",
-    "conn_status_yellow": "oklch(82% 0.19 95)",
-    "conn_status_red": "oklch(62% 0.23 25)",
-    # Pill widget
-    "pill_text_active_color": "oklch(0% 0 0)",           # Pure black
-    "live_dot_fill": "oklch(60% 0.18 145)",              # Green dot
-    "live_dot_border": "oklch(50% 0.18 145)",            # Darker green
-    # PnL colors (full saturation - VIVID for LIVE mode)
-    "pnl_pos_color": "oklch(65% 0.20 140)",              # Intense green
-    "pnl_neg_color": "oklch(58% 0.21 25)",               # Intense red
-    "pnl_neu_color": "oklch(77% 0.01 220)",              # Neutral gray
-    "pnl_pos_color_weak": "oklch(60% 0.20 145 / 0.35)",  # Green with alpha
-    "pnl_neg_color_weak": "oklch(50% 0.21 25 / 0.35)",   # Red with alpha
-    "pnl_neu_color_weak": "oklch(77% 0.01 220 / 0.35)",  # Gray with alpha
+    # PnL colors (full saturation)
+    "pnl_pos_color": "oklch(65% 0.20 140)",  # Intense green
+    "pnl_neg_color": "oklch(58% 0.21 25)",  # Intense red
+    "pnl_pos_color_weak": "rgba(32, 179, 111, 0.35)",
+    "pnl_neg_color_weak": "rgba(199, 70, 61, 0.35)",
     # Flash colors (vivid)
-    "flash_pos_color": "oklch(65% 0.20 140)",            # Intense green
-    "flash_neg_color": "oklch(58% 0.21 25)",             # Intense red
-    "flash_neu_color": "oklch(77% 0.01 220)",            # Neutral gray
-    # Sharpe bar
-    "sharpe_track_pen": "oklch(100% 0 0 / 0.16)",        # White with alpha
-    "sharpe_track_bg": "oklch(100% 0 0 / 0.10)",         # White with alpha
-    # Graph grid
-    "grid_color": "oklch(30% 0 0)",                      # Dark gray grid
-    # Badge styling (vibrant green - active LIVE mode)
-    "investing_text_color": "oklch(83% 0.30 50)",        # Gold
-    "badge_bg_color": "oklch(65% 0.22 156)",             # Vivid green
-    "badge_border_color": "oklch(65% 0.22 156)",         # Vivid green
-    "badge_text_color": "oklch(100% 0 0)",               # Pure white
-    "glow_color": "oklch(65% 0.22 156)",                 # Vivid green glow
-    # Mode indicators
-    "mode_indicator_live": "oklch(55% 0.30 25)",         # Neon red
-    "mode_indicator_sim": "oklch(75% 0.18 200)",         # Neon cyan
+    "flash_pos_color": "oklch(65% 0.20 140)",
+    "flash_neg_color": "oklch(58% 0.21 25)",
+    # Badge styling (vibrant green - active)
+    "badge_bg_color": "#00C97A",
+    "badge_border_color": "#00C97A",
+    "badge_text_color": "#FFFFFF",
+    "glow_color": "#00C97A",
+    # Live palette overrides
+    "bg_primary": "#000000",
+    "ink": "#FFD700",
+    "border": "#FFD700",
 }
 
 
@@ -402,60 +365,32 @@ SIM_THEME: dict[str, Union[int, float, str, bool]] = {
     **_BASE_THEME,
     # Typography - Lato for headings
     "heading_font_family": "Lato, Inter, sans-serif",
-    # Core palette (light mode with dark text)
-    "ink": "oklch(0% 0 0)",                              # Pure black text
-    "subtle_ink": "oklch(29% 0.03 215)",                 # Medium-dark subtle
-    "fg_primary": "oklch(9% 0.02 220)",                  # Very dark foreground
-    "fg_muted": "oklch(40% 0.02 219)",                   # Medium gray muted
-    "text_primary": "oklch(14% 0.03 215)",               # Dark gray text
-    "text_dim": "oklch(40% 0.02 219)",                   # Medium gray dimmed
-    # Backgrounds (white for light mode)
-    "bg_primary": "oklch(100% 0 0)",                     # Pure white background
-    "bg_panel": "oklch(100% 0 0)",                       # Pure white panels
-    "bg_secondary": "oklch(95% 0 0)",                    # Very light gray
-    "bg_elevated": "oklch(100% 0 0)",                    # Pure white
-    "bg_tertiary": "oklch(97% 0 0)",                     # Near white
-    "card_bg": "oklch(100% 0 0)",                        # Pure white cards
-    # Borders (light gray for subtle separation)
-    "border": "oklch(89% 0.01 220)",                     # Light gray borders
-    "cell_border": "none",
-    # Accents (balanced saturation for calm SIM mode)
-    "accent": "oklch(55% 0.15 213)",                     # Balanced blue
-    "accent_warning": "oklch(65% 0.15 75)",              # Balanced amber
-    "accent_alert": "oklch(50% 0.18 25)",                # Balanced red
-    # Connection status
-    "conn_status_green": "oklch(60% 0.18 150)",          # Darker for light bg
-    "conn_status_yellow": "oklch(70% 0.16 95)",          # Darker for light bg
-    "conn_status_red": "oklch(50% 0.20 25)",             # Darker for light bg
-    # Pill widget
-    "pill_text_active_color": "oklch(100% 0 0)",         # Pure white
-    "live_dot_fill": "oklch(55% 0.16 145)",              # Green dot (darker)
-    "live_dot_border": "oklch(45% 0.16 145)",            # Darker green
-    # PnL colors (balanced saturation - CALM for SIM mode)
-    "pnl_pos_color": "oklch(65% 0.12 140)",              # Muted green
-    "pnl_neg_color": "oklch(58% 0.12 25)",               # Muted red
-    "pnl_neu_color": "oklch(60% 0.01 220)",              # Medium gray
-    "pnl_pos_color_weak": "oklch(60% 0.12 145 / 0.30)",  # Green with alpha
-    "pnl_neg_color_weak": "oklch(50% 0.12 25 / 0.30)",   # Red with alpha
-    "pnl_neu_color_weak": "oklch(60% 0.01 220 / 0.35)",  # Gray with alpha
+    # PnL colors (reduced saturation)
+    "pnl_pos_color": "oklch(65% 0.12 140)",  # Muted green
+    "pnl_neg_color": "oklch(58% 0.12 25)",  # Muted red
+    "pnl_pos_color_weak": "rgba(32, 179, 111, 0.30)",
+    "pnl_neg_color_weak": "rgba(199, 70, 61, 0.30)",
     # Flash colors (balanced)
-    "flash_pos_color": "oklch(65% 0.12 140)",            # Muted green
-    "flash_neg_color": "oklch(58% 0.12 25)",             # Muted red
-    "flash_neu_color": "oklch(60% 0.01 220)",            # Medium gray
-    # Sharpe bar
-    "sharpe_track_pen": "oklch(0% 0 0 / 0.16)",          # Black with alpha
-    "sharpe_track_bg": "oklch(0% 0 0 / 0.10)",           # Black with alpha
-    # Graph grid
-    "grid_color": "oklch(80% 0 0)",                      # Light gray grid
+    "flash_pos_color": "oklch(65% 0.12 140)",
+    "flash_neg_color": "oklch(58% 0.12 25)",
     # Badge styling (gentle blue - sandbox)
-    "investing_text_color": "oklch(0% 0 0)",             # Pure black
-    "badge_bg_color": "oklch(60% 0.20 209)",             # Gentle blue
-    "badge_border_color": "oklch(60% 0.20 209)",         # Gentle blue
-    "badge_text_color": "oklch(0% 0 0)",                 # Pure black
-    "glow_color": "oklch(60% 0.20 209)",                 # Gentle blue glow
-    # Mode indicators
-    "mode_indicator_live": "oklch(50% 0.25 25)",         # Red (darker for light bg)
-    "mode_indicator_sim": "oklch(60% 0.15 200)",         # Cyan (darker for light bg)
+    "badge_bg_color": "#4DA7FF",
+    "badge_border_color": "#4DA7FF",
+    "badge_text_color": "#000000",
+    "glow_color": "#4DA7FF",
+    # CRITICAL: Light mode palette overrides (inverted from dark mode)
+    "bg_primary": "#FFFFFF",    # White main background
+    "bg_panel": "#FFFFFF",      # White panels (NOT black!)
+    "bg_secondary": "#F5F5F5",  # Light gray secondary bg
+    "bg_tertiary": "#FAFAFA",   # Very light gray
+    "card_bg": "#FFFFFF",       # White cards
+    "ink": "#000000",           # Black text (primary)
+    "text_primary": "#1F2937",  # Dark gray text (readable on white)
+    "text_dim": "#6B7280",      # Medium gray (dimmed text on white)
+    "fg_primary": "#111827",    # Very dark gray (foreground)
+    "fg_muted": "#6B7280",      # Medium gray (muted foreground)
+    "border": "#E5E7EB",        # Light gray borders
+    "subtle_ink": "#4B5563",    # Medium-dark gray (subtle text)
 }
 
 
@@ -752,25 +687,15 @@ def _get_luminance(color: str) -> float:
     """
     Calculate relative luminance of a color (0.0 = black, 1.0 = white).
 
-    Supports:
-    - OKLCH colors: "oklch(L% C H)" or "oklch(L% C H / alpha)"
-    - Hex colors: "#RRGGBB"
-
     Args:
-        color: Color string (OKLCH or hex)
+        color: Hex color string like "#FFFFFF" or "#000000"
 
     Returns:
         Luminance value 0.0-1.0
     """
-    # Handle OKLCH colors by extracting L value directly
+    # Handle oklch colors (just return 0.5 as approximation)
     if color.startswith("oklch"):
-        import re
-        # Match: oklch(L% C H) or oklch(L% C H / alpha)
-        match = re.search(r'oklch\(\s*(\d+(?:\.\d+)?)%', color)
-        if match:
-            # L in OKLCH is perceptual lightness 0-100%, convert to 0-1
-            return float(match.group(1)) / 100.0
-        return 0.5  # Fallback if parsing fails
+        return 0.5
 
     # Parse hex color
     hex_color = color.lstrip("#")
