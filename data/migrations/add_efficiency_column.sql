@@ -3,8 +3,5 @@
 -- Purpose: Add efficiency metric (capture ratio: realized_pnl / mfe)
 
 -- Add efficiency column (nullable, since existing trades won't have this value)
-ALTER TABLE traderecord
-ADD COLUMN IF NOT EXISTS efficiency DOUBLE PRECISION;
-
--- Add comment for documentation
-COMMENT ON COLUMN traderecord.efficiency IS 'Capture ratio: realized_pnl / mfe (0.0-1.0+), measures how much of maximum potential profit was captured';
+-- SQLite-compatible syntax (no IF NOT EXISTS support with ALTER TABLE)
+ALTER TABLE traderecord ADD COLUMN efficiency REAL;

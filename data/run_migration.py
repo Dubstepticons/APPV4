@@ -31,11 +31,18 @@ def run_migration():
             print(f"[MIGRATION] [OK] Successfully added 'efficiency' column to traderecord table")
             return True
     except Exception as e:
+        error_msg = str(e).lower()
         print(f"[MIGRATION] ERROR: {e}")
-        # If column already exists, that's OK
-        if "already exists" in str(e).lower() or "duplicate column" in str(e).lower():
+
+        # If column already exists, that's OK (SQLite error: "duplicate column name")
+        if any(phrase in error_msg for phrase in [
+            "already exists",
+            "duplicate column",
+            "duplicate column name"
+        ]):
             print(f"[MIGRATION] Column already exists, migration skipped")
             return True
+
         return False
 
 if __name__ == "__main__":
