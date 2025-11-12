@@ -5,19 +5,17 @@ import os
 
 # File: core/message_router.py
 # Unified message router between DTC client and GUI panels.
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Dict, Optional
 
 import structlog
 
 from core.state_manager import StateManager
 from services.trade_service import TradeManager
 
-# CRITICAL FIX: Use TYPE_CHECKING to avoid runtime panel imports (dependency injection pattern)
-# Panel references are only needed for type hints, not at runtime
-if TYPE_CHECKING:
-    from panels.panel1 import Panel1
-    from panels.panel2 import Panel2
-    from panels.panel3 import Panel3
+# ARCHITECTURAL FIX: Use protocol interfaces instead of concrete panel imports
+# This breaks circular dependency: core → interfaces ← panels (Dependency Inversion Principle)
+from core.interfaces import BalancePanel, TradingPanel, StatsPanel, DTCClient
+
 from utils.debug_flags import debug_data, debug_signal
 from utils.qt_bridge import marshal_to_qt_thread
 from utils.trade_mode import auto_detect_mode_from_order, auto_detect_mode_from_position, log_mode_switch
@@ -38,10 +36,10 @@ class MessageRouter:
         self,
         state: Optional[StateManager] = None,
         panels: Optional[dict[str, Any]] = None,
-        panel_balance: Optional[Panel1] = None,
-        panel_live: Optional[Panel2] = None,
-        panel_stats: Optional[Panel3] = None,
-        dtc_client: Optional[Any] = None,
+        panel_balance: Optional[BalancePanel] = None,
+        panel_live: Optional[TradingPanel] = None,
+        panel_stats: Optional[StatsPanel] = None,
+        dtc_client: Optional[DTCClient] = None,
         auto_subscribe: bool = True,
     ):
         # Core wiring
