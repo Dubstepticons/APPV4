@@ -338,23 +338,60 @@ LIVE_THEME: dict[str, Union[int, float, str, bool]] = {
     **_BASE_THEME,
     # Typography - Lato for headings
     "heading_font_family": "Lato, Inter, sans-serif",
+    # Core palette (inherit from DEBUG, override gold)
+    "ink": "#FFD700",
+    "subtle_ink": "#9CA3AF",
+    "fg_primary": "#E5E7EB",
+    "fg_muted": "#C8CDD3",
+    "text_primary": "#E6F6FF",
+    "text_dim": "#5B6C7A",
+    # Backgrounds (pure black for LIVE)
+    "bg_primary": "#000000",
+    "bg_secondary": "#000000",
+    "bg_panel": "#000000",
+    "bg_elevated": "#000000",
+    "bg_tertiary": "#0F0F1A",
+    "card_bg": "#1A1F2E",
+    # Borders (gold)
+    "border": "#FFD700",
+    "cell_border": "none",
+    # Accents
+    "accent": "#60A5FA",
+    "accent_warning": "#F5B342",
+    "accent_alert": "#C7463D",
+    # Connection status
+    "conn_status_green": "oklch(74% 0.21 150)",
+    "conn_status_yellow": "oklch(82% 0.19 95)",
+    "conn_status_red": "oklch(62% 0.23 25)",
+    # Pill widget
+    "pill_text_active_color": "#000000",
+    "live_dot_fill": "#20B36F",
+    "live_dot_border": "#188E5B",
     # PnL colors (full saturation)
     "pnl_pos_color": "oklch(65% 0.20 140)",  # Intense green
     "pnl_neg_color": "oklch(58% 0.21 25)",  # Intense red
+    "pnl_neu_color": "#C9CDD0",
     "pnl_pos_color_weak": "rgba(32, 179, 111, 0.35)",
     "pnl_neg_color_weak": "rgba(199, 70, 61, 0.35)",
+    "pnl_neu_color_weak": "rgba(201, 205, 208, 0.35)",
     # Flash colors (vivid)
     "flash_pos_color": "oklch(65% 0.20 140)",
     "flash_neg_color": "oklch(58% 0.21 25)",
+    "flash_neu_color": "#C9CDD0",
+    # Sharpe bar
+    "sharpe_track_pen": "rgba(255,255,255,0.16)",
+    "sharpe_track_bg": "rgba(255,255,255,0.10)",
+    # Graph grid
+    "grid_color": "#464646",
     # Badge styling (vibrant green - active)
+    "investing_text_color": "#FFD700",
     "badge_bg_color": "#00C97A",
     "badge_border_color": "#00C97A",
     "badge_text_color": "#FFFFFF",
     "glow_color": "#00C97A",
-    # Live palette overrides
-    "bg_primary": "#000000",
-    "ink": "#FFD700",
-    "border": "#FFD700",
+    # Mode indicators
+    "mode_indicator_live": "#FF0000",
+    "mode_indicator_sim": "#00FFFF",
 }
 
 
@@ -365,32 +402,60 @@ SIM_THEME: dict[str, Union[int, float, str, bool]] = {
     **_BASE_THEME,
     # Typography - Lato for headings
     "heading_font_family": "Lato, Inter, sans-serif",
+    # Core palette (light mode - dark text on white)
+    "ink": "#000000",           # Black text (primary)
+    "subtle_ink": "#4B5563",    # Medium-dark gray (subtle text)
+    "fg_primary": "#111827",    # Very dark gray (foreground)
+    "fg_muted": "#6B7280",      # Medium gray (muted foreground)
+    "text_primary": "#1F2937",  # Dark gray text (readable on white)
+    "text_dim": "#6B7280",      # Medium gray (dimmed text on white)
+    # Backgrounds (white for light mode)
+    "bg_primary": "#FFFFFF",    # White main background
+    "bg_panel": "#FFFFFF",      # White panels (NOT black!)
+    "bg_secondary": "#F5F5F5",  # Light gray secondary bg
+    "bg_elevated": "#FFFFFF",   # White elevated
+    "bg_tertiary": "#FAFAFA",   # Very light gray
+    "card_bg": "#FFFFFF",       # White cards
+    # Borders (light gray)
+    "border": "#E5E7EB",        # Light gray borders
+    "cell_border": "none",
+    # Accents (balanced for SIM)
+    "accent": "#60A5FA",
+    "accent_warning": "#F5B342",
+    "accent_alert": "#C7463D",
+    # Connection status
+    "conn_status_green": "oklch(74% 0.21 150)",
+    "conn_status_yellow": "oklch(82% 0.19 95)",
+    "conn_status_red": "oklch(62% 0.23 25)",
+    # Pill widget
+    "pill_text_active_color": "#FFFFFF",
+    "live_dot_fill": "#20B36F",
+    "live_dot_border": "#188E5B",
     # PnL colors (reduced saturation)
     "pnl_pos_color": "oklch(65% 0.12 140)",  # Muted green
     "pnl_neg_color": "oklch(58% 0.12 25)",  # Muted red
+    "pnl_neu_color": "#C9CDD0",
     "pnl_pos_color_weak": "rgba(32, 179, 111, 0.30)",
     "pnl_neg_color_weak": "rgba(199, 70, 61, 0.30)",
+    "pnl_neu_color_weak": "rgba(201, 205, 208, 0.35)",
     # Flash colors (balanced)
     "flash_pos_color": "oklch(65% 0.12 140)",
     "flash_neg_color": "oklch(58% 0.12 25)",
+    "flash_neu_color": "#C9CDD0",
+    # Sharpe bar
+    "sharpe_track_pen": "rgba(255,255,255,0.16)",
+    "sharpe_track_bg": "rgba(255,255,255,0.10)",
+    # Graph grid
+    "grid_color": "#EAEAEA",  # Light gray for light mode
     # Badge styling (gentle blue - sandbox)
+    "investing_text_color": "#000000",
     "badge_bg_color": "#4DA7FF",
     "badge_border_color": "#4DA7FF",
     "badge_text_color": "#000000",
     "glow_color": "#4DA7FF",
-    # CRITICAL: Light mode palette overrides (inverted from dark mode)
-    "bg_primary": "#FFFFFF",    # White main background
-    "bg_panel": "#FFFFFF",      # White panels (NOT black!)
-    "bg_secondary": "#F5F5F5",  # Light gray secondary bg
-    "bg_tertiary": "#FAFAFA",   # Very light gray
-    "card_bg": "#FFFFFF",       # White cards
-    "ink": "#000000",           # Black text (primary)
-    "text_primary": "#1F2937",  # Dark gray text (readable on white)
-    "text_dim": "#6B7280",      # Medium gray (dimmed text on white)
-    "fg_primary": "#111827",    # Very dark gray (foreground)
-    "fg_muted": "#6B7280",      # Medium gray (muted foreground)
-    "border": "#E5E7EB",        # Light gray borders
-    "subtle_ink": "#4B5563",    # Medium-dark gray (subtle text)
+    # Mode indicators
+    "mode_indicator_live": "#FF0000",
+    "mode_indicator_sim": "#00FFFF",
 }
 
 
