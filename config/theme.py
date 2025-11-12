@@ -359,7 +359,7 @@ LIVE_THEME: dict[str, Union[int, float, str, bool]] = {
 
 
 # ========================================================================
-# SIM THEME (Balanced saturation, calm)
+# SIM THEME (Balanced saturation, calm, LIGHT MODE)
 # ========================================================================
 SIM_THEME: dict[str, Union[int, float, str, bool]] = {
     **DEBUG_THEME,
@@ -378,10 +378,19 @@ SIM_THEME: dict[str, Union[int, float, str, bool]] = {
     "badge_border_color": "#4DA7FF",
     "badge_text_color": "#000000",
     "glow_color": "#4DA7FF",
-    # Sim palette overrides
-    "bg_primary": "#FFFFFF",
-    "ink": "#000000",
-    "border": "#00D4FF",
+    # CRITICAL: Light mode palette overrides (inverted from dark mode)
+    "bg_primary": "#FFFFFF",    # White main background
+    "bg_panel": "#FFFFFF",      # White panels (NOT black!)
+    "bg_secondary": "#F5F5F5",  # Light gray secondary bg
+    "bg_tertiary": "#FAFAFA",   # Very light gray
+    "card_bg": "#FFFFFF",       # White cards
+    "ink": "#000000",           # Black text (primary)
+    "text_primary": "#1F2937",  # Dark gray text (readable on white)
+    "text_dim": "#6B7280",      # Medium gray (dimmed text on white)
+    "fg_primary": "#111827",    # Very dark gray (foreground)
+    "fg_muted": "#6B7280",      # Medium gray (muted foreground)
+    "border": "#E5E7EB",        # Light gray borders
+    "subtle_ink": "#4B5563",    # Medium-dark gray (subtle text)
 }
 
 
