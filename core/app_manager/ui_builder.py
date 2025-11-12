@@ -13,7 +13,7 @@ import contextlib
 import os
 from PyQt6 import QtWidgets
 from config.theme import THEME
-from panels.panel1 import Panel1
+from panels.panel1 import Panel1, pnl_manager
 from panels.panel2 import Panel2
 from panels.panel3 import Panel3
 from utils.logger import get_logger
@@ -139,7 +139,7 @@ def initialize_panel1_balance(main_window) -> None:
 
         # CRITICAL: Load equity curve from database FIRST (before adding any new points)
         # This ensures we don't lose historical data
-        main_window.panel_balance._equity_points = main_window.panel_balance._get_equity_curve("SIM", "")
+        main_window.panel_balance._equity_points = pnl_manager.get_equity_curve(main_window.panel_balance, "SIM", "")
 
         # If we loaded historical data, don't add a new starting point (use the last balance from history)
         # Only add initial point if this is a fresh start with no trades
