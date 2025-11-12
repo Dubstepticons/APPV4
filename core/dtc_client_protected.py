@@ -53,10 +53,19 @@ class ProtectedDTCClient(QObject):
     connection_degraded = pyqtSignal(str)  # reason
     stats_updated = pyqtSignal(dict)
 
+    # Forwarded DTC client signals (for compatibility with existing code)
+    connected = pyqtSignal()
+    disconnected = pyqtSignal()
+    errorOccurred = pyqtSignal(str)
+    session_ready = pyqtSignal()
+    message = pyqtSignal(dict)
+    messageReceived = pyqtSignal(dict)
+
     def __init__(
         self,
         host: str,
         port: int,
+        router=None,
         failure_threshold: int = 5,
         recovery_timeout: int = 60,
         parent: Optional[QObject] = None
@@ -67,6 +76,7 @@ class ProtectedDTCClient(QObject):
         Args:
             host: DTC server hostname/IP
             port: DTC server port
+            router: MessageRouter instance for dispatching messages (optional)
             failure_threshold: Failures before opening circuit (default: 5)
             recovery_timeout: Seconds before retry (default: 60)
             parent: Qt parent object
@@ -75,9 +85,10 @@ class ProtectedDTCClient(QObject):
 
         self._host = host
         self._port = port
+        self._router = router
 
-        # Create underlying DTC client
-        self._client = DTCClientJSON(host=host, port=port, parent=self)
+        # Create underlying DTC client with router
+        self._client = DTCClientJSON(host=host, port=port, router=router, parent=self)
 
         # Create circuit breaker for connection protection
         self._circuit_breaker = CircuitBreaker(
@@ -90,11 +101,21 @@ class ProtectedDTCClient(QObject):
         # Register with global registry for monitoring
         get_registry().register(self._circuit_breaker)
 
-        # Wire up client signals
+        # Wire up client signals with forwarding
         self._client.connected.connect(self._on_client_connected)
+        self._client.connected.connect(self.connected)  # Forward signal
         self._client.disconnected.connect(self._on_client_disconnected)
+        self._client.disconnected.connect(self.disconnected)  # Forward signal
         self._client.errorOccurred.connect(self._on_client_error)
+        self._client.errorOccurred.connect(self.errorOccurred)  # Forward signal
         self._client.session_ready.connect(self._on_session_ready)
+        self._client.session_ready.connect(self.session_ready)  # Forward signal
+
+        # Forward message signals if they exist
+        if hasattr(self._client, 'message'):
+            self._client.message.connect(self.message)
+        if hasattr(self._client, 'messageReceived'):
+            self._client.messageReceived.connect(self.messageReceived)
 
         # State tracking
         self._is_connected = False

@@ -12,6 +12,7 @@ from PyQt6 import QtCore, QtWidgets
 from config.settings import DEBUG_DATA, DTC_HOST, DTC_PORT, LIVE_ACCOUNT
 from config.theme import THEME, ColorTheme, set_theme  # noqa: F401  # theme tokens used by helpers
 from core.data_bridge import DTCClientJSON
+from core.dtc_client_protected import ProtectedDTCClient
 from core.message_router import MessageRouter
 from panels.panel1 import Panel1
 from panels.panel2 import Panel2
@@ -655,7 +656,14 @@ class MainWindow(QtWidgets.QMainWindow):
             if os.getenv("DEBUG_DTC", "0") == "1":
                 log.debug("[DTC] MessageRouter instantiated and wired to panels/state")
 
-            self._dtc = DTCClientJSON(host=host, port=port, router=router)
+            # Use circuit-breaker protected DTC client for production-grade fault tolerance
+            self._dtc = ProtectedDTCClient(
+                host=host,
+                port=port,
+                router=router,
+                failure_threshold=5,  # Open circuit after 5 consecutive failures
+                recovery_timeout=60   # Wait 60s before retry attempt
+            )
 
             # Give router access to DTC client for balance refresh requests
             router._dtc_client = self._dtc
@@ -700,6 +708,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 c.message.connect(self._on_dtc_message)
             if hasattr(c, "messageReceived"):
                 c.messageReceived.connect(self._on_dtc_message)
+
+            # Wire circuit breaker health signals (if using ProtectedDTCClient)
+            if hasattr(c, "connection_healthy"):
+                c.connection_healthy.connect(self._on_connection_healthy)
+            if hasattr(c, "connection_degraded"):
+                c.connection_degraded.connect(self._on_connection_degraded)
         except Exception:
             pass
 
@@ -744,6 +758,18 @@ class MainWindow(QtWidgets.QMainWindow):
             # All messages count as data activity
             if hasattr(icon, "mark_data_activity"):
                 icon.mark_data_activity()
+
+    def _on_connection_healthy(self) -> None:
+        """Called when circuit breaker closes (connection recovered)."""
+        log.info("[CircuitBreaker] Connection healthy - circuit closed")
+        # Could add UI notification here (e.g., status bar message)
+        # For now, just log - connection icon already handles visual state
+
+    def _on_connection_degraded(self, reason: str) -> None:
+        """Called when circuit breaker opens (connection failing)."""
+        log.warning(f"[CircuitBreaker] Connection degraded - circuit open: {reason}")
+        # Could add UI notification here (e.g., banner warning)
+        # Application continues in degraded mode (no DTC data)
 
     def closeEvent(self, event) -> None:
         """Called when the app is closing. Log final balance state."""
