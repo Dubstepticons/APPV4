@@ -374,12 +374,29 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                     except (ValueError, TypeError):
                         return 0.0
 
+                # DEBUG: Log raw CSV row data
+                log.debug(f"[panel2] CSV row keys: {list(row.keys())}")
+                log.debug(f"[panel2] CSV row data: {row}")
+
                 self.last_price = fnum("last")
                 self.session_high = fnum("high")
                 self.session_low = fnum("low")
                 self.vwap = fnum("vwap")
                 self.cum_delta = fnum("cum_delta")
                 self.poc = fnum("poc")
+
+                # DEBUG: Log parsed values
+                log.debug(f"[panel2] Parsed CSV - last={self.last_price}, vwap={self.vwap}, cum_delta={self.cum_delta}, poc={self.poc}")
+
+                # PERIODIC: Log CSV values every 10 seconds to track changes
+                import time as time_mod
+                now = time_mod.time()
+                if not hasattr(self, '_last_csv_log_time'):
+                    self._last_csv_log_time = 0
+                if now - self._last_csv_log_time >= 10:
+                    self._last_csv_log_time = now
+                    log.info(f"[panel2] CSV Feed - cum_delta={self.cum_delta}, poc={self.poc}, vwap={self.vwap}, last={self.last_price}")
+
                 return True
 
         except FileNotFoundError:
@@ -416,13 +433,22 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                 self._trade_max_price = self.entry_price
 
                 # DEBUG: Comprehensive logging for entry snapshots
-                log.info(f"[panel2] Position opened - Entry snapshots captured:")
+                log.info(f"[panel2] ========== Position Opened - Entry Snapshots ==========")
+                log.info(f"  CSV Feed Path: {CSV_FEED_PATH}")
                 log.info(f"  Entry Price: {self.entry_price}")
                 log.info(f"  Entry Qty: {self.entry_qty} ({'LONG' if self.is_long else 'SHORT'})")
-                log.info(f"  Entry VWAP: {self.entry_vwap} (live vwap: {self.vwap})")
-                log.info(f"  Entry Delta: {self.entry_delta} (live cum_delta: {self.cum_delta})")
-                log.info(f"  Entry POC: {self.entry_poc} (live poc: {self.poc})")
+                log.info(f"  ---")
+                log.info(f"  Live VWAP from CSV: {self.vwap}")
+                log.info(f"  Captured Entry VWAP: {self.entry_vwap}")
+                log.info(f"  ---")
+                log.info(f"  Live cum_delta from CSV: {self.cum_delta} <-- CHECK THIS VALUE")
+                log.info(f"  Captured Entry Delta: {self.entry_delta} <-- THIS IS WHAT DISPLAYS")
+                log.info(f"  ---")
+                log.info(f"  Live POC from CSV: {self.poc}")
+                log.info(f"  Captured Entry POC: {self.entry_poc}")
+                log.info(f"  ---")
                 log.info(f"  Last Price: {self.last_price}")
+                log.info(f"[panel2] ==========================================================")
 
                 # CRITICAL: Warn if any snapshot is None
                 if self.entry_vwap is None:
