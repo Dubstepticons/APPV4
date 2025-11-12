@@ -129,51 +129,46 @@ class ProtectedDTCClient(QObject):
 
     def connect(self) -> bool:
         """
-        Attempt to connect to DTC server (protected by circuit breaker).
+        Attempt to connect to DTC server.
+
+        Circuit breaker is checked but NOT wrapped around the async call.
+        Connection success/failure is tracked via Qt signals.
 
         Returns:
-            True if connection attempt allowed, False if circuit is open
-
-        Raises:
-            CircuitBreakerError: If circuit is OPEN (too many failures)
+            True if connection attempt initiated, False if circuit is open
         """
+        from core.circuit_breaker import CircuitState
+
+        # Check if circuit breaker is open (too many failures)
+        if self._circuit_breaker.state == CircuitState.OPEN:
+            if not self._circuit_breaker._should_attempt_reset():
+                log.warning(
+                    f"[ProtectedDTC] Connection blocked - circuit breaker is OPEN "
+                    f"(failures: {self._circuit_breaker.failure_count}/{self._circuit_breaker.failure_threshold})"
+                )
+                self.connection_degraded.emit("Circuit breaker is OPEN - too many failures")
+                return False
+            else:
+                # Circuit moving to HALF_OPEN - allow single retry attempt
+                log.info("[ProtectedDTC] Circuit breaker transitioning to HALF_OPEN - attempting recovery")
+                self._circuit_breaker._transition_to_half_open()
+
+        # Initiate connection (async via Qt signals)
         self._connection_attempts += 1
+        log.info(
+            f"[ProtectedDTC] Initiating connection to {self._host}:{self._port} "
+            f"(attempt #{self._connection_attempts}, circuit: {self._circuit_breaker.state.value})"
+        )
 
         try:
-            # Execute connection through circuit breaker
-            self._circuit_breaker.call(self._protected_connect)
-            return True
-
-        except CircuitBreakerError as e:
-            # Circuit is open - reject connection attempt
-            log.warning(
-                f"[ProtectedDTC] Connection rejected by circuit breaker: {e}"
-            )
-            self.connection_degraded.emit(str(e))
-            return False
-
-    def _protected_connect(self) -> None:
-        """
-        Internal connection logic (wrapped by circuit breaker).
-
-        Raises:
-            ConnectionError: If connection fails
-        """
-        try:
-            log.info(
-                f"[ProtectedDTC] Attempting connection to {self._host}:{self._port} "
-                f"(attempt #{self._connection_attempts})"
-            )
             self._client.connect()
-
-            # Connection initiated successfully
-            # Actual success/failure determined by connected/errorOccurred signals
-
+            return True
         except Exception as e:
-            error_msg = f"Connection failed: {str(e)}"
+            error_msg = f"Connection initiation failed: {str(e)}"
             self._last_error = error_msg
             log.error(f"[ProtectedDTC] {error_msg}")
-            raise ConnectionError(error_msg) from e
+            self._on_connection_failed(error_msg)
+            return False
 
     def disconnect(self) -> None:
         """Disconnect from DTC server"""
@@ -213,10 +208,11 @@ class ProtectedDTCClient(QObject):
 
         log.info("[ProtectedDTC] DTC session ready - connection healthy")
 
-        # Connection successful - circuit breaker will register success
-        self.connection_healthy.emit()
+        # Connection successful - notify circuit breaker
+        self._on_connection_success()
 
-        # Emit health stats
+        # Emit health status
+        self.connection_healthy.emit()
         self._emit_stats()
 
     def _on_client_disconnected(self) -> None:
@@ -227,12 +223,8 @@ class ProtectedDTCClient(QObject):
         log.warning("[ProtectedDTC] Disconnected from DTC server")
 
         if was_connected:
-            # Unexpected disconnection - treat as failure for circuit breaker
-            try:
-                raise ConnectionError("Unexpected disconnection")
-            except ConnectionError:
-                # Circuit breaker will track this failure
-                pass
+            # Unexpected disconnection - treat as failure
+            self._on_connection_failed("Unexpected disconnection")
 
         self._emit_stats()
 
@@ -243,15 +235,28 @@ class ProtectedDTCClient(QObject):
 
         log.error(f"[ProtectedDTC] Connection error: {error_msg}")
 
-        # Notify circuit breaker of failure
-        # This will increment failure counter and potentially open circuit
-        try:
-            raise ConnectionError(error_msg)
-        except ConnectionError:
-            pass
+        # Record failure with circuit breaker
+        self._on_connection_failed(error_msg)
 
         self.connection_degraded.emit(error_msg)
         self._emit_stats()
+
+    def _on_connection_success(self) -> None:
+        """Handle successful connection - reset circuit breaker"""
+        self._circuit_breaker._on_success()
+        log.info(
+            f"[ProtectedDTC] Connection success - circuit breaker reset "
+            f"(state: {self._circuit_breaker.state.value})"
+        )
+
+    def _on_connection_failed(self, reason: str) -> None:
+        """Handle connection failure - update circuit breaker"""
+        self._circuit_breaker._on_failure()
+        log.warning(
+            f"[ProtectedDTC] Connection failure: {reason} "
+            f"(failures: {self._circuit_breaker.failure_count}/{self._circuit_breaker.failure_threshold}, "
+            f"state: {self._circuit_breaker.state.value})"
+        )
 
     # Health monitoring
 
