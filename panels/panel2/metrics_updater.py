@@ -22,7 +22,7 @@ Constants:
 import time
 from typing import Optional
 from config.theme import THEME, ColorTheme
-from services.trade_constants import COMM_PER_CONTRACT, DOLLARS_PER_POINT
+from config.trading_specs import match_spec
 from services.trade_math import TradeMath
 from utils.logger import get_logger
 
@@ -276,11 +276,12 @@ def update_secondary_metrics(panel) -> None:
         return
 
     # Planned Risk (always red, no negative sign shown)
-    # Formula: |entry - stop| * $50/point * qty + commission
+    # Formula: |entry - stop| * pt_value * qty + commission (symbol-aware)
     if panel.stop_price is not None:
+        spec = match_spec(panel.symbol)
         dist_pts = abs(panel.entry_price - panel.stop_price)
-        dollars = dist_pts * DOLLARS_PER_POINT * panel.entry_qty
-        comm = COMM_PER_CONTRACT * panel.entry_qty
+        dollars = dist_pts * spec["pt_value"] * panel.entry_qty
+        comm = spec["rt_fee"] * panel.entry_qty
         planned = dollars + comm
         panel.c_risk.set_value_text(f"${planned:,.2f}")
         panel.c_risk.set_value_color(THEME.get("pnl_neg_color", "#EF4444"))

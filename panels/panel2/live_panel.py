@@ -30,7 +30,7 @@ from typing import Optional
 from PyQt6 import QtCore, QtGui, QtWidgets
 
 from config.theme import THEME, ColorTheme
-from services.trade_constants import COMM_PER_CONTRACT, DOLLARS_PER_POINT
+from config.trading_specs import match_spec
 from services.trade_math import TradeMath
 from utils.format_utils import extract_symbol_display
 from utils.logger import get_logger
@@ -585,11 +585,12 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
 
         # Calculate derived metrics if we have an active position
         if self.entry_qty and self.entry_price is not None and self.last_price is not None:
-            # P&L calculation
+            # P&L calculation using symbol-aware constants
+            spec = match_spec(self.symbol)
             sign = 1 if self.is_long else -1
             pnl_pts = (self.last_price - self.entry_price) * sign
-            gross_pnl = pnl_pts * DOLLARS_PER_POINT * self.entry_qty
-            comm = COMM_PER_CONTRACT * self.entry_qty
+            gross_pnl = pnl_pts * spec["pt_value"] * self.entry_qty
+            comm = spec["rt_fee"] * self.entry_qty
             net_pnl = gross_pnl - comm
 
             data["pnl_points"] = pnl_pts
@@ -613,21 +614,21 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                 if mae_pts is not None and mfe_pts is not None:
                     data["mae_points"] = mae_pts
                     data["mfe_points"] = mfe_pts
-                    data["mae_dollars"] = mae_pts * DOLLARS_PER_POINT * self.entry_qty
-                    data["mfe_dollars"] = mfe_pts * DOLLARS_PER_POINT * self.entry_qty
+                    data["mae_dollars"] = mae_pts * spec["pt_value"] * self.entry_qty
+                    data["mfe_dollars"] = mfe_pts * spec["pt_value"] * self.entry_qty
 
                 # Calculate efficiency: (realized PnL / MFE) if MFE > 0
                 if mfe_pts > 0 and "net_pnl" in data:
                     # Efficiency = realized profit / maximum potential profit
                     # Expressed as percentage (0.0 to 1.0, where 1.0 = 100% efficient)
-                    efficiency = min(1.0, max(0.0, data["net_pnl"] / (mfe_pts * DOLLARS_PER_POINT * self.entry_qty)))
+                    efficiency = min(1.0, max(0.0, data["net_pnl"] / (mfe_pts * spec["pt_value"] * self.entry_qty)))
                     data["efficiency"] = efficiency
                 else:
                     data["efficiency"] = None
 
             # R-multiple
             if self.stop_price is not None and float(self.stop_price) > 0:
-                risk_per_contract = abs(self.entry_price - float(self.stop_price)) * DOLLARS_PER_POINT
+                risk_per_contract = abs(self.entry_price - float(self.stop_price)) * spec["pt_value"]
                 if risk_per_contract > 0:
                     r_multiple = net_pnl / (risk_per_contract * self.entry_qty)
                     data["r_multiple"] = r_multiple

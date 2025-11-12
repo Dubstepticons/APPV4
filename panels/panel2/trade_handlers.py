@@ -20,7 +20,7 @@ Features:
 from datetime import datetime, UTC
 from typing import Optional
 from config.theme import THEME
-from services.trade_constants import COMM_PER_CONTRACT, DOLLARS_PER_POINT
+from config.trading_specs import match_spec
 from services.trade_math import TradeMath
 from utils.format_utils import extract_symbol_display
 from utils.logger import get_logger
@@ -197,15 +197,16 @@ def on_order_update(panel, payload: dict) -> None:
         side = "long" if panel.is_long else "short"
         entry_price = float(panel.entry_price)
 
-        # Use centralized trading constants
+        # Use symbol-aware trading constants
+        spec = match_spec(panel.symbol)
         sign = 1.0 if panel.is_long else -1.0
-        realized_pnl = (exit_price - entry_price) * sign * qty * DOLLARS_PER_POINT
-        commissions = COMM_PER_CONTRACT * qty
+        realized_pnl = (exit_price - entry_price) * sign * qty * spec["pt_value"]
+        commissions = spec["rt_fee"] * qty
 
         # r-multiple if stop available
         r_multiple = None
         if panel.stop_price is not None and float(panel.stop_price) > 0:
-            risk_per_contract = abs(entry_price - float(panel.stop_price)) * DOLLARS_PER_POINT
+            risk_per_contract = abs(entry_price - float(panel.stop_price)) * spec["pt_value"]
             if risk_per_contract > 0:
                 r_multiple = realized_pnl / (risk_per_contract * qty)
 
@@ -220,8 +221,8 @@ def on_order_update(panel, payload: dict) -> None:
             is_long=panel.is_long,
         )
         if mae_pts is not None and mfe_pts is not None:
-            mae = mae_pts * DOLLARS_PER_POINT * qty
-            mfe = mfe_pts * DOLLARS_PER_POINT * qty
+            mae = mae_pts * spec["pt_value"] * qty
+            mfe = mfe_pts * spec["pt_value"] * qty
 
             # Calculate efficiency: (realized PnL / MFE) if MFE > 0
             if mfe > 0 and realized_pnl is not None:
@@ -322,15 +323,16 @@ def on_position_update(panel, payload: dict) -> None:
             side = "long" if panel.is_long else "short"
             entry_price_val = float(panel.entry_price)
 
-            # Calculate P&L
+            # Calculate P&L using symbol-aware constants
+            spec = match_spec(panel.symbol)
             sign = 1.0 if panel.is_long else -1.0
-            realized_pnl = (exit_price - entry_price_val) * sign * qty_val * DOLLARS_PER_POINT
-            commissions = COMM_PER_CONTRACT * qty_val
+            realized_pnl = (exit_price - entry_price_val) * sign * qty_val * spec["pt_value"]
+            commissions = spec["rt_fee"] * qty_val
 
             # r-multiple if stop available
             r_multiple = None
             if panel.stop_price is not None and float(panel.stop_price) > 0:
-                risk_per_contract = abs(entry_price_val - float(panel.stop_price)) * DOLLARS_PER_POINT
+                risk_per_contract = abs(entry_price_val - float(panel.stop_price)) * spec["pt_value"]
                 if risk_per_contract > 0:
                     r_multiple = realized_pnl / (risk_per_contract * qty_val)
 
@@ -344,8 +346,8 @@ def on_position_update(panel, payload: dict) -> None:
                 is_long=panel.is_long,
             )
             if mae_pts is not None and mfe_pts is not None:
-                mae = mae_pts * DOLLARS_PER_POINT * qty_val
-                mfe = mfe_pts * DOLLARS_PER_POINT * qty_val
+                mae = mae_pts * spec["pt_value"] * qty_val
+                mfe = mfe_pts * spec["pt_value"] * qty_val
 
             # Get account for mode detection
             account = payload.get("TradeAccount") or ""
