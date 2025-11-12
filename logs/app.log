@@ -1,616 +1,353 @@
-[2025-11-12 08:51:21] [INFO] [config.theme] Theme system validation passed - all OKLCH tokens and keys are valid
-[2025-11-12 08:51:21] [INFO] [AppManager] [startup] Initializing MainWindow
-[2025-11-12 08:51:22] [INFO] [StateManager] [Mode] INIT: Application now in SIM mode
-[2025-11-12 08:51:24] [INFO] [panels.panel1] Graph initialized successfully
-[2025-11-12 08:51:24] [INFO] [panels.panel1] [Panel1] Connected balance signal
-[2025-11-12 08:51:24] [INFO] [panels.panel1] [Panel1] Connected mode change signal
-[2025-11-12 08:51:24] [INFO] [StartupDiagnostics] ──────────────────────────────────────────────
-[2025-11-12 08:51:24] [INFO] [StartupDiagnostics] 🧭  APPSIERRA Startup Diagnostics
-[2025-11-12 08:51:24] [INFO] [StartupDiagnostics] ──────────────────────────────────────────────
-[2025-11-12 08:51:24] [INFO] [StartupDiagnostics] DB: PostgreSQL connected successfully
-[2025-11-12 08:51:24] [INFO] [StartupDiagnostics] CSV: Snapshot CSV active (updated 0.1s ago)
-[2025-11-12 08:51:24] [INFO] [StartupDiagnostics] DTC: DTC config valid (127.0.0.1:11099)
-[2025-11-12 08:51:24] [INFO] [StartupDiagnostics] ──────────────────────────────────────────────
-[2025-11-12 08:51:24] [INFO] [StartupDiagnostics] All diagnostics passed successfully.
-[2025-11-12 08:51:24] [INFO] [StartupDiagnostics] ──────────────────────────────────────────────
-[2025-11-12 08:51:24] [WARNING] [panels.panel1] [Panel1] QtConcurrent not available, loading equity curve synchronously
-[2025-11-12 08:51:24] [ERROR] [panels.panel1] [Panel1] Error loading equity curve from database: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.is_closed = 1 AND traderecord.realized_pnl IS NOT NULL AND traderecord.exit_time IS NOT NULL ORDER BY traderecord.exit_time ASC]
-[parameters: ('SIM',)]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
+[2025-11-12 12:27:03] [INFO] [config.theme] Theme system validation passed - all OKLCH tokens and keys are valid
+[2025-11-12 12:27:05] [INFO] [AppManager] [startup] Initializing MainWindow
+[2025-11-12 12:27:05] [INFO] [StateManager] [Mode] INIT: Application now in SIM mode
+[2025-11-12 12:27:05] [INFO] [panels.panel1] Graph initialized successfully
+[2025-11-12 12:27:05] [INFO] [panels.panel1] [Panel1] Connected balance signal
+[2025-11-12 12:27:05] [INFO] [panels.panel1] [Panel1] Connected mode change signal
+[2025-11-12 12:27:05] [INFO] [panels.panel2] [Panel2] Restored session timers from data\runtime_state_panel2_SIM_.json
+[2025-11-12 12:27:05] [ERROR] [AppManager] [DTC] Init failed: DTCClientJSON.__init__() got an unexpected keyword argument 'parent'
 Traceback (most recent call last):
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
-    self.dialect.do_execute(
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\default.py", line 951, in do_execute
-    cursor.execute(statement, parameters)
-sqlite3.OperationalError: no such column: traderecord.efficiency
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "C:\Users\cgrah\OneDrive\Desktop\APPV3\panels\panel1.py", line 896, in _load_equity_curve_from_database
-    trades = query.all()
-             ^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\query.py", line 2704, in all
-    return self._iter().all()  # type: ignore
-           ^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\query.py", line 2857, in _iter
-    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
-                                                  ^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlmodel\orm\session.py", line 144, in execute
-    return super().execute(
-           ^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
-    return self._execute_internal(
-           ^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\session.py", line 2249, in _execute_internal
-    result: Result[Any] = compile_state_cls.orm_execute_statement(
-                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\context.py", line 306, in orm_execute_statement
-    result = conn.execute(
-             ^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
-    return meth(
-           ^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\sql\elements.py", line 526, in _execute_on_connection
-    return connection._execute_clauseelement(
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
-    ret = self._execute_context(
-          ^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
-    return self._exec_single_context(
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
-    self._handle_dbapi_exception(
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 2355, in _handle_dbapi_exception
-    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
-    self.dialect.do_execute(
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\default.py", line 951, in do_execute
-    cursor.execute(statement, parameters)
-sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.is_closed = 1 AND traderecord.realized_pnl IS NOT NULL AND traderecord.exit_time IS NOT NULL ORDER BY traderecord.exit_time ASC]
-[parameters: ('SIM',)]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:24] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: 'Panel1' object has no attribute '_current_display_mode'
-[2025-11-12 08:51:24] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: 'Panel1' object has no attribute '_current_display_mode'
-[2025-11-12 08:51:24] [INFO] [core.diagnostics] DiagnosticsHub initialized (buffer size: 1000)
-[2025-11-12 08:51:24] [INFO] [AppManager] [startup] MainWindow initialized
-[2025-11-12 08:51:24] [INFO] [AppManager] [info] DTC connected
-[2025-11-12 08:51:24] [INFO] [AppManager] [startup] DTC session ready
-[2025-11-12 08:51:24] [INFO] [services.trade_service] trade_manager.account.120005
-[2025-11-12 08:51:24] [INFO] [StateManager] [Mode] StateManager.set_mode: Application now in LIVE mode
-[2025-11-12 08:51:24] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('LIVE', '2025-11-12 12:51:24.472019', '2025-11-12 13:51:24.472019')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:24] [INFO] [services.trade_service] trade_manager.account.120005
-[2025-11-12 08:51:24] [INFO] [services.trade_service] trade_manager.account.Sim1
-[2025-11-12 08:51:24] [INFO] [StateManager] [Mode] StateManager.set_mode: Application now in SIM mode
-[2025-11-12 08:51:24] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:24.486980', '2025-11-12 13:51:24.486980')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:24] [INFO] [services.trade_service] trade_manager.account.Sim1
-[2025-11-12 08:51:24] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6855.4116
-[2025-11-12 08:51:24] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 5572.0
-[2025-11-12 08:51:24] [INFO] [panels.panel2] [panel2] Position closed -- all position data cleared
-[2025-11-12 08:51:24] [INFO] [panels.panel2] [panel2] Position update accepted: symbol=ES, qty=0, avg=0.0, long=None
-[2025-11-12 08:51:24] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:24.861310', '2025-11-12 13:51:24.861310')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:24] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:24.876966', '2025-11-12 13:51:24.876966')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:25] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:25.073801', '2025-11-12 13:51:25.073801')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:26] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:26.075045', '2025-11-12 13:51:26.075045')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:27] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:27.076060', '2025-11-12 13:51:27.076060')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:28] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:28.090470', '2025-11-12 13:51:28.090470')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:29] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:29.089846', '2025-11-12 13:51:29.089846')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:30] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:30.099194', '2025-11-12 13:51:30.099194')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:31] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:31.090378', '2025-11-12 13:51:31.090378')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:32] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:32.095391', '2025-11-12 13:51:32.095391')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:33] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:33.097615', '2025-11-12 13:51:33.097615')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:33] [INFO] [panels.panel1] [Panel1] Mode change: ('SIM', '') -> ('LIVE', '')
-[2025-11-12 08:51:33] [WARNING] [panels.panel1] [Panel1] QtConcurrent not available, loading equity curve synchronously
-[2025-11-12 08:51:33] [ERROR] [panels.panel1] [Panel1] Error loading equity curve from database: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.is_closed = 1 AND traderecord.realized_pnl IS NOT NULL AND traderecord.exit_time IS NOT NULL ORDER BY traderecord.exit_time ASC]
-[parameters: ('LIVE',)]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-Traceback (most recent call last):
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
-    self.dialect.do_execute(
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\default.py", line 951, in do_execute
-    cursor.execute(statement, parameters)
-sqlite3.OperationalError: no such column: traderecord.efficiency
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "C:\Users\cgrah\OneDrive\Desktop\APPV3\panels\panel1.py", line 896, in _load_equity_curve_from_database
-    trades = query.all()
-             ^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\query.py", line 2704, in all
-    return self._iter().all()  # type: ignore
-           ^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\query.py", line 2857, in _iter
-    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
-                                                  ^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlmodel\orm\session.py", line 144, in execute
-    return super().execute(
-           ^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
-    return self._execute_internal(
-           ^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\session.py", line 2249, in _execute_internal
-    result: Result[Any] = compile_state_cls.orm_execute_statement(
-                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\context.py", line 306, in orm_execute_statement
-    result = conn.execute(
-             ^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
-    return meth(
-           ^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\sql\elements.py", line 526, in _execute_on_connection
-    return connection._execute_clauseelement(
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
-    ret = self._execute_context(
-          ^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
-    return self._exec_single_context(
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
-    self._handle_dbapi_exception(
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 2355, in _handle_dbapi_exception
-    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
-    self.dialect.do_execute(
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\default.py", line 951, in do_execute
-    cursor.execute(statement, parameters)
-sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.is_closed = 1 AND traderecord.realized_pnl IS NOT NULL AND traderecord.exit_time IS NOT NULL ORDER BY traderecord.exit_time ASC]
-[parameters: ('LIVE',)]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:33] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:33.604838', '2025-11-12 13:51:33.604838')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:33] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:33.604838', '2025-11-12 13:51:33.604838')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:33] [INFO] [panels.panel1] [Panel1] Switched to LIVE/ (1 points)
-[2025-11-12 08:51:34] [INFO] [panels.panel1] [Panel1] Mode change: ('LIVE', '') -> ('DEBUG', '')
-[2025-11-12 08:51:34] [WARNING] [panels.panel1] [Panel1] QtConcurrent not available, loading equity curve synchronously
-[2025-11-12 08:51:34] [ERROR] [panels.panel1] [Panel1] Error loading equity curve from database: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.is_closed = 1 AND traderecord.realized_pnl IS NOT NULL AND traderecord.exit_time IS NOT NULL ORDER BY traderecord.exit_time ASC]
-[parameters: ('DEBUG',)]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-Traceback (most recent call last):
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
-    self.dialect.do_execute(
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\default.py", line 951, in do_execute
-    cursor.execute(statement, parameters)
-sqlite3.OperationalError: no such column: traderecord.efficiency
-
-The above exception was the direct cause of the following exception:
-
-Traceback (most recent call last):
-  File "C:\Users\cgrah\OneDrive\Desktop\APPV3\panels\panel1.py", line 896, in _load_equity_curve_from_database
-    trades = query.all()
-             ^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\query.py", line 2704, in all
-    return self._iter().all()  # type: ignore
-           ^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\query.py", line 2857, in _iter
-    result: Union[ScalarResult[_T], Result[_T]] = self.session.execute(
-                                                  ^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlmodel\orm\session.py", line 144, in execute
-    return super().execute(
-           ^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\session.py", line 2351, in execute
-    return self._execute_internal(
-           ^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\session.py", line 2249, in _execute_internal
-    result: Result[Any] = compile_state_cls.orm_execute_statement(
-                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\orm\context.py", line 306, in orm_execute_statement
-    result = conn.execute(
-             ^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 1419, in execute
-    return meth(
-           ^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\sql\elements.py", line 526, in _execute_on_connection
-    return connection._execute_clauseelement(
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 1641, in _execute_clauseelement
-    ret = self._execute_context(
-          ^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 1846, in _execute_context
-    return self._exec_single_context(
-           ^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 1986, in _exec_single_context
-    self._handle_dbapi_exception(
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 2355, in _handle_dbapi_exception
-    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\base.py", line 1967, in _exec_single_context
-    self.dialect.do_execute(
-  File "C:\Users\cgrah\AppData\Local\Programs\Python\Python312\Lib\site-packages\sqlalchemy\engine\default.py", line 951, in do_execute
-    cursor.execute(statement, parameters)
-sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.is_closed = 1 AND traderecord.realized_pnl IS NOT NULL AND traderecord.exit_time IS NOT NULL ORDER BY traderecord.exit_time ASC]
-[parameters: ('DEBUG',)]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:34] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:34.136982', '2025-11-12 13:51:34.136982')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:34] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:34.136982', '2025-11-12 13:51:34.136982')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:34] [INFO] [panels.panel1] [Panel1] Switched to DEBUG/ (1 points)
-[2025-11-12 08:51:34] [INFO] [panels.panel1] [Panel1] Mode change: ('DEBUG', '') -> ('SIM', '')
-[2025-11-12 08:51:34] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:34.605473', '2025-11-12 13:51:34.605473')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:34] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:34.605473', '2025-11-12 13:51:34.605473')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:34] [INFO] [panels.panel1] [Panel1] Switched to SIM/ (15 points)
-[2025-11-12 08:51:34] [INFO] [panels.panel1] [Panel1] Mode change: ('SIM', '') -> ('LIVE', '')
-[2025-11-12 08:51:34] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:34.889992', '2025-11-12 13:51:34.889992')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:34] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:34.892070', '2025-11-12 13:51:34.892070')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:34] [INFO] [panels.panel1] [Panel1] Switched to LIVE/ (2 points)
-[2025-11-12 08:51:35] [INFO] [panels.panel1] [Panel1] Mode change: ('LIVE', '') -> ('DEBUG', '')
-[2025-11-12 08:51:35] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:35.274776', '2025-11-12 13:51:35.274776')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:35] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:35.274776', '2025-11-12 13:51:35.274776')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:35] [INFO] [panels.panel1] [Panel1] Switched to DEBUG/ (2 points)
-[2025-11-12 08:51:35] [INFO] [panels.panel1] [Panel1] Mode change: ('DEBUG', '') -> ('SIM', '')
-[2025-11-12 08:51:35] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:35.559300', '2025-11-12 13:51:35.559300')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:35] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:35.574889', '2025-11-12 13:51:35.574889')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:35] [INFO] [panels.panel1] [Panel1] Switched to SIM/ (17 points)
-[2025-11-12 08:51:35] [INFO] [panels.panel1] [Panel1] Mode change: ('SIM', '') -> ('LIVE', '')
-[2025-11-12 08:51:35] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:35.919131', '2025-11-12 13:51:35.919131')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:35] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:35.942397', '2025-11-12 13:51:35.942397')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:35] [INFO] [panels.panel1] [Panel1] Switched to LIVE/ (3 points)
-[2025-11-12 08:51:36] [INFO] [panels.panel1] [Panel1] Mode change: ('LIVE', '') -> ('DEBUG', '')
-[2025-11-12 08:51:36] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:36.246573', '2025-11-12 13:51:36.246573')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:36] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:36.246573', '2025-11-12 13:51:36.246573')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:36] [INFO] [panels.panel1] [Panel1] Switched to DEBUG/ (3 points)
-[2025-11-12 08:51:36] [INFO] [panels.panel1] [Panel1] Mode change: ('DEBUG', '') -> ('SIM', '')
-[2025-11-12 08:51:36] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:36.479180', '2025-11-12 13:51:36.479180')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:36] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:36.494359', '2025-11-12 13:51:36.494359')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:36] [INFO] [panels.panel1] [Panel1] Switched to SIM/ (19 points)
-[2025-11-12 08:51:36] [INFO] [panels.panel1] [Panel1] Mode change: ('SIM', '') -> ('LIVE', '')
-[2025-11-12 08:51:36] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:36.732011', '2025-11-12 13:51:36.732011')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:36] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:36.747220', '2025-11-12 13:51:36.747220')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:36] [INFO] [panels.panel1] [Panel1] Switched to LIVE/ (4 points)
-[2025-11-12 08:51:36] [INFO] [panels.panel1] [Panel1] Mode change: ('LIVE', '') -> ('DEBUG', '')
-[2025-11-12 08:51:36] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:36.933614', '2025-11-12 13:51:36.933614')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:36] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:36.949236', '2025-11-12 13:51:36.949236')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:36] [INFO] [panels.panel1] [Panel1] Switched to DEBUG/ (4 points)
-[2025-11-12 08:51:37] [INFO] [panels.panel1] [Panel1] Mode change: ('DEBUG', '') -> ('SIM', '')
-[2025-11-12 08:51:37] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:37.147159', '2025-11-12 13:51:37.147159')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:37] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:37.162587', '2025-11-12 13:51:37.162587')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:37] [INFO] [panels.panel1] [Panel1] Switched to SIM/ (21 points)
-[2025-11-12 08:51:37] [INFO] [panels.panel1] [Panel1] Mode change: ('SIM', '') -> ('LIVE', '')
-[2025-11-12 08:51:37] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:37.372109', '2025-11-12 13:51:37.372109')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:37] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:37.372109', '2025-11-12 13:51:37.372109')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:37] [INFO] [panels.panel1] [Panel1] Switched to LIVE/ (5 points)
-[2025-11-12 08:51:37] [INFO] [panels.panel1] [Panel1] Mode change: ('LIVE', '') -> ('DEBUG', '')
-[2025-11-12 08:51:37] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:37.589833', '2025-11-12 13:51:37.589833')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:37] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:37.589833', '2025-11-12 13:51:37.589833')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:37] [INFO] [panels.panel1] [Panel1] Switched to DEBUG/ (5 points)
-[2025-11-12 08:51:37] [INFO] [panels.panel1] [Panel1] Mode change: ('DEBUG', '') -> ('SIM', '')
-[2025-11-12 08:51:37] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:37.801926', '2025-11-12 13:51:37.801926')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:37] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:37.809145', '2025-11-12 13:51:37.809145')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:37] [INFO] [panels.panel1] [Panel1] Switched to SIM/ (22 points)
-[2025-11-12 08:51:38] [INFO] [panels.panel1] [Panel1] Mode change: ('SIM', '') -> ('LIVE', '')
-[2025-11-12 08:51:38] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:38.027264', '2025-11-12 13:51:38.027264')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:38] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:38.042887', '2025-11-12 13:51:38.042887')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:38] [INFO] [panels.panel1] [Panel1] Switched to LIVE/ (6 points)
-[2025-11-12 08:51:38] [INFO] [panels.panel1] [Panel1] Mode change: ('LIVE', '') -> ('DEBUG', '')
-[2025-11-12 08:51:38] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:38.237217', '2025-11-12 13:51:38.237217')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:38] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:38.247031', '2025-11-12 13:51:38.247031')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:38] [INFO] [panels.panel1] [Panel1] Switched to DEBUG/ (6 points)
-[2025-11-12 08:51:38] [INFO] [panels.panel1] [Panel1] Mode change: ('DEBUG', '') -> ('SIM', '')
-[2025-11-12 08:51:38] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:38.762390', '2025-11-12 13:51:38.762390')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:38] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:38.777772', '2025-11-12 13:51:38.777772')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:38] [INFO] [panels.panel1] [Panel1] Switched to SIM/ (24 points)
-[2025-11-12 08:51:39] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:39.136726', '2025-11-12 13:51:39.136726')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:39] [INFO] [panels.panel1] [Panel1] Mode change: ('SIM', '') -> ('LIVE', '')
-[2025-11-12 08:51:39] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:39.356182', '2025-11-12 13:51:39.356182')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:39] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:39.371346', '2025-11-12 13:51:39.371346')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:39] [INFO] [panels.panel1] [Panel1] Switched to LIVE/ (7 points)
-[2025-11-12 08:51:44] [INFO] [panels.panel1] [Panel1] Mode change: ('LIVE', '') -> ('DEBUG', '')
-[2025-11-12 08:51:44] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:44.029426', '2025-11-12 13:51:44.029426')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:44] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:44.039809', '2025-11-12 13:51:44.039809')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:44] [INFO] [panels.panel1] [Panel1] Switched to DEBUG/ (7 points)
-[2025-11-12 08:51:44] [INFO] [panels.panel1] [Panel1] Mode change: ('DEBUG', '') -> ('SIM', '')
-[2025-11-12 08:51:44] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:44.496563', '2025-11-12 13:51:44.496563')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:44] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:44.511745', '2025-11-12 13:51:44.511745')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:44] [INFO] [panels.panel1] [Panel1] Switched to SIM/ (31 points)
-[2025-11-12 08:51:44] [INFO] [panels.panel1] [Panel1] Mode change: ('SIM', '') -> ('LIVE', '')
-[2025-11-12 08:51:44] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:44.746989', '2025-11-12 13:51:44.746989')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:44] [ERROR] [panels.panel1] [panel1] Could not calculate PnL for timeframe LIVE: (sqlite3.OperationalError) no such column: traderecord.efficiency
-[SQL: SELECT traderecord.id AS traderecord_id, traderecord.symbol AS traderecord_symbol, traderecord.side AS traderecord_side, traderecord.qty AS traderecord_qty, traderecord.mode AS traderecord_mode, traderecord.entry_time AS traderecord_entry_time, traderecord.entry_price AS traderecord_entry_price, traderecord.exit_time AS traderecord_exit_time, traderecord.exit_price AS traderecord_exit_price, traderecord.is_closed AS traderecord_is_closed, traderecord.realized_pnl AS traderecord_realized_pnl, traderecord.commissions AS traderecord_commissions, traderecord.r_multiple AS traderecord_r_multiple, traderecord.mae AS traderecord_mae, traderecord.mfe AS traderecord_mfe, traderecord.efficiency AS traderecord_efficiency, traderecord.account AS traderecord_account, traderecord.entry_vwap AS traderecord_entry_vwap, traderecord.entry_cum_delta AS traderecord_entry_cum_delta, traderecord.exit_vwap AS traderecord_exit_vwap, traderecord.exit_cum_delta AS traderecord_exit_cum_delta, traderecord.created_at AS traderecord_created_at 
-FROM traderecord 
-WHERE traderecord.mode = ? AND traderecord.exit_time >= ? AND traderecord.exit_time <= ? AND traderecord.is_closed = 1]
-[parameters: ('SIM', '2025-11-12 12:51:44.762221', '2025-11-12 13:51:44.762221')]
-(Background on this error at: https://sqlalche.me/e/20/e3q8)
-[2025-11-12 08:51:44] [INFO] [panels.panel1] [Panel1] Switched to LIVE/ (8 points)
-[2025-11-12 08:51:48] [INFO] [AppManager] [Shutdown] App closing with SIM balance: $10,000.00
+  File "C:\Users\cgrah\OneDrive\Desktop\APPV4\core\app_manager.py", line 660, in _init_dtc
+    self._dtc = ProtectedDTCClient(
+                ^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\cgrah\OneDrive\Desktop\APPV4\core\dtc_client_protected.py", line 91, in __init__
+    self._client = DTCClientJSON(host=host, port=port, router=router, parent=self)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+TypeError: DTCClientJSON.__init__() got an unexpected keyword argument 'parent'
+[2025-11-12 12:27:05] [INFO] [StartupDiagnostics] ──────────────────────────────────────────────
+[2025-11-12 12:27:05] [INFO] [StartupDiagnostics] 🧭  APPSIERRA Startup Diagnostics
+[2025-11-12 12:27:05] [INFO] [StartupDiagnostics] ──────────────────────────────────────────────
+[2025-11-12 12:27:05] [INFO] [StartupDiagnostics] DB: PostgreSQL connected successfully
+[2025-11-12 12:27:05] [INFO] [StartupDiagnostics] CSV: Snapshot CSV active (updated 0.1s ago)
+[2025-11-12 12:27:05] [INFO] [StartupDiagnostics] DTC: DTC config valid (127.0.0.1:11099)
+[2025-11-12 12:27:05] [INFO] [StartupDiagnostics] ──────────────────────────────────────────────
+[2025-11-12 12:27:05] [INFO] [StartupDiagnostics] All diagnostics passed successfully.
+[2025-11-12 12:27:05] [INFO] [StartupDiagnostics] ──────────────────────────────────────────────
+[2025-11-12 12:27:05] [WARNING] [panels.panel1] [Panel1] QtConcurrent not available, loading equity curve synchronously
+[2025-11-12 12:27:05] [INFO] [core.diagnostics] DiagnosticsHub initialized (buffer size: 1000)
+[2025-11-12 12:27:05] [INFO] [AppManager] [startup] MainWindow initialized
+[2025-11-12 12:27:06] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5444
+[2025-11-12 12:27:06] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3783.0
+[2025-11-12 12:27:06] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5439
+[2025-11-12 12:27:06] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3762.0
+[2025-11-12 12:27:08] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3761.0
+[2025-11-12 12:27:10] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3766.0
+[2025-11-12 12:27:11] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3764.0
+[2025-11-12 12:27:13] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3770.0
+[2025-11-12 12:27:13] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3773.0
+[2025-11-12 12:27:14] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3772.0
+[2025-11-12 12:27:14] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3780.0
+[2025-11-12 12:27:15] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3771.0
+[2025-11-12 12:27:16] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3777.0
+[2025-11-12 12:27:16] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3774.0
+[2025-11-12 12:27:17] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5435
+[2025-11-12 12:27:17] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3747.0
+[2025-11-12 12:27:17] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3751.0
+[2025-11-12 12:27:18] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3748.0
+[2025-11-12 12:27:18] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.543
+[2025-11-12 12:27:18] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3735.0
+[2025-11-12 12:27:19] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3736.0
+[2025-11-12 12:27:19] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5425
+[2025-11-12 12:27:19] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3715.0
+[2025-11-12 12:27:20] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3740.0
+[2025-11-12 12:27:21] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.542
+[2025-11-12 12:27:21] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3703.0
+[2025-11-12 12:27:21] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3713.0
+[2025-11-12 12:27:22] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5415
+[2025-11-12 12:27:22] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3708.0
+[2025-11-12 12:27:22] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3703.0
+[2025-11-12 12:27:23] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.541
+[2025-11-12 12:27:23] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3694.0
+[2025-11-12 12:27:23] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3699.0
+[2025-11-12 12:27:24] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3691.0
+[2025-11-12 12:27:25] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3690.0
+[2025-11-12 12:27:25] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5405
+[2025-11-12 12:27:25] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3685.0
+[2025-11-12 12:27:26] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.541
+[2025-11-12 12:27:26] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3687.0
+[2025-11-12 12:27:26] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3693.0
+[2025-11-12 12:27:27] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5405
+[2025-11-12 12:27:27] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3692.0
+[2025-11-12 12:27:27] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3698.0
+[2025-11-12 12:27:28] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3697.0
+[2025-11-12 12:27:28] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3700.0
+[2025-11-12 12:27:29] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3710.0
+[2025-11-12 12:27:29] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3700.0
+[2025-11-12 12:27:30] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3703.0
+[2025-11-12 12:27:31] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3704.0
+[2025-11-12 12:27:31] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.541
+[2025-11-12 12:27:31] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3708.0
+[2025-11-12 12:27:33] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5405
+[2025-11-12 12:27:33] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3702.0
+[2025-11-12 12:27:33] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.54
+[2025-11-12 12:27:33] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3692.0
+[2025-11-12 12:27:34] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3697.0
+[2025-11-12 12:27:35] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3703.0
+[2025-11-12 12:27:36] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5396
+[2025-11-12 12:27:36] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3695.0
+[2025-11-12 12:27:36] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3698.0
+[2025-11-12 12:27:38] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5391
+[2025-11-12 12:27:38] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3692.0
+[2025-11-12 12:27:39] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5386
+[2025-11-12 12:27:39] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3710.0
+[2025-11-12 12:27:40] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5376
+[2025-11-12 12:27:40] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3702.0
+[2025-11-12 12:27:41] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5371
+[2025-11-12 12:27:41] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3673.0
+[2025-11-12 12:27:41] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5356
+[2025-11-12 12:27:41] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3661.0
+[2025-11-12 12:27:42] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3659.0
+[2025-11-12 12:27:43] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5361
+[2025-11-12 12:27:43] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3662.0
+[2025-11-12 12:27:43] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5356
+[2025-11-12 12:27:43] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3660.0
+[2025-11-12 12:27:44] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3664.0
+[2025-11-12 12:27:44] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5352
+[2025-11-12 12:27:44] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3662.0
+[2025-11-12 12:27:45] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3660.0
+[2025-11-12 12:27:46] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3665.0
+[2025-11-12 12:27:46] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3675.0
+[2025-11-12 12:27:46] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3669.0
+[2025-11-12 12:27:47] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5356
+[2025-11-12 12:27:47] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3675.0
+[2025-11-12 12:27:48] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3679.0
+[2025-11-12 12:27:48] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5361
+[2025-11-12 12:27:48] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3680.0
+[2025-11-12 12:27:48] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5352
+[2025-11-12 12:27:48] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3705.0
+[2025-11-12 12:27:49] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5342
+[2025-11-12 12:27:51] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3702.0
+[2025-11-12 12:27:51] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5347
+[2025-11-12 12:27:51] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3703.0
+[2025-11-12 12:27:52] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5342
+[2025-11-12 12:27:52] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3713.0
+[2025-11-12 12:27:53] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5347
+[2025-11-12 12:27:53] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3718.0
+[2025-11-12 12:27:53] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3707.0
+[2025-11-12 12:27:54] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5337
+[2025-11-12 12:27:54] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3699.0
+[2025-11-12 12:27:54] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5347
+[2025-11-12 12:27:54] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3706.0
+[2025-11-12 12:27:55] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5352
+[2025-11-12 12:27:55] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3711.0
+[2025-11-12 12:27:55] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5356
+[2025-11-12 12:27:55] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3717.0
+[2025-11-12 12:27:56] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5361
+[2025-11-12 12:27:56] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3731.0
+[2025-11-12 12:27:56] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5356
+[2025-11-12 12:27:56] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3716.0
+[2025-11-12 12:27:57] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3717.0
+[2025-11-12 12:27:57] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3719.0
+[2025-11-12 12:27:58] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5361
+[2025-11-12 12:27:58] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3722.0
+[2025-11-12 12:27:59] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5356
+[2025-11-12 12:27:59] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3718.0
+[2025-11-12 12:28:00] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3716.0
+[2025-11-12 12:28:00] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5352
+[2025-11-12 12:28:00] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3719.0
+[2025-11-12 12:28:01] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3715.0
+[2025-11-12 12:28:02] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3712.0
+[2025-11-12 12:28:03] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3701.0
+[2025-11-12 12:28:03] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3703.0
+[2025-11-12 12:28:04] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5347
+[2025-11-12 12:28:04] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3708.0
+[2025-11-12 12:28:05] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3699.0
+[2025-11-12 12:28:05] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3704.0
+[2025-11-12 12:28:06] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3692.0
+[2025-11-12 12:28:07] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5342
+[2025-11-12 12:28:07] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3695.0
+[2025-11-12 12:28:08] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3701.0
+[2025-11-12 12:28:08] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3714.0
+[2025-11-12 12:28:09] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3720.0
+[2025-11-12 12:28:10] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5347
+[2025-11-12 12:28:10] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3728.0
+[2025-11-12 12:28:10] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3732.0
+[2025-11-12 12:28:11] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5342
+[2025-11-12 12:28:11] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3724.0
+[2025-11-12 12:28:12] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3723.0
+[2025-11-12 12:28:13] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3716.0
+[2025-11-12 12:28:13] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3725.0
+[2025-11-12 12:28:15] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3721.0
+[2025-11-12 12:28:15] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5337
+[2025-11-12 12:28:15] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3715.0
+[2025-11-12 12:28:16] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3727.0
+[2025-11-12 12:28:16] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3716.0
+[2025-11-12 12:28:17] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5332
+[2025-11-12 12:28:17] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3706.0
+[2025-11-12 12:28:17] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3707.0
+[2025-11-12 12:28:18] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3705.0
+[2025-11-12 12:28:18] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3714.0
+[2025-11-12 12:28:19] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3711.0
+[2025-11-12 12:28:20] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5327
+[2025-11-12 12:28:20] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3709.0
+[2025-11-12 12:28:20] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3713.0
+[2025-11-12 12:28:20] [INFO] [config.theme] Theme system validation passed - all OKLCH tokens and keys are valid
+[2025-11-12 12:28:20] [INFO] [AppManager] [startup] Initializing MainWindow
+[2025-11-12 12:28:21] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3717.0
+[2025-11-12 12:28:21] [INFO] [StateManager] [Mode] INIT: Application now in SIM mode
+[2025-11-12 12:28:21] [INFO] [panels.panel1] Graph initialized successfully
+[2025-11-12 12:28:21] [INFO] [panels.panel1] [Panel1] Connected balance signal
+[2025-11-12 12:28:21] [INFO] [panels.panel1] [Panel1] Connected mode change signal
+[2025-11-12 12:28:21] [INFO] [panels.panel2] [Panel2] Restored session timers from data\runtime_state_panel2_SIM_.json
+[2025-11-12 12:28:21] [INFO] [StartupDiagnostics] ──────────────────────────────────────────────
+[2025-11-12 12:28:21] [INFO] [StartupDiagnostics] 🧭  APPSIERRA Startup Diagnostics
+[2025-11-12 12:28:21] [INFO] [StartupDiagnostics] ──────────────────────────────────────────────
+[2025-11-12 12:28:21] [INFO] [StartupDiagnostics] DB: PostgreSQL connected successfully
+[2025-11-12 12:28:21] [INFO] [StartupDiagnostics] CSV: Snapshot CSV active (updated 0.4s ago)
+[2025-11-12 12:28:21] [INFO] [StartupDiagnostics] DTC: DTC config valid (127.0.0.1:11099)
+[2025-11-12 12:28:21] [INFO] [StartupDiagnostics] ──────────────────────────────────────────────
+[2025-11-12 12:28:21] [INFO] [StartupDiagnostics] All diagnostics passed successfully.
+[2025-11-12 12:28:21] [INFO] [StartupDiagnostics] ──────────────────────────────────────────────
+[2025-11-12 12:28:21] [WARNING] [panels.panel1] [Panel1] QtConcurrent not available, loading equity curve synchronously
+[2025-11-12 12:28:21] [INFO] [core.diagnostics] DiagnosticsHub initialized (buffer size: 1000)
+[2025-11-12 12:28:21] [INFO] [AppManager] [startup] MainWindow initialized
+[2025-11-12 12:28:21] [INFO] [AppManager] [info] DTC connected
+[2025-11-12 12:28:21] [INFO] [AppManager] [CircuitBreaker] Connection healthy - circuit closed
+[2025-11-12 12:28:21] [INFO] [AppManager] [startup] DTC session ready
+[2025-11-12 12:28:21] [INFO] [services.trade_service] trade_manager.account.120005
+[2025-11-12 12:28:21] [INFO] [services.trade_service] trade_manager.account.120005
+[2025-11-12 12:28:21] [INFO] [services.trade_service] trade_manager.account.Sim1
+[2025-11-12 12:28:21] [INFO] [services.trade_service] trade_manager.account.Sim1
+[2025-11-12 12:28:21] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3721.0
+[2025-11-12 12:28:21] [INFO] [panels.panel2] [panel2] Position closed -- all position data cleared
+[2025-11-12 12:28:21] [INFO] [panels.panel2] [panel2] Position update accepted: symbol=ES, qty=0, avg=0.0, long=None
+[2025-11-12 12:28:21] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5327
+[2025-11-12 12:28:21] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3721.0
+[2025-11-12 12:28:22] [INFO] [panels.panel2] [panel2] Symbol updated from PositionUpdate: F.US.MESZ25 -> MES
+[2025-11-12 12:28:22] [INFO] [panels.panel2] [panel2] Position closed -- all position data cleared
+[2025-11-12 12:28:22] [INFO] [panels.panel2] [panel2] Position update accepted: symbol=MES, qty=0, avg=0.0, long=None
+[2025-11-12 12:28:22] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5322
+[2025-11-12 12:28:22] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3711.0
+[2025-11-12 12:28:22] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5322
+[2025-11-12 12:28:22] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3711.0
+[2025-11-12 12:28:23] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5317
+[2025-11-12 12:28:23] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3716.0
+[2025-11-12 12:28:23] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5317
+[2025-11-12 12:28:23] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3716.0
+[2025-11-12 12:28:23] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5322
+[2025-11-12 12:28:23] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3705.0
+[2025-11-12 12:28:23] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5322
+[2025-11-12 12:28:23] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3705.0
+[2025-11-12 12:28:24] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3710.0
+[2025-11-12 12:28:24] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3710.0
+[2025-11-12 12:28:24] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3708.0
+[2025-11-12 12:28:24] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3708.0
+[2025-11-12 12:28:25] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3702.0
+[2025-11-12 12:28:25] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3702.0
+[2025-11-12 12:28:26] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3707.0
+[2025-11-12 12:28:26] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3707.0
+[2025-11-12 12:28:26] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5317
+[2025-11-12 12:28:26] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3702.0
+[2025-11-12 12:28:26] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5317
+[2025-11-12 12:28:26] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3702.0
+[2025-11-12 12:28:28] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3713.0
+[2025-11-12 12:28:29] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3720.0
+[2025-11-12 12:28:29] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5312
+[2025-11-12 12:28:29] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3708.0
+[2025-11-12 12:28:30] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5317
+[2025-11-12 12:28:30] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3712.0
+[2025-11-12 12:28:30] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3715.0
+[2025-11-12 12:28:31] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3708.0
+[2025-11-12 12:28:31] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5312
+[2025-11-12 12:28:31] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3717.0
+[2025-11-12 12:28:32] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5317
+[2025-11-12 12:28:32] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3722.0
+[2025-11-12 12:28:32] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3719.0
+[2025-11-12 12:28:33] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3723.0
+[2025-11-12 12:28:34] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5312
+[2025-11-12 12:28:34] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3708.0
+[2025-11-12 12:28:35] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3703.0
+[2025-11-12 12:28:36] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3711.0
+[2025-11-12 12:28:36] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5303
+[2025-11-12 12:28:36] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3760.0
+[2025-11-12 12:28:37] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3793.0
+[2025-11-12 12:28:37] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3788.0
+[2025-11-12 12:28:38] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5308
+[2025-11-12 12:28:38] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3789.0
+[2025-11-12 12:28:39] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5303
+[2025-11-12 12:28:39] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3782.0
+[2025-11-12 12:28:39] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5308
+[2025-11-12 12:28:39] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3803.0
+[2025-11-12 12:28:40] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5303
+[2025-11-12 12:28:40] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3795.0
+[2025-11-12 12:28:42] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3799.0
+[2025-11-12 12:28:43] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5298
+[2025-11-12 12:28:43] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3789.0
+[2025-11-12 12:28:43] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5293
+[2025-11-12 12:28:43] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3792.0
+[2025-11-12 12:28:44] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3790.0
+[2025-11-12 12:28:44] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5298
+[2025-11-12 12:28:44] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3793.0
+[2025-11-12 12:28:46] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3794.0
+[2025-11-12 12:28:47] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3796.0
+[2025-11-12 12:28:48] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5293
+[2025-11-12 12:28:48] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3787.0
+[2025-11-12 12:28:49] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3789.0
+[2025-11-12 12:28:50] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5283
+[2025-11-12 12:28:50] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3786.0
+[2025-11-12 12:28:51] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5288
+[2025-11-12 12:28:51] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3784.0
+[2025-11-12 12:28:51] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3786.0
+[2025-11-12 12:28:52] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3789.0
+[2025-11-12 12:28:52] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3790.0
+[2025-11-12 12:28:53] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3779.0
+[2025-11-12 12:28:54] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5293
+[2025-11-12 12:28:54] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3782.0
+[2025-11-12 12:28:55] [INFO] [AppManager] [Shutdown] App closing with SIM balance: $9,916.25
+[2025-11-12 12:28:57] [INFO] [config.theme] Theme system validation passed - all OKLCH tokens and keys are valid
+[2025-11-12 12:28:59] [INFO] [AppManager] [startup] Initializing MainWindow
+[2025-11-12 12:28:59] [INFO] [StateManager] [Mode] INIT: Application now in SIM mode
+[2025-11-12 12:28:59] [INFO] [panels.panel1] Graph initialized successfully
+[2025-11-12 12:28:59] [INFO] [panels.panel1] [Panel1] Connected balance signal
+[2025-11-12 12:28:59] [INFO] [panels.panel1] [Panel1] Connected mode change signal
+[2025-11-12 12:28:59] [INFO] [panels.panel2] [Panel2] Restored session timers from data\runtime_state_panel2_SIM_.json
+[2025-11-12 12:28:59] [INFO] [StartupDiagnostics] ──────────────────────────────────────────────
+[2025-11-12 12:28:59] [INFO] [StartupDiagnostics] 🧭  APPSIERRA Startup Diagnostics
+[2025-11-12 12:28:59] [INFO] [StartupDiagnostics] ──────────────────────────────────────────────
+[2025-11-12 12:28:59] [INFO] [StartupDiagnostics] DB: PostgreSQL connected successfully
+[2025-11-12 12:28:59] [INFO] [StartupDiagnostics] CSV: Snapshot CSV active (updated 0.1s ago)
+[2025-11-12 12:28:59] [INFO] [StartupDiagnostics] DTC: DTC config valid (127.0.0.1:11099)
+[2025-11-12 12:28:59] [INFO] [StartupDiagnostics] ──────────────────────────────────────────────
+[2025-11-12 12:28:59] [INFO] [StartupDiagnostics] All diagnostics passed successfully.
+[2025-11-12 12:28:59] [INFO] [StartupDiagnostics] ──────────────────────────────────────────────
+[2025-11-12 12:28:59] [WARNING] [panels.panel1] [Panel1] QtConcurrent not available, loading equity curve synchronously
+[2025-11-12 12:28:59] [INFO] [core.diagnostics] DiagnosticsHub initialized (buffer size: 1000)
+[2025-11-12 12:28:59] [INFO] [AppManager] [startup] MainWindow initialized
+[2025-11-12 12:28:59] [INFO] [AppManager] [info] DTC connected
+[2025-11-12 12:28:59] [INFO] [AppManager] [CircuitBreaker] Connection healthy - circuit closed
+[2025-11-12 12:28:59] [INFO] [AppManager] [startup] DTC session ready
+[2025-11-12 12:28:59] [INFO] [services.trade_service] trade_manager.account.120005
+[2025-11-12 12:28:59] [INFO] [services.trade_service] trade_manager.account.120005
+[2025-11-12 12:28:59] [INFO] [services.trade_service] trade_manager.account.Sim1
+[2025-11-12 12:28:59] [INFO] [services.trade_service] trade_manager.account.Sim1
+[2025-11-12 12:29:00] [INFO] [panels.panel2] [panel2] Symbol updated from PositionUpdate: F.US.MESZ25 -> MES
+[2025-11-12 12:29:00] [INFO] [panels.panel2] [panel2] Position closed -- all position data cleared
+[2025-11-12 12:29:00] [INFO] [panels.panel2] [panel2] Position update accepted: symbol=MES, qty=0, avg=0.0, long=None
+[2025-11-12 12:29:00] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5264
+[2025-11-12 12:29:00] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3795.0
+[2025-11-12 12:29:00] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3794.0
+[2025-11-12 12:29:01] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5259
+[2025-11-12 12:29:01] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3744.0
+[2025-11-12 12:29:01] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3739.0
+[2025-11-12 12:29:02] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5254
+[2025-11-12 12:29:02] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3748.0
+[2025-11-12 12:29:02] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3758.0
+[2025-11-12 12:29:03] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3761.0
+[2025-11-12 12:29:03] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3769.0
+[2025-11-12 12:29:04] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3762.0
+[2025-11-12 12:29:05] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3763.0
+[2025-11-12 12:29:05] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5249
+[2025-11-12 12:29:05] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3766.0
+[2025-11-12 12:29:06] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3790.0
+[2025-11-12 12:29:06] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3794.0
+[2025-11-12 12:29:07] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3793.0
+[2025-11-12 12:29:07] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3803.0
+[2025-11-12 12:29:08] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3802.0
+[2025-11-12 12:29:09] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3808.0
+[2025-11-12 12:29:09] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3835.0
+[2025-11-12 12:29:10] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3826.0
+[2025-11-12 12:29:10] [INFO] [panels.panel2] [panel2] Feed updated -- VWAP changed: 6870.5244
+[2025-11-12 12:29:10] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3835.0
+[2025-11-12 12:29:11] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3840.0
+[2025-11-12 12:29:12] [INFO] [panels.panel2] [panel2] Feed updated -- Delta changed: 3834.0
+[2025-11-12 12:29:12] [INFO] [AppManager] [Shutdown] App closing with SIM balance: $9,916.25
