@@ -157,11 +157,19 @@ def _dtc_to_app_event(dtc: dict) -> Optional[AppMessage]:
 
     # Route position updates (Type 306)
     if name == "PositionUpdate":
-        return AppMessage(type="POSITION_UPDATE", payload=_normalize_position(dtc))
+        # DEBUG: Log ALL incoming PositionUpdate messages
+        log.info(f"[DTC] PositionUpdate RAW: {dtc}")
+        normalized = _normalize_position(dtc)
+        log.info(f"[DTC] PositionUpdate NORMALIZED: {normalized}")
+        return AppMessage(type="POSITION_UPDATE", payload=normalized)
 
     # Route order/fill updates (Types 301, 304, 307)
     if name in ("OrderUpdate", "OrderFillResponse", "HistoricalOrderFillResponse"):
-        return AppMessage(type="ORDER_UPDATE", payload=_normalize_order(dtc))
+        # DEBUG: Log ALL incoming OrderUpdate messages
+        log.info(f"[DTC] {name} RAW: {dtc}")
+        normalized = _normalize_order(dtc)
+        log.info(f"[DTC] {name} NORMALIZED: {normalized}")
+        return AppMessage(type="ORDER_UPDATE", payload=normalized)
 
     # DEBUG: Log unhandled message types (helps identify missing handlers)
     try:
