@@ -52,10 +52,10 @@ def test_theme_colors():
     apply_trading_mode_theme("SIM")
     assert THEME["bg_primary"] == "#FFFFFF", "SIM bg incorrect"
     assert THEME["ink"] == "#000000", "SIM ink incorrect"
-    assert THEME["border"] == "#00D4FF", "SIM border incorrect"
+    assert THEME["border"] == "#E5E7EB", "SIM border incorrect"
     print(f"  Background: {THEME['bg_primary']} (White) ✓")
     print(f"  Text: {THEME['ink']} (Black) ✓")
-    print(f"  Border: {THEME['border']} (Neon Blue) ✓")
+    print(f"  Border: {THEME['border']} (Light gray) ✓")
 
     # Test LIVE mode
     print("\n[LIVE Mode]")
