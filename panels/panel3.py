@@ -393,16 +393,24 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
             from utils.logger import get_logger
             log = get_logger(__name__)
 
-            # Refresh the metrics for current timeframe
-            self._load_metrics_for_timeframe(self._tf)
+            # CRITICAL FIX: Add small delay to ensure database write completes before querying
+            # Panel 2's trade recording might not be synchronous - give it time to finish
+            def delayed_refresh():
+                try:
+                    # Refresh the metrics for current timeframe
+                    self._load_metrics_for_timeframe(self._tf)
+                    log.info(f"[panel3] Metrics refreshed on trade close for {self._tf}")
+                except Exception as e:
+                    log.error(f"[panel3] Error refreshing metrics after trade close: {e}")
 
-            # Grab live data from Panel 2 if available
+            # Schedule refresh after 100ms to allow database write to complete
+            QtCore.QTimer.singleShot(100, delayed_refresh)
+
+            # Grab live data from Panel 2 if available (immediate - for real-time display)
             if hasattr(self, "analyze_and_store_trade_snapshot"):
                 self.analyze_and_store_trade_snapshot()
-            else:
-                pass
 
-            log.debug(f"[panel3] Metrics refreshed on trade close")
+            log.debug(f"[panel3] Trade close event received, scheduled metrics refresh")
         except Exception as e:
             try:
                 from utils.logger import get_logger

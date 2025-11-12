@@ -197,23 +197,22 @@ class MainWindow(QtWidgets.QMainWindow):
             if self.panel_balance and self._state:
                 starting_balance = self._state.sim_balance
 
-                # CRITICAL: Load equity curve from database FIRST (before adding any new points)
-                # This ensures we don't lose historical data
-                self.panel_balance._equity_points = self.panel_balance._get_equity_curve("SIM", "")
+                # CRITICAL FIX: Trigger async equity curve load for SIM mode
+                # The _get_equity_curve method loads asynchronously and will populate _equity_points when done
+                # Don't call it directly - it returns empty list during load. Instead, let it load in background.
+                equity_points = self.panel_balance._get_equity_curve("SIM", "")
 
-                # If we loaded historical data, don't add a new starting point (use the last balance from history)
-                # Only add initial point if this is a fresh start with no trades
-                if not self.panel_balance._equity_points:
-                    # Store the session start balance for PnL baseline calculation
-                    self.panel_balance._session_start_balance_sim = starting_balance
-                    self.panel_balance._session_start_balance_live = 0.0  # No LIVE balance at startup
-                    # Also add it to equity curve so graph has initial point
-                    self.panel_balance.update_equity_series_from_balance(starting_balance, mode="SIM")
-                else:
-                    # Use the last point from historical data as session start baseline
-                    last_balance = self.panel_balance._equity_points[-1][1]
-                    self.panel_balance._session_start_balance_sim = last_balance
-                    self.panel_balance._session_start_balance_live = 0.0  # No LIVE balance at startup
+                # If we have immediate equity points (synchronous path), use them
+                if equity_points:
+                    self.panel_balance._equity_points = equity_points
+                # Otherwise, async load is in progress and will populate later
+
+                # Store the session start balance for PnL baseline calculation
+                self.panel_balance._session_start_balance_sim = starting_balance
+                self.panel_balance._session_start_balance_live = 0.0  # No LIVE balance at startup
+
+                # Add initial balance point to equity curve (will be deduplicated if historical data loads)
+                self.panel_balance.update_equity_series_from_balance(starting_balance, mode="SIM")
 
                 # Display SIM balance by emitting balance signal
                 try:
@@ -222,12 +221,13 @@ class MainWindow(QtWidgets.QMainWindow):
                 except Exception as e:
                     pass
 
-                # Redraw graph with loaded equity curve
+                # Redraw graph with current equity curve (may be just the starting point initially)
                 if hasattr(self.panel_balance, "_replot_from_cache"):
                     self.panel_balance._replot_from_cache()
 
                 # Concise session start notification
-                print(f"[SESSION START] SIM Balance: ${starting_balance:,.2f} | Equity Points: {len(self.panel_balance._equity_points)}")
+                equity_count = len(self.panel_balance._equity_points) if hasattr(self.panel_balance, '_equity_points') else 0
+                print(f"[SESSION START] SIM Balance: ${starting_balance:,.2f} | Equity Points: {equity_count}")
                 log.debug(f"[Startup] Panel1 initialized with SIM balance: ${starting_balance:,.2f}")
 
         except Exception as e:

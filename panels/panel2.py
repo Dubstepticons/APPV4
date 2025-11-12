@@ -242,8 +242,12 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             side = payload.get("BuySell")  # 1=Buy, 2=Sell
             price1 = payload.get("Price1")
 
-            # Auto-detect stop/target from sell orders (regardless of fill status)
-            if side == 2 and self.entry_price is not None and price1 is not None:
+            # CRITICAL FIX: Only auto-detect stop/target when we have an active position
+            # Without this check, stop/target orders placed BEFORE entry would be detected prematurely
+            has_active_position = bool(self.entry_qty and self.entry_qty > 0 and self.entry_price is not None and self.is_long is not None)
+
+            # Auto-detect stop/target from sell orders (only when position is active)
+            if has_active_position and side == 2 and price1 is not None:
                 price1 = float(price1)
                 if price1 < self.entry_price:
                     # Lower price = Stop loss
@@ -686,14 +690,35 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
 
         # Heat transitions (drawdown tracking)
         self._update_heat_state_transitions(prev[0], self.last_price)
-        # Track per-trade min/max while in position for MAE/MFE
+
+        # CRITICAL FIX: Track per-trade min/max while in position for MAE/MFE
+        # Only update if price has moved meaningfully from entry (prevents premature calculations)
         try:
-            if self.entry_qty and self.last_price is not None:
+            if self.entry_qty and self.last_price is not None and self.entry_price is not None:
                 p = float(self.last_price)
-                if self._trade_min_price is None or p < self._trade_min_price:
-                    self._trade_min_price = p
-                if self._trade_max_price is None or p > self._trade_max_price:
-                    self._trade_max_price = p
+
+                # Only update min/max if price has moved at least 0.25 points from entry
+                # This prevents noise/spread from creating false MAE/MFE immediately after entry
+                MIN_PRICE_MOVEMENT = 0.25  # Minimum meaningful price change (1 tick for ES)
+
+                # For min (MAE tracking)
+                if self._trade_min_price is None:
+                    # First initialization - use entry price
+                    self._trade_min_price = self.entry_price
+                elif p < self.entry_price - MIN_PRICE_MOVEMENT:
+                    # Price moved meaningfully below entry - update min
+                    if p < self._trade_min_price:
+                        self._trade_min_price = p
+
+                # For max (MFE tracking)
+                if self._trade_max_price is None:
+                    # First initialization - use entry price
+                    self._trade_max_price = self.entry_price
+                elif p > self.entry_price + MIN_PRICE_MOVEMENT:
+                    # Price moved meaningfully above entry - update max
+                    if p > self._trade_max_price:
+                        self._trade_max_price = p
+
         except Exception:
             pass
 
@@ -716,6 +741,7 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
           - Expects header row: last,high,low,vwap,cum_delta,poc
           - Uses FIRST data row after the header (row 2)
           - Robust to BOM and column re-ordering
+          - CRITICAL FIX: Better error handling for missing columns and values
         """
         try:
             with open(CSV_FEED_PATH, newline="", encoding="utf-8-sig") as f:
@@ -724,21 +750,47 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                 if not row:
                     return False
 
-                def fnum(key: str) -> float:
-                    val = (row.get(key, "") or "").strip()
-                    if not val:
-                        return 0.0  # Default to 0.0 for empty values
-                    try:
-                        return float(val)
-                    except (ValueError, TypeError):
-                        return 0.0
+                # Log available columns on first read for debugging
+                static_key = "_csv_columns_logged"
+                if not getattr(self, static_key, False):
+                    log.info(f"[panel2] CSV columns available: {list(row.keys())}")
+                    setattr(self, static_key, True)
 
+                def fnum(key: str) -> Optional[float]:
+                    """Extract float value, returning None if not found or invalid."""
+                    val = (row.get(key, "") or "").strip()
+                    if not val or val == "0" or val == "0.0":
+                        # CRITICAL FIX: Return None for missing/zero values instead of 0.0
+                        # This allows us to distinguish between "no data" and "zero value"
+                        return None
+                    try:
+                        parsed = float(val)
+                        return parsed if parsed != 0.0 else None
+                    except (ValueError, TypeError):
+                        return None
+
+                # Read required fields (always needed)
                 self.last_price = fnum("last")
                 self.session_high = fnum("high")
                 self.session_low = fnum("low")
-                self.vwap = fnum("vwap")
-                self.cum_delta = fnum("cum_delta")
-                self.poc = fnum("poc")
+
+                # Read optional fields (may not exist in all CSV formats)
+                # Try multiple column name variations for flexibility
+                self.vwap = fnum("vwap") or fnum("VWAP") or fnum("vWap")
+                self.cum_delta = fnum("cum_delta") or fnum("delta") or fnum("Delta") or fnum("cumulative_delta")
+                self.poc = fnum("poc") or fnum("POC") or fnum("point_of_control")
+
+                # Log when optional fields are missing (but don't fail)
+                if self.vwap is None and not getattr(self, "_vwap_missing_logged", False):
+                    log.warning("[panel2] VWAP column not found in CSV - will display '--'")
+                    setattr(self, "_vwap_missing_logged", True)
+                if self.cum_delta is None and not getattr(self, "_delta_missing_logged", False):
+                    log.warning("[panel2] Delta column not found in CSV - will display '--'")
+                    setattr(self, "_delta_missing_logged", True)
+                if self.poc is None and not getattr(self, "_poc_missing_logged", False):
+                    log.warning("[panel2] POC column not found in CSV - will display '--'")
+                    setattr(self, "_poc_missing_logged", True)
+
                 return True
 
         except FileNotFoundError:
@@ -752,6 +804,8 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             return False
         except Exception as e:
             log.error(f"[panel2] CSV read error: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     # -------------------- Timers & Feed (end)
