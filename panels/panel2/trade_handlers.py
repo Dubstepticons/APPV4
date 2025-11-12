@@ -211,6 +211,9 @@ def on_position_update(panel, payload: dict) -> None:
         was_flat = (current_qty == 0)
         has_position = (current_qty > 0 and panel.entry_price is not None and panel.is_long is not None)
 
+        # DEBUG: Log every PositionUpdate with current panel state
+        log.info(f"[panel2] PositionUpdate: new_qty={new_qty}, current_qty={current_qty}, entry_price={panel.entry_price}, is_long={panel.is_long}, has_position={has_position}")
+
         # ===========================================
         # CASE 1: CLOSE - Position went to zero
         # ===========================================
