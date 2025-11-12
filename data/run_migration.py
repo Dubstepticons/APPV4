@@ -3,10 +3,19 @@
 Database migration runner - adds missing efficiency column.
 
 Run this script to update your database schema:
-    python data/run_migration.py
+    python -m data.run_migration
+    OR
+    python data/run_migration.py (from project root)
 """
 
+import sys
 from pathlib import Path
+
+# Add project root to Python path if running directly
+project_root = Path(__file__).parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 from data.db_engine import engine
 from sqlalchemy import text
 
