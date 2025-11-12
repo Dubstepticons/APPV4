@@ -335,7 +335,7 @@ DEBUG_THEME: dict[str, Union[int, float, str, bool]] = {
 # LIVE THEME (High saturation, vivid)
 # ========================================================================
 LIVE_THEME: dict[str, Union[int, float, str, bool]] = {
-    **DEBUG_THEME,
+    **_BASE_THEME,
     # Typography - Lato for headings
     "heading_font_family": "Lato, Inter, sans-serif",
     # PnL colors (full saturation)
@@ -362,7 +362,7 @@ LIVE_THEME: dict[str, Union[int, float, str, bool]] = {
 # SIM THEME (Balanced saturation, calm, LIGHT MODE)
 # ========================================================================
 SIM_THEME: dict[str, Union[int, float, str, bool]] = {
-    **DEBUG_THEME,
+    **_BASE_THEME,
     # Typography - Lato for headings
     "heading_font_family": "Lato, Inter, sans-serif",
     # PnL colors (reduced saturation)
