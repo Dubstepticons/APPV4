@@ -683,6 +683,39 @@ _REQUIRED_THEME_KEYS = [
 ]
 
 
+def _get_luminance(color: str) -> float:
+    """
+    Calculate relative luminance of a color (0.0 = black, 1.0 = white).
+
+    Args:
+        color: Hex color string like "#FFFFFF" or "#000000"
+
+    Returns:
+        Luminance value 0.0-1.0
+    """
+    # Handle oklch colors (just return 0.5 as approximation)
+    if color.startswith("oklch"):
+        return 0.5
+
+    # Parse hex color
+    hex_color = color.lstrip("#")
+    if len(hex_color) != 6:
+        return 0.5  # Default mid-luminance for invalid colors
+
+    r = int(hex_color[0:2], 16) / 255.0
+    g = int(hex_color[2:4], 16) / 255.0
+    b = int(hex_color[4:6], 16) / 255.0
+
+    # Apply gamma correction
+    def gamma(c):
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+
+    r, g, b = gamma(r), gamma(g), gamma(b)
+
+    # Calculate relative luminance (ITU-R BT.709)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
 def validate_theme(theme_dict: dict, theme_name: str) -> list[str]:
     """
     Validate that a theme dict contains all required keys.
@@ -698,12 +731,81 @@ def validate_theme(theme_dict: dict, theme_name: str) -> list[str]:
     return missing
 
 
+def validate_theme_colors(theme_dict: dict, theme_name: str) -> list[str]:
+    """
+    Validate that theme colors are semantically correct for the mode.
+
+    Checks:
+    - Light mode (white bg) should have dark text
+    - Dark mode (dark bg) should have light text
+
+    Args:
+        theme_dict: Theme dictionary to validate
+        theme_name: Name of theme (for error messages)
+
+    Returns:
+        List of color problems (empty if valid)
+    """
+    problems = []
+
+    # Get background color
+    bg_primary = theme_dict.get("bg_primary", "#000000")
+    bg_lum = _get_luminance(str(bg_primary))
+
+    # Determine if this is a light or dark mode
+    is_light_mode = bg_lum > 0.5  # White/light backgrounds
+    mode_type = "LIGHT" if is_light_mode else "DARK"
+
+    # Colors that should contrast with background
+    text_colors = {
+        "ink": theme_dict.get("ink"),
+        "text_primary": theme_dict.get("text_primary"),
+        "fg_primary": theme_dict.get("fg_primary"),
+        "fg_muted": theme_dict.get("fg_muted"),
+    }
+
+    background_colors = {
+        "bg_panel": theme_dict.get("bg_panel"),
+        "bg_secondary": theme_dict.get("bg_secondary"),
+        "card_bg": theme_dict.get("card_bg"),
+    }
+
+    # Check text colors have proper contrast
+    for key, color in text_colors.items():
+        if color and isinstance(color, str):
+            text_lum = _get_luminance(color)
+
+            # Light mode should have dark text (low luminance)
+            # Dark mode should have light text (high luminance)
+            if is_light_mode and text_lum > 0.7:
+                problems.append(f"{key}={color} (light text on light bg - invisible!)")
+            elif not is_light_mode and text_lum < 0.3:
+                problems.append(f"{key}={color} (dark text on dark bg - invisible!)")
+
+    # Check background colors match mode
+    for key, color in background_colors.items():
+        if color and isinstance(color, str):
+            bg_color_lum = _get_luminance(color)
+
+            # In light mode, backgrounds should be light
+            # In dark mode, backgrounds should be dark
+            if is_light_mode and bg_color_lum < 0.3:
+                problems.append(f"{key}={color} (dark bg in light mode - wrong!)")
+            elif not is_light_mode and bg_color_lum > 0.7:
+                problems.append(f"{key}={color} (light bg in dark mode - wrong!)")
+
+    if problems:
+        problems.insert(0, f"Mode type: {mode_type} (bg_primary={bg_primary}, luminance={bg_lum:.2f})")
+
+    return problems
+
+
 def validate_all_themes() -> None:
     """
-    Validate all theme modes have required keys.
+    Validate all theme modes have required keys and correct colors.
 
     Raises:
-        ValueError: If any theme is missing required keys
+        ValueError: If any theme is missing required keys or has color problems
     """
     themes_to_check = [
         (DEBUG_THEME, "DEBUG_THEME"),
@@ -712,10 +814,18 @@ def validate_all_themes() -> None:
     ]
 
     all_errors = []
+
+    # Check for missing keys
     for theme_dict, theme_name in themes_to_check:
         missing = validate_theme(theme_dict, theme_name)
         if missing:
             all_errors.append(f"{theme_name} missing {len(missing)} keys: {missing}")
+
+    # Check for color problems (semantic validation)
+    for theme_dict, theme_name in themes_to_check:
+        color_problems = validate_theme_colors(theme_dict, theme_name)
+        if color_problems:
+            all_errors.append(f"{theme_name} color problems:\n    " + "\n    ".join(color_problems))
 
     if all_errors:
         error_msg = "Theme validation failed:\n  " + "\n  ".join(all_errors)
