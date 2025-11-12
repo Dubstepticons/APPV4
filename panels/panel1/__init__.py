@@ -20,12 +20,7 @@ Usage:
     panel.set_account_balance(10500.00)
 """
 
-# Will be populated as modules are created
-# from panels.panel1.balance_panel import Panel1
-# from panels.panel1.masked_frame import MaskedFrame
+from panels.panel1.balance_panel import Panel1
+from panels.panel1.masked_frame import MaskedFrame
 
-# __all__ = ["Panel1", "MaskedFrame"]
-
-# Temporary: During decomposition, export nothing
-# Once all modules are created, uncomment above imports
-__all__ = []
+__all__ = ["Panel1", "MaskedFrame"]
