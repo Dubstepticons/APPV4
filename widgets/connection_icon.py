@@ -57,6 +57,12 @@ class ConnectionIcon(QtWidgets.QWidget, ThemeAwareMixin):
         self._outer_color: str = "red"  # Start red (disconnected)
         self._inner_color: str = "red"  # Start red (no data)
 
+        # Circuit breaker state
+        self._circuit_state: str = "CLOSED"  # CLOSED / OPEN / HALF_OPEN
+        self._circuit_failures: int = 0
+        self._circuit_threshold: int = 5
+        self._circuit_recovery_time: Optional[float] = None  # When circuit can retry
+
         # Update timer (checks thresholds every second)
         self._timer = QtCore.QTimer(self)
         self._timer.timeout.connect(self._update_colors)
@@ -88,6 +94,21 @@ class ConnectionIcon(QtWidgets.QWidget, ThemeAwareMixin):
         self._last_heartbeat_time = None
         self._last_data_time = None
         self._update_colors()
+        self._update_tooltip()
+
+    def update_circuit_breaker(self, state: str, failures: int, threshold: int, recovery_time: Optional[float] = None) -> None:
+        """Update circuit breaker status display.
+
+        Args:
+            state: Circuit state ("CLOSED", "OPEN", "HALF_OPEN")
+            failures: Current failure count
+            threshold: Failure threshold before opening
+            recovery_time: Epoch timestamp when circuit can retry (for OPEN state)
+        """
+        self._circuit_state = state
+        self._circuit_failures = failures
+        self._circuit_threshold = threshold
+        self._circuit_recovery_time = recovery_time
         self._update_tooltip()
 
     def _on_theme_refresh(self) -> None:
@@ -166,6 +187,21 @@ class ConnectionIcon(QtWidgets.QWidget, ThemeAwareMixin):
             datetime.fromtimestamp(self._last_data_time).strftime("%H:%M:%S") if self._last_data_time else "Never"
         )
 
+        # Circuit breaker status
+        circuit_color_map = {
+            "CLOSED": "#22C55E",  # Green - healthy
+            "OPEN": "#EF4444",    # Red - failing
+            "HALF_OPEN": "#F59E0B"  # Yellow - testing recovery
+        }
+        circuit_color = circuit_color_map.get(self._circuit_state, "#9CA3AF")
+
+        # Format recovery time if circuit is open
+        recovery_info = ""
+        if self._circuit_state == "OPEN" and self._circuit_recovery_time:
+            seconds_until_retry = max(0, int(self._circuit_recovery_time - time.time()))
+            if seconds_until_retry > 0:
+                recovery_info = f" (retry in {seconds_until_retry}s)"
+
         # Build tooltip
         bg_color = normalize_color(THEME["bg_panel"])
         text_color = normalize_color(THEME["ink"])
@@ -184,6 +220,8 @@ class ConnectionIcon(QtWidgets.QWidget, ThemeAwareMixin):
             f"<b>Sierra Connection</b><br>"
             f"Outer (Connection): <b style='color:{outer_hex};'>{outer_status}</b><br>"
             f"Inner (Data Feed): <b style='color:{inner_hex};'>{inner_status}</b><br>"
+            f"Circuit Breaker: <b style='color:{circuit_color};'>{self._circuit_state}</b>{recovery_info}<br>"
+            f"Failures: {self._circuit_failures}/{self._circuit_threshold}<br>"
             f"Host: {self._host}  Port: {self._port}<br>"
             f"Last Heartbeat: {hb_time}<br>"
             f"Last Data: {data_time}</div>"

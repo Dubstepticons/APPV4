@@ -714,6 +714,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 c.connection_healthy.connect(self._on_connection_healthy)
             if hasattr(c, "connection_degraded"):
                 c.connection_degraded.connect(self._on_connection_degraded)
+            if hasattr(c, "stats_updated"):
+                c.stats_updated.connect(self._on_dtc_stats_updated)
         except Exception:
             pass
 
@@ -770,6 +772,33 @@ class MainWindow(QtWidgets.QMainWindow):
         log.warning(f"[CircuitBreaker] Connection degraded - circuit open: {reason}")
         # Could add UI notification here (e.g., banner warning)
         # Application continues in degraded mode (no DTC data)
+
+    def _on_dtc_stats_updated(self, stats: dict) -> None:
+        """Called when DTC health stats are updated - updates connection icon with circuit breaker status."""
+        try:
+            icon = getattr(self.panel_balance, "conn_icon", None)
+            if not icon or not hasattr(icon, "update_circuit_breaker"):
+                return
+
+            # Extract circuit breaker stats
+            cb_stats = stats.get("circuit_breaker", {})
+            state = cb_stats.get("state", "CLOSED").upper()
+            failures = cb_stats.get("failure_count", 0)
+            threshold = cb_stats.get("failure_threshold", 5)
+            recovery_time = cb_stats.get("last_failure_time")  # Epoch timestamp
+
+            # If circuit is OPEN, add recovery timeout to get retry time
+            if state == "OPEN":
+                recovery_timeout = cb_stats.get("recovery_timeout", 60)
+                if recovery_time:
+                    recovery_time = recovery_time + recovery_timeout
+            else:
+                recovery_time = None
+
+            # Update connection icon
+            icon.update_circuit_breaker(state, failures, threshold, recovery_time)
+        except Exception as e:
+            log.debug(f"[CircuitBreaker] Failed to update connection icon: {e}")
 
     def closeEvent(self, event) -> None:
         """Called when the app is closing. Log final balance state."""
