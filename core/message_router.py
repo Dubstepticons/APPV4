@@ -76,6 +76,11 @@ class MessageRouter:
         self._current_mode: str = "DEBUG"
         self._current_account: str = ""
 
+        # Account enumeration tracking (prevents duplicate mode switching during init)
+        self._accounts_seen: set[str] = set()
+        self._primary_account: Optional[str] = None
+        self._mode_initialized: bool = False
+
         # Coalesced UI updates (10Hz refresh rate)
         self._ui_refresh_pending: bool = False
         self._ui_refresh_timer: Optional[Any] = None
@@ -631,6 +636,9 @@ class MessageRouter:
         if os.getenv("DEBUG_DTC", "0") == "1":
             log.debug(f"router.trade_account.{acct}")
 
+        # Track this account
+        self._accounts_seen.add(acct)
+
         # Update trade logger with current account
         if self._trade_manager:
             self._trade_manager.set_account(acct)
@@ -639,9 +647,47 @@ class MessageRouter:
             with contextlib.suppress(Exception):
                 self.panel_balance.set_account(acct)
 
-        # Update state manager mode (uses proper mode detection)
+        # CRITICAL FIX: Smart mode switching to prevent duplicate switches during initialization
+        # Strategy: Only switch mode ONCE to match the account that corresponds to configured TRADING_MODE
+        # This prevents the "repeat" issue where mode switches multiple times during account enumeration
         if self.state:
-            self.state.set_mode(acct)
+            from config import settings
+            from utils.trade_mode import detect_mode_from_account
+
+            detected_mode = detect_mode_from_account(acct)
+
+            # Get the user's configured trading mode preference from settings
+            configured_mode = getattr(settings, 'TRADING_MODE', 'SIM')
+
+            # Switch mode only if:
+            # 1. We haven't initialized mode yet, AND
+            # 2. This account matches the user's configured TRADING_MODE preference
+            #
+            # This ensures we switch exactly ONCE, to the account that matches user's config
+            should_switch = (
+                not self._mode_initialized and
+                detected_mode == configured_mode
+            )
+
+            if should_switch:
+                self.state.set_mode(acct)
+                self._primary_account = acct
+                self._mode_initialized = True
+                log.info(
+                    f"[Mode] Mode initialized from account: {acct} -> {detected_mode} "
+                    f"(matches configured TRADING_MODE={configured_mode}, accounts seen: {len(self._accounts_seen)})"
+                )
+            else:
+                if not self._mode_initialized:
+                    log.debug(
+                        f"[Mode] Account {acct} ({detected_mode}) does not match configured "
+                        f"TRADING_MODE={configured_mode}, waiting for matching account..."
+                    )
+                else:
+                    log.debug(
+                        f"[Mode] Account {acct} ({detected_mode}) skipped - mode already initialized "
+                        f"to {self.state.current_mode} via account {self._primary_account}"
+                    )
 
     def _on_balance_update(self, payload: dict):
         bal = payload.get("balance")
