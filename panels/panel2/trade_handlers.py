@@ -125,19 +125,21 @@ def on_order_update(panel, payload: dict) -> None:
     """
     Handle normalized OrderUpdate from DTC (via data_bridge).
 
-    CRITICAL: This function ONLY detects stop/target prices from order placement.
-    It does NOT open or close positions - that's handled exclusively by on_position_update().
+    CRITICAL LOGIC:
+    - Detects stop/target prices from sell orders (for UI display)
+    - SIM MODE ONLY: Seeds positions from fills (Sierra Chart doesn't send PositionUpdate qty > 0 in SIM)
+    - NEVER closes positions (that's PositionUpdate's job)
 
     Args:
         panel: Panel2 instance
         payload: Normalized order update dict from data_bridge (not raw DTC)
     """
     try:
+        order_status = payload.get("OrderStatus")
         side = payload.get("BuySell")  # 1=Buy, 2=Sell
         price1 = payload.get("Price1")
 
-        # ONLY detect stop/target from sell orders (for UI display)
-        # Do NOT modify position state - PositionUpdate handles that
+        # Auto-detect stop/target from sell orders (for UI display)
         if side == 2 and panel.entry_price is not None and price1 is not None:
             price1 = float(price1)
             if price1 < panel.entry_price:
@@ -153,7 +155,33 @@ def on_order_update(panel, payload: dict) -> None:
                 panel.c_target.set_value_color(THEME.get("text_primary", "#E6F6FF"))
                 log.info(f"[panel2] Target detected @ {price1:.2f}")
 
-        # NO POSITION OPENS/CLOSES HERE - PositionUpdate is the single source of truth
+        # SIM MODE WORKAROUND: Seed position from fill (Sierra Chart doesn't send PositionUpdate qty > 0 in SIM)
+        # Only seed if: (1) order is filled, (2) we're flat, (3) mode is SIM
+        if order_status not in (3, 7):  # Not filled
+            return
+
+        # Detect mode from account
+        account = payload.get("TradeAccount") or ""
+        mode = detect_mode_from_account(account)
+
+        # Only seed positions in SIM mode (LIVE uses PositionUpdate exclusively)
+        if mode != "SIM":
+            return
+
+        # Only seed if currently flat (don't interfere with existing positions)
+        if panel.entry_qty and panel.entry_price is not None and panel.is_long is not None:
+            return
+
+        # Extract fill data
+        qty = payload.get("FilledQuantity") or 0
+        price = payload.get("AverageFillPrice") or payload.get("Price1")
+        is_long = side == 1
+
+        if qty > 0 and price is not None:
+            panel.set_position(qty, price, is_long)
+            log.info(f"[panel2] SIM mode: Seeded position from fill: qty={qty}, price={price}, long={is_long}")
+
+        # NO POSITION CLOSES HERE - PositionUpdate handles that (even in SIM mode)
 
     except Exception as e:
         log.error(f"[panel2] on_order_update error: {e}")
