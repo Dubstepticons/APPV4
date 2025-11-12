@@ -88,7 +88,7 @@ class ProtectedDTCClient(QObject):
         self._router = router
 
         # Create underlying DTC client with router
-        self._client = DTCClientJSON(host=host, port=port, router=router, parent=self)
+        self._client = DTCClientJSON(host=host, port=port, router=router)
 
         # Create circuit breaker for connection protection
         self._circuit_breaker = CircuitBreaker(
