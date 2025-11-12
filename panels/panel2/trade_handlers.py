@@ -21,6 +21,8 @@ from datetime import datetime, UTC
 from typing import Optional
 from config.theme import THEME
 from services.trade_constants import COMM_PER_CONTRACT, DOLLARS_PER_POINT
+from services.trade_math import TradeMath
+from utils.format_utils import extract_symbol_display
 from utils.logger import get_logger
 from utils.trade_mode import detect_mode_from_account
 
@@ -208,31 +210,26 @@ def on_order_update(panel, payload: dict) -> None:
             if risk_per_contract > 0:
                 r_multiple = realized_pnl / (risk_per_contract * qty)
 
-        # MAE/MFE in PnL units using tracked extremes
-        # LONG: MAE from min (adverse), MFE from max (favorable)
-        # SHORT: MAE from max (adverse), MFE from min (favorable)
+        # MAE/MFE using TradeMath
         mae = None
         mfe = None
         efficiency = None
-        try:
-            if panel._trade_min_price is not None and panel._trade_max_price is not None:
-                if panel.is_long:
-                    mae_pts = min(0.0, panel._trade_min_price - entry_price)
-                    mfe_pts = max(0.0, panel._trade_max_price - entry_price)
-                else:  # SHORT
-                    mae_pts = min(0.0, entry_price - panel._trade_max_price)
-                    mfe_pts = max(0.0, entry_price - panel._trade_min_price)
-                mae = mae_pts * DOLLARS_PER_POINT * qty
-                mfe = mfe_pts * DOLLARS_PER_POINT * qty
+        mae_pts, mfe_pts = TradeMath.calculate_mae_mfe(
+            entry_price=entry_price,
+            trade_min_price=panel._trade_min_price,
+            trade_max_price=panel._trade_max_price,
+            is_long=panel.is_long,
+        )
+        if mae_pts is not None and mfe_pts is not None:
+            mae = mae_pts * DOLLARS_PER_POINT * qty
+            mfe = mfe_pts * DOLLARS_PER_POINT * qty
 
-                # Calculate efficiency: (realized PnL / MFE) if MFE > 0
-                if mfe > 0 and realized_pnl is not None:
-                    # Efficiency = realized profit / maximum potential profit
-                    # Expressed as decimal (0.0 to 1.0, where 1.0 = 100% efficient)
-                    # Can exceed 1.0 if trail added profit beyond max seen during trade
-                    efficiency = realized_pnl / mfe
-        except Exception:
-            pass
+            # Calculate efficiency: (realized PnL / MFE) if MFE > 0
+            if mfe > 0 and realized_pnl is not None:
+                # Efficiency = realized profit / maximum potential profit
+                # Expressed as decimal (0.0 to 1.0, where 1.0 = 100% efficient)
+                # Can exceed 1.0 if trail added profit beyond max seen during trade
+                efficiency = realized_pnl / mfe
 
         # entry/exit times
         entry_time = datetime.fromtimestamp(panel.entry_time_epoch, tz=UTC) if panel.entry_time_epoch else None
@@ -280,8 +277,6 @@ def on_position_update(panel, payload: dict) -> None:
         payload: Normalized position update dict from MessageRouter (lowercase keys)
     """
     try:
-        from panels.panel2.helpers import extract_symbol_display
-
         # Extract from normalized payload (lowercase keys from data_bridge normalization)
         qty = int(payload.get("qty", 0))
         avg_price = payload.get("avg_entry")
@@ -341,21 +336,18 @@ def on_position_update(panel, payload: dict) -> None:
                 if risk_per_contract > 0:
                     r_multiple = realized_pnl / (risk_per_contract * qty_val)
 
-            # MAE/MFE
+            # MAE/MFE using TradeMath
             mae = None
             mfe = None
-            try:
-                if panel._trade_min_price is not None and panel._trade_max_price is not None:
-                    if panel.is_long:
-                        mae_pts = min(0.0, panel._trade_min_price - entry_price_val)
-                        mfe_pts = max(0.0, panel._trade_max_price - entry_price_val)
-                    else:
-                        mae_pts = min(0.0, entry_price_val - panel._trade_max_price)
-                        mfe_pts = max(0.0, entry_price_val - panel._trade_min_price)
-                    mae = mae_pts * DOLLARS_PER_POINT * qty_val
-                    mfe = mfe_pts * DOLLARS_PER_POINT * qty_val
-            except Exception:
-                pass
+            mae_pts, mfe_pts = TradeMath.calculate_mae_mfe(
+                entry_price=entry_price_val,
+                trade_min_price=panel._trade_min_price,
+                trade_max_price=panel._trade_max_price,
+                is_long=panel.is_long,
+            )
+            if mae_pts is not None and mfe_pts is not None:
+                mae = mae_pts * DOLLARS_PER_POINT * qty_val
+                mfe = mfe_pts * DOLLARS_PER_POINT * qty_val
 
             # Get account for mode detection
             account = payload.get("TradeAccount") or ""

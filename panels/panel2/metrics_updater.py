@@ -24,6 +24,7 @@ import time
 from typing import Optional
 from config.theme import THEME, ColorTheme
 from services.trade_constants import COMM_PER_CONTRACT, DOLLARS_PER_POINT
+from services.trade_math import TradeMath
 from utils.logger import get_logger
 
 log = get_logger(__name__)
@@ -45,8 +46,6 @@ def refresh_all_cells(panel, initial: bool = False) -> None:
         panel: Panel2 instance
         initial: True if this is the initial UI setup
     """
-    from panels.panel2.helpers import fmt_time_human
-
     # If flat (no position), set all cells to dashes and exit
     if not (getattr(panel, "entry_qty", 0) and panel.entry_price is not None):
         dim_color = THEME.get("text_dim", "#5B6C7A")
@@ -140,12 +139,10 @@ def update_time_and_heat_cells(panel) -> None:
     Args:
         panel: Panel2 instance
     """
-    from panels.panel2.helpers import fmt_time_human
-
     # Duration
     if panel.entry_time_epoch:
         dur_sec = int(time.time() - panel.entry_time_epoch)
-        panel.c_time.set_value_text(fmt_time_human(dur_sec))
+        panel.c_time.set_value_text(TradeMath.fmt_time_human(dur_sec))
         panel.c_time.set_value_color(THEME.get("text_primary", "#E6F6FF"))
     else:
         panel.c_time.set_value_text("--")
@@ -176,7 +173,7 @@ def update_time_and_heat_cells(panel) -> None:
         if panel.heat_start_epoch is not None:
             heat_sec = int(time.time() - panel.heat_start_epoch)
 
-        panel.c_heat.set_value_text(fmt_time_human(heat_sec))
+        panel.c_heat.set_value_text(TradeMath.fmt_time_human(heat_sec))
 
         # Heat color/flash thresholds
         if heat_sec == 0 or heat_sec < HEAT_WARN_SEC:
@@ -306,18 +303,14 @@ def update_secondary_metrics(panel) -> None:
         panel.c_range.set_value_text("--")
         panel.c_range.set_value_color(THEME.get("text_dim", "#5B6C7A"))
 
-    # MAE / MFE from TRADE extremes (not session extremes)
-    # LONG: MAE from min (adverse), MFE from max (favorable)
-    # SHORT: MAE from max (adverse), MFE from min (favorable)
-    # These track min/max SINCE position entry, not session-wide
-    if panel._trade_min_price is not None and panel._trade_max_price is not None:
-        if panel.is_long:
-            mae_pts = min(0.0, panel._trade_min_price - panel.entry_price)
-            mfe_pts = max(0.0, panel._trade_max_price - panel.entry_price)
-        else:  # SHORT
-            mae_pts = min(0.0, panel.entry_price - panel._trade_max_price)
-            mfe_pts = max(0.0, panel.entry_price - panel._trade_min_price)
-
+    # MAE / MFE using TradeMath
+    mae_pts, mfe_pts = TradeMath.calculate_mae_mfe(
+        entry_price=panel.entry_price,
+        trade_min_price=panel._trade_min_price,
+        trade_max_price=panel._trade_max_price,
+        is_long=panel.is_long,
+    )
+    if mae_pts is not None and mfe_pts is not None:
         panel.c_mae.set_value_text(f"{mae_pts:.2f} pt")
         panel.c_mae.set_value_color(THEME.get("pnl_neg_color", "#EF4444") if mae_pts < 0 else THEME.get("pnl_neu_color", "#C9CDD0"))
 
@@ -365,17 +358,20 @@ def update_secondary_metrics(panel) -> None:
     # Position guaranteed, so entry_price, last_price, is_long exist
     # Uses TRADE max price (not session high) for accurate MFE
     eff_val: Optional[float] = None
-    if panel.last_price is not None and panel._trade_max_price is not None:
+    if panel.last_price is not None:
         # Calculate current P&L in points
-        if panel.is_long:
-            pnl_pts = panel.last_price - panel.entry_price
-            mfe_pts = max(0.0, panel._trade_max_price - panel.entry_price)
-        else:  # SHORT
-            pnl_pts = panel.entry_price - panel.last_price
-            mfe_pts = max(0.0, panel.entry_price - panel._trade_min_price)
+        pnl_pts = (panel.last_price - panel.entry_price) if panel.is_long else (panel.entry_price - panel.last_price)
+
+        # Get MFE using TradeMath
+        _, mfe_pts = TradeMath.calculate_mae_mfe(
+            entry_price=panel.entry_price,
+            trade_min_price=panel._trade_min_price,
+            trade_max_price=panel._trade_max_price,
+            is_long=panel.is_long,
+        )
 
         # Calculate efficiency if MFE is positive
-        if mfe_pts > 1e-9:
+        if mfe_pts is not None and mfe_pts > 1e-9:
             eff_val = pnl_pts / mfe_pts
 
     if eff_val is None:

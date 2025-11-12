@@ -5,11 +5,14 @@ Live trading metrics panel with 3x5 grid layout.
 Decomposed from monolithic panel2.py for modularity.
 
 Architecture:
-- helpers: Utility functions (fmt_time_human, sign_from_side, extract_symbol_display)
 - state_manager: State persistence and mode management
 - trade_handlers: Trade notifications and DTC message handling
 - metrics_updater: Cell calculation engine
 - live_panel: Main Panel2 class with UI and delegation
+
+Utilities:
+- TradeMath (services/trade_math.py): Trade calculations including MAE/MFE
+- extract_symbol_display (utils/format_utils.py): Symbol formatting
 
 Usage:
     from panels.panel2 import Panel2

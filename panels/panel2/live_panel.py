@@ -31,12 +31,14 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 
 from config.theme import THEME, ColorTheme
 from services.trade_constants import COMM_PER_CONTRACT, DOLLARS_PER_POINT
+from services.trade_math import TradeMath
+from utils.format_utils import extract_symbol_display
 from utils.logger import get_logger
 from utils.theme_mixin import ThemeAwareMixin
 from widgets.metric_cell import MetricCell
 
 # Import helper modules
-from panels.panel2 import helpers, state_manager, trade_handlers, metrics_updater
+from panels.panel2 import state_manager, trade_handlers, metrics_updater
 
 log = get_logger(__name__)
 
@@ -450,9 +452,9 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         """
         self.symbol = symbol.strip().upper() if symbol else "ES"
         # Extract display symbol (3 letters after "US.")
-        display_symbol = helpers.extract_symbol_display(self.symbol)
+        display_sym = extract_symbol_display(self.symbol)
         if hasattr(self, "symbol_banner"):
-            self.symbol_banner.setText(display_symbol)
+            self.symbol_banner.setText(display_sym)
 
     def set_trading_mode(self, mode: str, account: Optional[str] = None) -> None:
         """
@@ -562,17 +564,19 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             # SHORT: MAE from max (adverse), MFE from min (favorable)
             # These track min/max SINCE position entry, not session-wide
             if self._trade_min_price is not None and self._trade_max_price is not None:
-                if self.is_long:
-                    mae_pts = min(0.0, self._trade_min_price - self.entry_price)
-                    mfe_pts = max(0.0, self._trade_max_price - self.entry_price)
-                else:  # SHORT
-                    mae_pts = min(0.0, self.entry_price - self._trade_max_price)
-                    mfe_pts = max(0.0, self.entry_price - self._trade_min_price)
+                # Use centralized TradeMath calculation
+                mae_pts, mfe_pts = TradeMath.calculate_mae_mfe(
+                    entry_price=self.entry_price,
+                    trade_min_price=self._trade_min_price,
+                    trade_max_price=self._trade_max_price,
+                    is_long=self.is_long,
+                )
 
-                data["mae_points"] = mae_pts
-                data["mfe_points"] = mfe_pts
-                data["mae_dollars"] = mae_pts * DOLLARS_PER_POINT * self.entry_qty
-                data["mfe_dollars"] = mfe_pts * DOLLARS_PER_POINT * self.entry_qty
+                if mae_pts is not None and mfe_pts is not None:
+                    data["mae_points"] = mae_pts
+                    data["mfe_points"] = mfe_pts
+                    data["mae_dollars"] = mae_pts * DOLLARS_PER_POINT * self.entry_qty
+                    data["mfe_dollars"] = mfe_pts * DOLLARS_PER_POINT * self.entry_qty
 
                 # Calculate efficiency: (realized PnL / MFE) if MFE > 0
                 if mfe_pts > 0 and "net_pnl" in data:

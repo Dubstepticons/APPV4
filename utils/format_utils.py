@@ -50,3 +50,38 @@ def mmss(seconds: float) -> str:
         return f"{m:02d}:{s:02d}"
     except Exception:
         return "00:00"
+
+
+def extract_symbol_display(full_symbol: str) -> str:
+    """
+    Extract 3-letter display symbol from full DTC symbol.
+
+    Args:
+        full_symbol: Full DTC symbol (e.g., "F.US.MESZ25")
+
+    Returns:
+        3-letter symbol (e.g., "MES")
+
+    Examples:
+        extract_symbol_display("F.US.MESZ25") -> "MES"
+        extract_symbol_display("F.US.ESH25") -> "ESH"
+        extract_symbol_display("UNKNOWN") -> "UNKNOWN"
+
+    Note:
+        Looks for pattern: *.US.XXX* where XXX are the 3 letters we want.
+        If format doesn't match, returns full symbol as-is.
+    """
+    try:
+        # Look for pattern: *.US.XXX* where XXX are the 3 letters we want
+        parts = full_symbol.split(".")
+        for i, part in enumerate(parts):
+            if part == "US" and i + 1 < len(parts):
+                # Get the next part after 'US'
+                next_part = parts[i + 1]
+                if len(next_part) >= 3:
+                    # Extract first 3 letters
+                    return next_part[:3].upper()
+        # Fallback: return as-is
+        return full_symbol.strip().upper()
+    except Exception:
+        return full_symbol.strip().upper()
