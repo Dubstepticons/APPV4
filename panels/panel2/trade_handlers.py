@@ -6,8 +6,8 @@ Extracted from panels/panel2.py for modularity.
 
 Functions:
 - notify_trade_closed(): Handle trade closure and persistence
-- on_order_update(): Handle DTC order status messages
-- on_position_update(): Handle DTC position updates
+- on_order_update(): Handle DTC order status messages (TARGETS/STOPS ONLY)
+- on_position_update(): Handle DTC position updates (SINGLE SOURCE OF TRUTH FOR POSITIONS)
 
 Features:
 - Automatic trade persistence to database
@@ -15,6 +15,11 @@ Features:
 - P&L calculations with MAE/MFE/R-multiple
 - Position state synchronization
 - Mode detection (SIM/LIVE) from account
+
+CRITICAL DESIGN PRINCIPLE:
+- on_position_update() is the ONLY function that opens/closes positions
+- on_order_update() ONLY detects stop/target prices, NEVER modifies position state
+- DTC PositionUpdate messages are the single source of truth for qty/entry/direction
 """
 
 from datetime import datetime, UTC
@@ -120,20 +125,19 @@ def on_order_update(panel, payload: dict) -> None:
     """
     Handle normalized OrderUpdate from DTC (via data_bridge).
 
-    Persists closed trades automatically and resets per-trade trackers.
-    Seeds position from fill data when in SIM mode (Sierra Chart doesn't send non-zero PositionUpdate).
-    Auto-detects stop and target orders from sell orders based on price relative to entry.
+    CRITICAL: This function ONLY detects stop/target prices from order placement.
+    It does NOT open or close positions - that's handled exclusively by on_position_update().
 
     Args:
         panel: Panel2 instance
         payload: Normalized order update dict from data_bridge (not raw DTC)
     """
     try:
-        order_status = payload.get("OrderStatus")
         side = payload.get("BuySell")  # 1=Buy, 2=Sell
         price1 = payload.get("Price1")
 
-        # Auto-detect stop/target from sell orders (regardless of fill status)
+        # ONLY detect stop/target from sell orders (for UI display)
+        # Do NOT modify position state - PositionUpdate handles that
         if side == 2 and panel.entry_price is not None and price1 is not None:
             price1 = float(price1)
             if price1 < panel.entry_price:
@@ -149,118 +153,8 @@ def on_order_update(panel, payload: dict) -> None:
                 panel.c_target.set_value_color(THEME.get("text_primary", "#E6F6FF"))
                 log.info(f"[panel2] Target detected @ {price1:.2f}")
 
-        # Process fills (Status 3=Filled, 7=Filled)
-        if order_status not in (3, 7):
-            return
+        # NO POSITION OPENS/CLOSES HERE - PositionUpdate is the single source of truth
 
-        # SIM mode workaround: Seed position from fill if we don't have one yet
-        # (Sierra Chart in SIM mode never sends non-zero PositionUpdate, only qty=0)
-        qty = payload.get("FilledQuantity") or 0
-        price = payload.get("AverageFillPrice") or payload.get("Price1")
-        is_long = side == 1
-
-        if qty > 0 and price is not None:
-            # Only seed if we're currently flat (no existing position)
-            if not (panel.entry_qty and panel.entry_price is not None and panel.is_long is not None):
-                panel.set_position(qty, price, is_long)
-                log.info(f"[panel2] Seeded position from fill: qty={qty}, price={price}, long={is_long}")
-                return  # Early exit - don't process as close since we just opened
-
-        # Require we have an active position context for closing logic
-        if not (panel.entry_qty and panel.entry_price is not None and panel.is_long is not None):
-            return
-
-        # CRITICAL FIX: Only process as a CLOSE if quantity is DECREASING
-        # If qty stayed the same or increased, this is NOT a close - skip it!
-        current_qty = panel.entry_qty if panel.entry_qty else 0
-
-        # If incoming qty >= current qty, this is adding to or maintaining position, not closing
-        if qty >= current_qty:
-            return
-
-        # If we reach here, it's a CLOSE
-        print(f"  CLOSE DETECTED: qty decreased from {current_qty} to {qty}")
-
-        # Extract exit price from payload
-        exit_price = (
-            payload.get("LastFillPrice")
-            or payload.get("AverageFillPrice")
-            or payload.get("Price1")
-            or panel.last_price
-        )
-        if exit_price is None:
-            log.warning("[panel2] Fill detected but no exit price available")
-            return
-        exit_price = float(exit_price)
-
-        qty = int(abs(panel.entry_qty))
-        side = "long" if panel.is_long else "short"
-        entry_price = float(panel.entry_price)
-
-        # Use symbol-aware trading constants
-        spec = match_spec(panel.symbol)
-        sign = 1.0 if panel.is_long else -1.0
-        realized_pnl = (exit_price - entry_price) * sign * qty * spec["pt_value"]
-        commissions = spec["rt_fee"] * qty
-
-        # r-multiple if stop available
-        r_multiple = None
-        if panel.stop_price is not None and float(panel.stop_price) > 0:
-            risk_per_contract = abs(entry_price - float(panel.stop_price)) * spec["pt_value"]
-            if risk_per_contract > 0:
-                r_multiple = realized_pnl / (risk_per_contract * qty)
-
-        # MAE/MFE using TradeMath
-        mae = None
-        mfe = None
-        efficiency = None
-        mae_pts, mfe_pts = TradeMath.calculate_mae_mfe(
-            entry_price=entry_price,
-            trade_min_price=panel._trade_min_price,
-            trade_max_price=panel._trade_max_price,
-            is_long=panel.is_long,
-        )
-        if mae_pts is not None and mfe_pts is not None:
-            mae = mae_pts * spec["pt_value"] * qty
-            mfe = mfe_pts * spec["pt_value"] * qty
-
-            # Calculate efficiency: (realized PnL / MFE) if MFE > 0
-            if mfe > 0 and realized_pnl is not None:
-                # Efficiency = realized profit / maximum potential profit
-                # Expressed as decimal (0.0 to 1.0, where 1.0 = 100% efficient)
-                # Can exceed 1.0 if trail added profit beyond max seen during trade
-                efficiency = realized_pnl / mfe
-
-        # entry/exit times
-        entry_time = datetime.fromtimestamp(panel.entry_time_epoch, tz=UTC) if panel.entry_time_epoch else None
-        # Use DTC timestamp from payload
-        exit_ts = payload.get("DateTime")
-        exit_time = datetime.fromtimestamp(float(exit_ts), tz=UTC) if exit_ts else datetime.now(tz=UTC)
-
-        # Get account for mode detection (SIM vs LIVE)
-        account = payload.get("TradeAccount") or ""
-
-        trade = {
-            "symbol": payload.get("Symbol") or "",
-            "side": side,
-            "qty": qty,
-            "entry_price": entry_price,
-            "exit_price": exit_price,
-            "realized_pnl": realized_pnl,
-            "entry_time": entry_time,
-            "exit_time": exit_time,
-            "commissions": commissions,
-            "r_multiple": r_multiple,
-            "mae": mae,
-            "mfe": mfe,
-            "efficiency": efficiency,
-            "account": account,  # <- Include account for mode detection (SIM/LIVE)
-        }
-
-        notify_trade_closed(panel, trade)
-
-        # Reset position context after close
-        panel.set_position(0, 0.0, None)
     except Exception as e:
         log.error(f"[panel2] on_order_update error: {e}")
 
@@ -269,7 +163,12 @@ def on_position_update(panel, payload: dict) -> None:
     """
     Handle normalized PositionUpdate from DTC and mirror into local state.
 
-    Detects trade closure when position goes from non-zero to zero.
+    CRITICAL: This is the SINGLE SOURCE OF TRUTH for all position opens/closes/updates.
+
+    Logic:
+    - qty > 0 and panel flat → OPEN position
+    - qty = 0 and panel has position → CLOSE position (record trade)
+    - qty changed but > 0 → UPDATE position (partial close/scale)
 
     Args:
         panel: Panel2 instance
@@ -277,26 +176,25 @@ def on_position_update(panel, payload: dict) -> None:
     """
     try:
         # Extract from normalized payload (lowercase keys from data_bridge normalization)
-        qty = int(payload.get("qty", 0))
+        new_qty = int(payload.get("qty", 0))
         avg_price = payload.get("avg_entry")
 
         # CRITICAL: Extract symbol from PositionUpdate payload (NOT from quote feed)
         # Try both lowercase (normalized) and uppercase (raw DTC) keys
         symbol = payload.get("symbol") or payload.get("Symbol") or ""
+        account = payload.get("TradeAccount") or ""
 
         # Convert to float if not None
         if avg_price is not None:
             avg_price = float(avg_price)
 
         # CRITICAL: Reject positions without valid price data (avoid cached stale data)
-        if qty != 0 and avg_price is None:
-            log.warning(
-                f"[panel2] Rejecting position with qty={qty} but missing price"
-            )
+        if new_qty != 0 and avg_price is None:
+            log.warning(f"[panel2] Rejecting position with qty={new_qty} but missing price")
             return
 
         # Determine direction
-        is_long = None if qty == 0 else (qty > 0)
+        is_long = None if new_qty == 0 else (new_qty > 0)
 
         # CRITICAL: Update symbol from PositionUpdate payload (BEFORE set_position)
         # This ensures symbol comes from the live position, not the quote feed
@@ -308,9 +206,16 @@ def on_position_update(panel, payload: dict) -> None:
             if hasattr(panel, "symbol_banner"):
                 panel.symbol_banner.setText(panel.symbol)
 
-        # CRITICAL: Detect trade closure - position went from non-zero to zero
-        if qty == 0 and panel.entry_qty and panel.entry_qty > 0 and panel.entry_price is not None and panel.is_long is not None:
-            pass
+        # Check current panel state
+        current_qty = panel.entry_qty if panel.entry_qty else 0
+        was_flat = (current_qty == 0)
+        has_position = (current_qty > 0 and panel.entry_price is not None and panel.is_long is not None)
+
+        # ===========================================
+        # CASE 1: CLOSE - Position went to zero
+        # ===========================================
+        if new_qty == 0 and has_position:
+            log.info(f"[panel2] CLOSE detected via PositionUpdate: qty {current_qty} → 0")
 
             # Use last price as exit price (position already closed, we don't have fill price here)
             exit_price = panel.last_price if panel.last_price else panel.entry_price
@@ -349,9 +254,6 @@ def on_position_update(panel, payload: dict) -> None:
                 mae = mae_pts * spec["pt_value"] * qty_val
                 mfe = mfe_pts * spec["pt_value"] * qty_val
 
-            # Get account for mode detection
-            account = payload.get("TradeAccount") or ""
-
             trade = {
                 "symbol": panel.symbol or "",
                 "side": side,
@@ -371,20 +273,58 @@ def on_position_update(panel, payload: dict) -> None:
             # Persist the trade
             notify_trade_closed(panel, trade)
 
-        # Update position state (ONLY if we have valid data)
-        if qty == 0 or avg_price is not None:
-            # Store entry price and quantity explicitly
-            panel.entry_price = avg_price if qty != 0 else None
-            panel.entry_qty = abs(qty) if qty != 0 else 0
-
-            # Call set_position to update timers and capture snapshots
-            panel.set_position(abs(qty), avg_price, is_long)
-            log.info(f"[panel2] Position update accepted: symbol={panel.symbol}, qty={qty}, avg={avg_price}, long={is_long}")
+            # Reset position to flat
+            panel.set_position(0, 0.0, None)
+            log.info(f"[panel2] Position closed and reset to flat")
 
             # Ensure UI refresh happens
             from panels.panel2 import metrics_updater
             metrics_updater.refresh_all_cells(panel)
+
+        # ===========================================
+        # CASE 2: OPEN - Went from flat to position
+        # ===========================================
+        elif new_qty > 0 and was_flat and avg_price is not None:
+            log.info(f"[panel2] OPEN detected via PositionUpdate: qty 0 → {new_qty} @ {avg_price}")
+
+            # Open new position
+            panel.set_position(abs(new_qty), avg_price, is_long)
+            log.info(f"[panel2] Position opened: symbol={panel.symbol}, qty={new_qty}, avg={avg_price}, long={is_long}")
+
+            # Ensure UI refresh happens
+            from panels.panel2 import metrics_updater
+            metrics_updater.refresh_all_cells(panel)
+
+        # ===========================================
+        # CASE 3: UPDATE - Qty changed but still in position
+        # ===========================================
+        elif new_qty > 0 and has_position and new_qty != current_qty and avg_price is not None:
+            if new_qty < current_qty:
+                log.info(f"[panel2] PARTIAL CLOSE detected via PositionUpdate: qty {current_qty} → {new_qty}")
+                # TODO: In future, could record partial close as separate trade
+            else:
+                log.info(f"[panel2] SCALE IN detected via PositionUpdate: qty {current_qty} → {new_qty}")
+
+            # Update position with new qty/avg
+            panel.set_position(abs(new_qty), avg_price, is_long)
+            log.info(f"[panel2] Position updated: symbol={panel.symbol}, qty={new_qty}, avg={avg_price}")
+
+            # Ensure UI refresh happens
+            from panels.panel2 import metrics_updater
+            metrics_updater.refresh_all_cells(panel)
+
+        # ===========================================
+        # CASE 4: NO CHANGE - Redundant update
+        # ===========================================
+        elif new_qty == current_qty:
+            log.debug(f"[panel2] Redundant PositionUpdate: qty unchanged at {new_qty}")
+            # No action needed
+
+        # ===========================================
+        # CASE 5: Invalid state
+        # ===========================================
         else:
-            log.warning(f"[panel2] Invalid position data - skipping: qty={qty}, avg={avg_price}")
+            log.warning(f"[panel2] Unexpected PositionUpdate state: new_qty={new_qty}, current_qty={current_qty}, avg={avg_price}")
+
     except Exception as e:
         log.error(f"[panel2] on_position_update error: {e}", exc_info=True)
