@@ -391,8 +391,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _setup_reset_balance_hotkey(self) -> None:
         """Setup SIM balance reset hotkey (Ctrl+Shift+R)."""
         try:
-            from PyQt6.QtWidgets import QShortcut
-            from PyQt6.QtGui import QKeySequence
+            from PyQt6.QtGui import QKeySequence, QShortcut
 
             shortcut = QShortcut(QKeySequence("Ctrl+Shift+R"), self)
             shortcut.activated.connect(self._on_reset_sim_balance_hotkey)

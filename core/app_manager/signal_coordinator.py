@@ -16,8 +16,8 @@ Functions:
 import contextlib
 import os
 from PyQt6 import QtCore, QtWidgets
-from PyQt6.QtWidgets import QShortcut, QMessageBox
-from PyQt6.QtGui import QKeySequence
+from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtGui import QKeySequence, QShortcut
 from utils.logger import get_logger
 
 log = get_logger("SignalCoordinator")
