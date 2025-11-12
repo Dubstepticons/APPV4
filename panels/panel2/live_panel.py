@@ -327,8 +327,6 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         if self.cum_delta != prev[4]:
             log.info(f"[panel2] Feed updated -- Delta changed: {self.cum_delta}")
 
-        # Heat transitions (drawdown tracking)
-        metrics_updater.update_heat_state_transitions(self, prev[0], self.last_price)
         # Track per-trade min/max while in position for MAE/MFE
         try:
             if self.entry_qty and self.last_price is not None:
@@ -416,9 +414,23 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                 # Initialize trade extremes to entry price (prevents premature MAE/MFE)
                 self._trade_min_price = self.entry_price
                 self._trade_max_price = self.entry_price
-                log.info(
-                    f"[panel2] Position opened -- Entry VWAP: {self.entry_vwap}, Entry Delta: {self.entry_delta}, Entry POC: {self.entry_poc}"
-                )
+
+                # DEBUG: Comprehensive logging for entry snapshots
+                log.info(f"[panel2] Position opened - Entry snapshots captured:")
+                log.info(f"  Entry Price: {self.entry_price}")
+                log.info(f"  Entry Qty: {self.entry_qty} ({'LONG' if self.is_long else 'SHORT'})")
+                log.info(f"  Entry VWAP: {self.entry_vwap} (live vwap: {self.vwap})")
+                log.info(f"  Entry Delta: {self.entry_delta} (live cum_delta: {self.cum_delta})")
+                log.info(f"  Entry POC: {self.entry_poc} (live poc: {self.poc})")
+                log.info(f"  Last Price: {self.last_price}")
+
+                # CRITICAL: Warn if any snapshot is None
+                if self.entry_vwap is None:
+                    log.warning("[panel2] WARNING: entry_vwap is None - VWAP cell will not display!")
+                if self.entry_delta is None:
+                    log.warning("[panel2] WARNING: entry_delta is None - Delta cell will not display!")
+                if self.entry_poc is None:
+                    log.warning("[panel2] WARNING: entry_poc is None - POC cell will not display!")
         else:
             # No position - clear all position-specific data
             self.entry_price = None

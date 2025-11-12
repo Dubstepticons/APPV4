@@ -162,8 +162,7 @@ def on_order_update(panel, payload: dict) -> None:
         if qty > 0 and price is not None:
             # Only seed if we're currently flat (no existing position)
             if not (panel.entry_qty and panel.entry_price is not None and panel.is_long is not None):
-                from panels.panel2 import live_panel
-                live_panel.set_position(panel, qty, price, is_long)
+                panel.set_position(qty, price, is_long)
                 log.info(f"[panel2] Seeded position from fill: qty={qty}, price={price}, long={is_long}")
                 return  # Early exit - don't process as close since we just opened
 
@@ -260,8 +259,7 @@ def on_order_update(panel, payload: dict) -> None:
         notify_trade_closed(panel, trade)
 
         # Reset position context after close
-        from panels.panel2 import live_panel
-        live_panel.set_position(panel, 0, 0.0, None)
+        panel.set_position(0, 0.0, None)
     except Exception as e:
         log.error(f"[panel2] on_order_update error: {e}")
 
@@ -378,8 +376,7 @@ def on_position_update(panel, payload: dict) -> None:
             panel.entry_qty = abs(qty) if qty != 0 else 0
 
             # Call set_position to update timers and capture snapshots
-            from panels.panel2 import live_panel
-            live_panel.set_position(panel, abs(qty), avg_price, is_long)
+            panel.set_position(abs(qty), avg_price, is_long)
             log.info(f"[panel2] Position update accepted: symbol={panel.symbol}, qty={qty}, avg={avg_price}, long={is_long}")
 
             # Ensure UI refresh happens

@@ -12,7 +12,6 @@ Functions:
 - update_secondary_metrics(): Complex metrics (R-multiple, MAE/MFE, efficiency, etc.)
 - update_live_banner(): Symbol and live price banner
 - update_proximity_alerts(): Proximity warnings
-- update_heat_state_transitions(): Heat state machine transitions
 
 Constants:
 - HEAT_WARN_SEC: 3 minutes (warning threshold)
@@ -159,17 +158,33 @@ def update_time_and_heat_cells(panel) -> None:
     else:
         # In position - calculate and display heat
         heat_sec = 0
+
+        # CRITICAL FIX: Check conditions separately for better debugging
         if panel.entry_price is not None and panel.last_price is not None and panel.is_long is not None:
+            # Calculate if position is in drawdown (underwater)
             in_dd = (panel.last_price < panel.entry_price) if panel.is_long else (panel.last_price > panel.entry_price)
+
+            # DEBUG: Log drawdown state on transitions
+            if in_dd and panel.heat_start_epoch is None:
+                log.info(f"[panel2] Heat timer STARTING - Underwater (entry: {panel.entry_price}, last: {panel.last_price}, {'LONG' if panel.is_long else 'SHORT'})")
+
             if in_dd:
+                # Start heat timer if underwater
                 if panel.heat_start_epoch is None:
                     panel.heat_start_epoch = int(time.time())
                     log.info("[panel2] Heat timer started (drawdown detected)")
             else:
+                # Pause heat timer if back above water
                 if panel.heat_start_epoch is not None:
-                    log.info("[panel2] Heat timer paused (drawdown ended)")
+                    elapsed = int(time.time() - panel.heat_start_epoch)
+                    log.info(f"[panel2] Heat timer paused (drawdown ended) - was underwater for {elapsed}s")
                 panel.heat_start_epoch = None
+        else:
+            # CRITICAL: Log missing data that prevents heat timer
+            if panel.entry_price is None or panel.last_price is None or panel.is_long is None:
+                log.warning(f"[panel2] Heat timer BLOCKED - Missing: entry_price={panel.entry_price}, last_price={panel.last_price}, is_long={panel.is_long}")
 
+        # Calculate heat duration
         if panel.heat_start_epoch is not None:
             heat_sec = int(time.time() - panel.heat_start_epoch)
 
@@ -473,31 +488,3 @@ def update_proximity_alerts(panel) -> None:
             log.info("[panel2] Stop proximity cleared -- flashing off")
 
 
-def update_heat_state_transitions(panel, _prev_last: Optional[float], new_last: Optional[float]) -> None:
-    """
-    Update heat state machine transitions.
-
-    Logs when position transitions into/out of drawdown state.
-
-    Args:
-        panel: Panel2 instance
-        _prev_last: Previous last price (unused, for signature compatibility)
-        new_last: New last price
-    """
-    if panel.entry_price is None or getattr(panel, "entry_qty", 0) == 0 or panel.is_long is None or new_last is None:
-        return
-    in_drawdown = (new_last < panel.entry_price) if panel.is_long else (new_last > panel.entry_price)
-    prev_drawdown = None
-    key = "_prev_drawdown_state"
-    if hasattr(panel, key):
-        prev_drawdown = getattr(panel, key)
-    setattr(panel, key, in_drawdown)
-
-    if prev_drawdown is None:
-        return  # first sample
-
-    if prev_drawdown != in_drawdown:
-        if in_drawdown:
-            log.info("[panel2] Heat state: drawdown entered")
-        else:
-            log.info("[panel2] Heat state: drawdown exited")
