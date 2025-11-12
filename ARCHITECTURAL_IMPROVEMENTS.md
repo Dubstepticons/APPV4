@@ -231,10 +231,10 @@ class AsyncMessageProcessor:
 - [ ] Split panel2.py into 4 modules
 - [ ] Update all imports across codebase
 
-### Week 4: Integration & Testing 🔄 OPTIONAL
+### Week 4: Integration & Testing 🔄 IN PROGRESS
 - [ ] Integrate ProtectedDTCClient into app_manager
-- [ ] Refactor panel3 to use TradeRepository
-- [ ] Refactor panel1 to use repositories
+- [x] Refactor panel3 to use TradeRepository (via stats_service)
+- [x] Refactor panel1 to use repositories (2 queries refactored)
 - [ ] Add health monitoring dashboard
 - [ ] Write unit tests with mock repositories
 
