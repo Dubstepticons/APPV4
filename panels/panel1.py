@@ -756,9 +756,7 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
 
         try:
             from datetime import datetime, timedelta, timezone
-            from data.db_engine import get_session
-            from data.schema import TradeRecord
-            from sqlalchemy import func
+            from services.repositories.trade_repository import TradeRepository
 
             UTC = timezone.utc
             now = datetime.now(UTC)
@@ -779,16 +777,16 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
             else:
                 start_time, end_time = timeframe_ranges[self._tf]
 
-
-            # Query trades for this timeframe
-            with get_session() as session:
-                trades = session.query(TradeRecord).filter(
-                    TradeRecord.mode == mode,
-                    TradeRecord.exit_time >= start_time,
-                    TradeRecord.exit_time <= end_time,
-                    TradeRecord.realized_pnl is not None,  # Only trades with valid PnL
-                    TradeRecord.is_closed == True
-                ).all()
+            # Query trades for this timeframe using repository
+            repo = TradeRepository()
+            trades = repo.get_range(
+                start_time,
+                end_time,
+                mode=mode,
+                is_closed=True
+            )
+            # Filter out trades with None realized_pnl (repository returns all closed trades)
+            trades = [t for t in trades if t.realized_pnl is not None]
 
             if trades:
                 # Calculate total PnL for timeframe (filter out None values)
@@ -879,40 +877,33 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
 
         try:
             from datetime import timezone
-            from data.db_engine import get_session
-            from data.schema import TradeRecord
+            from services.repositories.trade_repository import TradeRepository
 
             # Get starting balance (default 10k for SIM, 0 for LIVE)
             starting_balance = 10000.0 if mode == "SIM" else 0.0
 
-            # Query all trades for this mode, ordered by exit time
-            with get_session() as s:
-                query = (
-                    s.query(TradeRecord)
-                    .filter(TradeRecord.mode == mode)
-                    .filter(TradeRecord.is_closed == True)
-                    .filter(TradeRecord.realized_pnl.isnot(None))
-                    .filter(TradeRecord.exit_time.isnot(None))
-                    .order_by(TradeRecord.exit_time.asc())
-                )
+            # Query all closed trades for this mode using repository
+            repo = TradeRepository()
+            trades = repo.get_closed_trades_by_mode(mode)
 
-                trades = query.all()
+            # Filter trades with valid P&L and exit time, then sort by exit time
+            trades = [t for t in trades if t.realized_pnl is not None and t.exit_time is not None]
+            trades.sort(key=lambda t: t.exit_time)
 
-                if not trades:
-                    # No trades yet, return empty curve
-                    return []
+            if not trades:
+                # No trades yet, return empty curve
+                return []
 
-                # Build equity curve: cumulative sum of P&L
-                equity_points = []
-                cumulative_balance = starting_balance
+            # Build equity curve: cumulative sum of P&L
+            equity_points = []
+            cumulative_balance = starting_balance
 
-                for trade in trades:
-                    if trade.realized_pnl is not None and trade.exit_time is not None:
-                        cumulative_balance += trade.realized_pnl
-                        timestamp = trade.exit_time.replace(tzinfo=timezone.utc).timestamp()
-                        equity_points.append((timestamp, cumulative_balance))
+            for trade in trades:
+                cumulative_balance += trade.realized_pnl
+                timestamp = trade.exit_time.replace(tzinfo=timezone.utc).timestamp()
+                equity_points.append((timestamp, cumulative_balance))
 
-                return equity_points
+            return equity_points
 
         except Exception as e:
             log.error(f"[Panel1] Error loading equity curve from database: {e}", exc_info=True)
