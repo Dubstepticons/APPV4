@@ -125,7 +125,7 @@ def on_order_update(panel, payload: dict) -> None:
     """
     Handle normalized OrderUpdate from DTC (via data_bridge).
 
-    CRITICAL: This function ONLY detects stop/target prices from order placement.
+    CRITICAL: This function ONLY detects stop/target prices and captures close fills.
     It does NOT open or close positions - that's handled exclusively by on_position_update().
 
     Args:
@@ -135,6 +135,9 @@ def on_order_update(panel, payload: dict) -> None:
     try:
         side = payload.get("BuySell")  # 1=Buy, 2=Sell
         price1 = payload.get("Price1")
+        order_status = payload.get("OrderStatus")  # 7=Fully Filled
+        filled_qty = payload.get("FilledQuantity")
+        avg_fill_price = payload.get("AverageFillPrice")
 
         # ONLY detect stop/target from sell orders (for UI display)
         # Do NOT modify position state - PositionUpdate handles that
@@ -152,6 +155,23 @@ def on_order_update(panel, payload: dict) -> None:
                 panel.c_target.set_value_text(f"{price1:.2f}")
                 panel.c_target.set_value_color(THEME.get("text_primary", "#E6F6FF"))
                 log.info(f"[panel2] Target detected @ {price1:.2f}")
+
+        # CRITICAL: Capture the exit fill price from closing orders
+        # When we have a position and get a fully-filled order, save it for the next PositionUpdate
+        if (panel.entry_qty and panel.entry_qty > 0 and
+            side == 2 and order_status == 7 and filled_qty and avg_fill_price):
+            # This is a fully-filled SELL order (side=2) while we have a position
+            try:
+                filled_qty = int(filled_qty) if isinstance(filled_qty, (int, float, str)) else 0
+                avg_fill_price = float(avg_fill_price) if isinstance(avg_fill_price, (int, float, str)) else None
+
+                # Store it if it matches our position qty (closing order)
+                if filled_qty > 0 and avg_fill_price is not None and avg_fill_price > 0:
+                    if abs(filled_qty) == abs(panel.entry_qty):
+                        panel._last_exit_fill_price = avg_fill_price
+                        log.info(f"[panel2] Captured exit fill price from OrderUpdate: {avg_fill_price:.2f}")
+            except (ValueError, TypeError):
+                pass
 
         # NO POSITION OPENS/CLOSES HERE - PositionUpdate is the single source of truth
 
@@ -220,8 +240,20 @@ def on_position_update(panel, payload: dict) -> None:
         if new_qty == 0 and has_position:
             log.info(f"[panel2] CLOSE detected via PositionUpdate: qty {current_qty} → 0")
 
-            # Use last price as exit price (position already closed, we don't have fill price here)
-            exit_price = panel.last_price if panel.last_price else panel.entry_price
+            # CRITICAL: Use the captured exit fill price from the OrderUpdate
+            # If not available, fall back to CSV last_price, then entry_price
+            exit_price = None
+            if hasattr(panel, '_last_exit_fill_price') and panel._last_exit_fill_price:
+                exit_price = panel._last_exit_fill_price
+                log.info(f"[panel2] Using captured exit fill price from OrderUpdate: {exit_price:.2f}")
+                # Clear it after use so we don't use stale data
+                panel._last_exit_fill_price = None
+            elif panel.last_price:
+                exit_price = panel.last_price
+                log.info(f"[panel2] Using CSV last_price (fill price not captured): {exit_price:.2f}")
+            else:
+                exit_price = panel.entry_price
+                log.info(f"[panel2] Using entry_price as fallback: {exit_price:.2f}")
 
             # Build trade dict
             entry_time = datetime.fromtimestamp(panel.entry_time_epoch, tz=UTC) if panel.entry_time_epoch else None
