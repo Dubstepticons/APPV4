@@ -692,7 +692,11 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
         if hasattr(self, "graph_container") and self.graph_container:
             self.graph_container.set_background_color(THEME.get("bg_secondary", "#000000"))
 
-        # Note: mode_badge is NOT updated here - it's managed by set_trading_mode() or set_mode_live()
+        # CRITICAL FIX: Update mode badge styling with current THEME colors
+        if hasattr(self, "mode_badge") and self.mode_badge:
+            from panels.panel1 import pnl_manager
+            current_mode = self.current_mode  # Get current mode from active scope
+            pnl_manager.update_badge_style(self, current_mode)
 
         # Update balance label
         if hasattr(self, "lbl_balance") and self.lbl_balance:

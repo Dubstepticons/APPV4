@@ -303,25 +303,45 @@ def update_trails_and_glow(panel) -> None:
     """
     Update trailing lines and glow effect with current data.
 
+    CRITICAL: Only renders trails/glow for LIVE/1D timeframes or when perf_safe=False.
+
     Args:
         panel: Panel1 instance
     """
     if not panel._equity_points or not getattr(panel, "_line", None):
         return
+
+    # CRITICAL FIX: Respect timeframe and perf settings for trails/glow
+    # Only show visual effects for LIVE/1D timeframes (not 1W/1M/3M/YTD)
+    tf = getattr(panel, "_tf", "LIVE")
+    perf_safe = getattr(panel, "_perf_safe", False)
+
     try:
         from panels.panel1 import pnl_manager
         pts = pnl_manager.filtered_points_for_current_tf(panel)
         if pts:
             xs, ys = zip(*pts)
-            # Update trail lines with fractional data
-            for trail_item in getattr(panel, "_trail_lines", []) or []:
-                if hasattr(trail_item, "_trail_take"):
-                    take = trail_item._trail_take
-                    start_idx = max(0, int(len(xs) * (1 - take)))
-                    trail_item.setData(xs[start_idx:], ys[start_idx:])
-            # Update glow line
-            if getattr(panel, "_glow_line", None):
-                panel._glow_line.setData(xs, ys)
+
+            # Update trail lines (only if perf_safe=False and LIVE/1D timeframe)
+            if not perf_safe and tf in ("LIVE", "1D"):
+                for trail_item in getattr(panel, "_trail_lines", []) or []:
+                    if hasattr(trail_item, "_trail_take"):
+                        take = trail_item._trail_take
+                        start_idx = max(0, int(len(xs) * (1 - take)))
+                        trail_item.setData(xs[start_idx:], ys[start_idx:])
+            else:
+                # Clear trail lines for other timeframes or perf_safe mode
+                for trail_item in getattr(panel, "_trail_lines", []) or []:
+                    trail_item.setData([], [])
+
+            # Update glow line (only if perf_safe=False and LIVE/1D timeframe)
+            glow_line = getattr(panel, "_glow_line", None)
+            if glow_line:
+                if not perf_safe and tf in ("LIVE", "1D"):
+                    glow_line.setData(xs, ys)
+                else:
+                    # Clear glow for other timeframes or perf_safe mode
+                    glow_line.setData([], [])
     except Exception as e:
         log.debug(f"_update_trails_and_glow error: {e}")
 
