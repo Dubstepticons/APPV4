@@ -26,9 +26,9 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional
+from typing import Optional, Union
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class OrderState(str, Enum):
@@ -66,7 +66,7 @@ class OrderRecord(BaseModel):
 
     # Order details
     symbol: str
-    side: str  # "BUY" or "SELL"
+    side: Union[int, str]  # "BUY" or "SELL" (or DTC integer: 1=BUY, 2=SELL)
     qty: int
     filled_qty: int = 0
     price: Optional[float] = None
@@ -84,9 +84,50 @@ class OrderRecord(BaseModel):
     last_updated: datetime = Field(default_factory=datetime.now)
 
     # Metadata
-    order_type: Optional[str] = None  # MARKET, LIMIT, STOP, etc.
-    time_in_force: Optional[str] = None
+    order_type: Optional[Union[int, str]] = None  # MARKET, LIMIT, STOP, etc. (or DTC integer)
+    time_in_force: Optional[Union[int, str]] = None  # GTC, DAY, etc. (or DTC integer)
     text: Optional[str] = None  # User notes or broker messages
+
+    # Validators to convert DTC integer codes to strings
+    @field_validator('side', mode='before')
+    @classmethod
+    def convert_side(cls, v):
+        """Convert DTC BuySell integer to string"""
+        if isinstance(v, int):
+            return {1: "BUY", 2: "SELL"}.get(v, f"UNKNOWN_{v}")
+        return v
+
+    @field_validator('order_type', mode='before')
+    @classmethod
+    def convert_order_type(cls, v):
+        """Convert DTC OrderType integer to string"""
+        if v is None:
+            return None
+        if isinstance(v, int):
+            return {
+                1: "MARKET",
+                2: "LIMIT",
+                3: "STOP",
+                4: "STOP_LIMIT",
+                5: "MARKET_IF_TOUCHED",
+            }.get(v, f"UNKNOWN_{v}")
+        return v
+
+    @field_validator('time_in_force', mode='before')
+    @classmethod
+    def convert_time_in_force(cls, v):
+        """Convert DTC TimeInForce integer to string"""
+        if v is None:
+            return None
+        if isinstance(v, int):
+            return {
+                1: "DAY",
+                2: "GTC",
+                3: "IOC",
+                4: "FOK",
+                5: "GOOD_TILL_DATE_TIME",
+            }.get(v, f"UNKNOWN_{v}")
+        return v
 
 
 class OrderStateMachine:
