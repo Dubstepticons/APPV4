@@ -112,8 +112,6 @@ def build_ui(main_window) -> None:
     try:
         from core.app_manager import theme_manager
         theme_manager.on_theme_changed(main_window, main_window.current_theme_mode)
-        if os.getenv("DEBUG_DTC", "0") == "1":
-            log.debug(f"[Theme] Reapplied {main_window.current_theme_mode.upper()} after panel init")
     except Exception:
         pass
 

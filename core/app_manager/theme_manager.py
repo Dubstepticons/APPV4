@@ -63,11 +63,6 @@ def on_theme_changed(main_window, mode: str) -> None:
         from utils.logger import get_logger
         log = get_logger(__name__)
 
-        # DEBUG: Log theme state
-        log.info(f"[ThemeManager] Switching to mode: {mode}")
-        log.info(f"[ThemeManager] THEME.bg_panel = {THEME.get('bg_panel', 'KEY_NOT_FOUND')}")
-        log.info(f"[ThemeManager] THEME.cell_border = {THEME.get('cell_border', 'KEY_NOT_FOUND')}")
-
         # Refresh connection icon
         icon = getattr(main_window.panel_balance, "conn_icon", None)
         if icon and hasattr(icon, "refresh_theme"):
@@ -79,12 +74,10 @@ def on_theme_changed(main_window, mode: str) -> None:
 
         # Refresh Panel 2 (live)
         if hasattr(main_window.panel_live, "refresh_theme"):
-            log.info(f"[ThemeManager] Calling refresh_theme on Panel2")
             main_window.panel_live.refresh_theme()
 
         # Refresh Panel 3 (stats)
         if hasattr(main_window.panel_stats, "refresh_theme"):
-            log.info(f"[ThemeManager] Calling refresh_theme on Panel3")
             main_window.panel_stats.refresh_theme()
 
         # Update central widget background
