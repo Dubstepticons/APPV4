@@ -97,8 +97,10 @@ class MetricCell(QtWidgets.QFrame, ThemeAwareMixin):
         """
 
     def _on_theme_refresh(self) -> None:
-        """Update label colors after theme refresh."""
+        """Update label colors and frame styling after theme refresh."""
         self.lbl_title.setStyleSheet(f"color: {THEME.get('text_dim', '#5B6C7A')};")
+        # CRITICAL: Also update frame borders and background when theme changes
+        self.setStyleSheet(self._build_theme_stylesheet())
 
     # Value/text/color API
     def set_value_text(self, text: str):

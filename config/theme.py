@@ -354,7 +354,7 @@ LIVE_THEME: dict[str, Union[int, float, str, bool]] = {
     "card_bg": "#1A1F2E",
     # Borders (gold)
     "border": "#FFD700",
-    "cell_border": "none",
+    "cell_border": "2px solid #FFD700",  # Gold borders for LIVE mode
     # Accents
     "accent": "#60A5FA",
     "accent_warning": "#F5B342",
@@ -418,7 +418,7 @@ SIM_THEME: dict[str, Union[int, float, str, bool]] = {
     "card_bg": "#FFFFFF",       # White cards
     # Borders (light gray)
     "border": "#E5E7EB",        # Light gray borders
-    "cell_border": "none",
+    "cell_border": "2px solid #4DA7FF",  # Neon blue for SIM mode (light panels need visible borders)
     # Accents (balanced for SIM)
     "accent": "#60A5FA",
     "accent_warning": "#F5B342",
