@@ -330,13 +330,28 @@ def auto_range(panel, xs: tuple, ys: tuple) -> None:
     """
     Automatic axis scaling based on data and timeframe window.
 
+    CRITICAL: Ensures stable graph zoom even with sparse data points.
+
     Args:
         panel: Panel1 instance
         xs: X data (timestamps)
         ys: Y data (balances)
     """
-    if not has_graph(panel) or not xs or not ys:
+    if not has_graph(panel):
         return
+
+    # Handle empty data gracefully
+    if not xs or not ys:
+        import time
+        now = time.time()
+        log.debug("[Panel1] auto_range: No data, using default range")
+        try:
+            panel._plot.setXRange(now - 3600, now, padding=0.02)
+            panel._plot.setYRange(9000, 11000, padding=0.10)
+            return
+        except Exception as e:
+            log.warning(f"[Panel1] auto_range fallback failed: {e}")
+            return
 
     # FIX: Set X range based on timeframe window, not just data extent
     # This prevents over-zooming when there are few data points
@@ -352,15 +367,30 @@ def auto_range(panel, xs: tuple, ys: tuple) -> None:
         # YTD or no window - fit to data
         x_min, x_max = min(xs), max(xs)
 
+    # Calculate Y range with better padding for visual clarity
     y_min, y_max = min(ys), max(ys)
-    if y_min == y_max:
-        pad = max(1.0, abs(y_min) * 0.01)
+    y_span = y_max - y_min
+
+    # CRITICAL FIX: Ensure minimum Y span to prevent flat/narrow graphs
+    if y_span < 0.01:
+        # Nearly flat data - add ±0.5% padding around value
+        center = (y_min + y_max) / 2
+        pad = max(10.0, abs(center) * 0.005)
+        y_min = center - pad
+        y_max = center + pad
+    else:
+        # Normal data - add 10% padding top/bottom
+        pad = y_span * 0.10
         y_min -= pad
         y_max += pad
+
+    # Apply ranges with error handling
     try:
-        panel._plot.setXRange(x_min, x_max, padding=0.02)
-        panel._plot.setYRange(y_min, y_max, padding=0.10)
-    except Exception:
+        panel._plot.setXRange(x_min, x_max, padding=0.0)  # No extra padding, we calculated it
+        panel._plot.setYRange(y_min, y_max, padding=0.0)
+        log.debug(f"[Panel1] auto_range: X=[{x_min:.0f}, {x_max:.0f}], Y=[${y_min:.2f}, ${y_max:.2f}]")
+    except Exception as e:
+        log.error(f"[Panel1] auto_range setRange failed: {e}")
         with contextlib.suppress(Exception):
             panel._plot.enableAutoRange(axis="xy")
 

@@ -232,8 +232,8 @@ def update_header_for_hover(panel, x: float, y: float) -> None:
     from panels.panel1 import pnl_manager
     panel.lbl_balance.setText(pnl_manager.fmt_money(y))
 
-    # Get baseline from full equity history (not just filtered points)
-    baseline = pnl_manager.get_baseline_for_tf(panel, x)
+    # Get baseline from start of timeframe window (not relative to hover position)
+    baseline = pnl_manager.get_baseline_for_tf(panel)
     if baseline is None:
         # If no baseline found, show just the balance
         panel.lbl_pnl.setText("--  --")

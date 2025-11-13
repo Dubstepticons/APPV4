@@ -166,9 +166,22 @@ def update_pnl_for_current_tf(panel) -> None:
         if trades:
             # Calculate total PnL for timeframe
             total_pnl = sum(t.realized_pnl for t in trades if t.realized_pnl is not None)
-            baseline = 10000.0  # Standard SIM starting balance
-            pnl_pct = (total_pnl / baseline) * 100.0
 
+            # CRITICAL FIX: Use session start balance as baseline, not hardcoded 10k
+            # Get baseline for current (mode, account) scope
+            scope = panel._active_scope
+            baseline = panel._session_start_balances.get(scope)
+
+            # Fallback to current balance if session start not available
+            if baseline is None:
+                from core.app_state import get_state_manager
+                state = get_state_manager()
+                if state:
+                    baseline = state.get_balance_for_mode(mode)
+                else:
+                    baseline = 10000.0  # Last resort fallback
+
+            pnl_pct = (total_pnl / baseline) * 100.0 if baseline != 0 else 0.0
             pnl_up = total_pnl > 0 if abs(total_pnl) > 0.01 else None
         else:
             total_pnl = 0.0
@@ -224,13 +237,16 @@ def filtered_points_for_current_tf(panel) -> list[tuple[float, float]]:
     return filtered
 
 
-def get_baseline_for_tf(panel, at_time: float) -> Optional[float]:
+def get_baseline_for_tf(panel, at_time: Optional[float] = None) -> Optional[float]:
     """
     Get the baseline value for PnL calculation based on timeframe.
 
+    CRITICAL: Baseline is calculated from the START of the current timeframe window,
+    not relative to the hover position. This ensures consistent PnL during scrubbing.
+
     Args:
         panel: Panel1 instance
-        at_time: Timestamp to calculate baseline for
+        at_time: IGNORED (kept for backward compatibility)
 
     Returns:
         Baseline balance value or None
@@ -239,24 +255,35 @@ def get_baseline_for_tf(panel, at_time: float) -> Optional[float]:
         return None
 
     import bisect
+    import time
     from datetime import datetime
 
     xs = [p[0] for p in panel._equity_points]
     ys = [p[1] for p in panel._equity_points]
 
+    # Calculate baseline from the start of the CURRENT timeframe window
+    # Use NOW as the reference point, not the hover position
+    now = time.time()
+
     if panel._tf == "LIVE":
-        baseline_time = at_time - 3600
+        # Baseline is 1 hour ago from NOW
+        baseline_time = now - 3600
     elif panel._tf == "1D":
-        dt = datetime.fromtimestamp(at_time)
+        # Baseline is midnight TODAY
+        dt = datetime.fromtimestamp(now)
         baseline_time = datetime(dt.year, dt.month, dt.day).timestamp()
     elif panel._tf == "1W":
-        baseline_time = at_time - 604800
+        # Baseline is 1 week ago from NOW
+        baseline_time = now - 604800
     elif panel._tf == "1M":
-        baseline_time = at_time - 2592000
+        # Baseline is 1 month ago from NOW
+        baseline_time = now - 2592000
     elif panel._tf == "3M":
-        baseline_time = at_time - 7776000
+        # Baseline is 3 months ago from NOW
+        baseline_time = now - 7776000
     else:  # YTD
-        dt = datetime.fromtimestamp(at_time)
+        # Baseline is January 1st of THIS YEAR
+        dt = datetime.fromtimestamp(now)
         baseline_time = datetime(dt.year, 1, 1).timestamp()
 
     i = bisect.bisect_right(xs, baseline_time)
@@ -714,6 +741,16 @@ def set_trading_mode(panel, mode: str, account: Optional[str] = None) -> None:
     # 2. Swap: Update active scope (single source of truth)
     # current_mode and current_account are properties that derive from _active_scope
     panel._active_scope = new_scope
+
+    # CRITICAL FIX: Record session start balance for this scope (for PnL % calculation)
+    # Only set if not already recorded (preserve original session start)
+    if new_scope not in panel._session_start_balances:
+        from core.app_state import get_state_manager
+        state = get_state_manager()
+        if state:
+            current_balance = state.get_balance_for_mode(mode)
+            panel._session_start_balances[new_scope] = current_balance
+            log.debug(f"[Panel1] Recorded session start balance for {new_scope}: ${current_balance:.2f}")
 
     # 3. Reload: Get equity curve for new scope
     panel._equity_points = get_equity_curve(panel, mode, account)
