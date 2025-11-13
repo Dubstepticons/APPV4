@@ -147,6 +147,13 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
     # -------------------- Trade persistence hooks (start)
     def notify_trade_closed(self, trade: dict) -> None:
         """External hook to persist a closed trade and notify listeners.
+
+        CRITICAL: Uses PositionRepository to atomically close position:
+        - Reads from OpenPosition table
+        - Writes to TradeRecord table
+        - Deletes from OpenPosition table
+        All in one database transaction.
+
         Expects keys: symbol, side, qty, entry_price, exit_price, realized_pnl,
         optional: entry_time, exit_time, commissions, r_multiple, mae, mfe, account.
         """
@@ -172,6 +179,94 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
 
         # Simple one-line trade close notification
         print(f"[TRADE CLOSE] {symbol} {qty} @ {entry} -> {exit_p} | P&L: {pnl_sign}${abs(pnl):,.2f} | Mode: {mode}")
+
+        # CRITICAL: Close position in database (single source of truth)
+        # This replaces the old TradeManager approach
+        ok = self._close_position_in_database(trade)
+
+        if not ok:
+            # Fallback to old TradeManager approach if database close fails
+            print("[TRADE CLOSE] Database close failed, falling back to TradeManager...")
+            ok = self._close_position_legacy(trade)
+
+        # Emit regardless; consumers may refresh their views
+        try:
+            payload = dict(trade)
+            payload["ok"] = ok
+            self.tradesChanged.emit(payload)
+        except Exception as e:
+            pass
+
+    def _close_position_in_database(self, trade: dict) -> bool:
+        """
+        Close position using PositionRepository (database as source of truth).
+
+        This is the new approach that atomically:
+        1. Reads from OpenPosition table
+        2. Writes to TradeRecord table
+        3. Deletes from OpenPosition table
+
+        Args:
+            trade: Trade dict with exit data
+
+        Returns:
+            True if close succeeded, False otherwise
+        """
+        try:
+            from data.position_repository import get_position_repository
+            from datetime import datetime, timezone
+
+            position_repo = get_position_repository()
+
+            # Extract exit data from trade dict
+            exit_price = trade.get("exit_price")
+            if exit_price is None:
+                log.error("[Panel2 DB] Cannot close position: exit_price missing")
+                return False
+
+            # Get exit time (default to now if not provided)
+            exit_time = trade.get("exit_time")
+            if exit_time is None:
+                exit_time = datetime.now(timezone.utc)
+            elif isinstance(exit_time, int):
+                # Convert epoch to datetime
+                exit_time = datetime.fromtimestamp(exit_time, tz=timezone.utc)
+
+            # Close position in database (atomic operation)
+            trade_id = position_repo.close_position(
+                mode=self.current_mode,
+                account=self.current_account,
+                exit_price=float(exit_price),
+                exit_time=exit_time,
+                realized_pnl=trade.get("realized_pnl"),
+                commissions=trade.get("commissions"),
+                exit_vwap=self.vwap,  # Current VWAP at exit
+                exit_cum_delta=self.cum_delta,  # Current cum delta at exit
+            )
+
+            if trade_id:
+                log.info(
+                    f"[Panel2 DB] Closed position in database: trade_id={trade_id} "
+                    f"{self.current_mode}/{self.current_account}"
+                )
+                return True
+            else:
+                log.error("[Panel2 DB] Failed to close position in database")
+                return False
+
+        except Exception as e:
+            log.error(f"[Panel2 DB] Error closing position in database: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def _close_position_legacy(self, trade: dict) -> bool:
+        """
+        Legacy approach using TradeManager (fallback only).
+
+        This is kept as a fallback in case database close fails.
+        Should rarely be used in normal operation.
+        """
         try:
             from services.trade_service import TradeManager
             from core.app_state import get_state_manager
@@ -180,6 +275,7 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             trade_manager = TradeManager(state_manager=state)
         except Exception as e:
             trade_manager = None
+
         ok = False
         try:
             if trade_manager:
@@ -215,15 +311,10 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         except Exception as e:
             from utils.logger import get_logger
             log = get_logger(__name__)
-            log.error(f"[panel2] Error recording closed trade: {e}", exc_info=True)
+            log.error(f"[panel2] Error recording closed trade (legacy): {e}", exc_info=True)
             ok = False
-        # Emit regardless; consumers may refresh their views
-        try:
-            payload = dict(trade)
-            payload["ok"] = ok
-            self.tradesChanged.emit(payload)
-        except Exception as e:
-            pass
+
+        return ok
 
     # -------------------- Trade persistence hooks (end)
 
