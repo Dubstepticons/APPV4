@@ -40,11 +40,15 @@ from utils.request_timeout import RequestTimeoutManager
 log = structlog.get_logger(__name__)
 
 # -------------------- App-level normalized signals (start)
+# DEPRECATED: Blinker signals (being migrated to SignalBus)
 signal_trade_account = Signal("trade_account")
 signal_balance = Signal("balance")
 signal_position = Signal("position")
 signal_order = Signal("order")
 # -------------------- App-level normalized signals (end)
+
+# MIGRATION: Import SignalBus for Qt signal emission
+from core.signal_bus import get_signal_bus
 
 
 # -------------------- AppMessage model (start)
@@ -305,7 +309,14 @@ class DTCClientJSON(QtCore.QObject):
         # Start timeout checking when connected
         self._start_timeout_checker()
 
+        # Emit connection event
         self.connected.emit()
+        # NEW: Also emit to SignalBus
+        try:
+            signal_bus = get_signal_bus()
+            signal_bus.dtcConnected.emit()
+        except Exception as e:
+            log.warning("signal_bus.connected.error", error=str(e))
 
         # Send DTC LOGON directly (Sierra Chart doesn't support ENCODING_REQUEST negotiation)
         try:
@@ -338,7 +349,15 @@ class DTCClientJSON(QtCore.QObject):
         self._stop_timeout_checker()
         self._timeout_manager.reset()
 
+        # Emit disconnection event
         self.disconnected.emit()
+        # NEW: Also emit to SignalBus
+        try:
+            signal_bus = get_signal_bus()
+            signal_bus.dtcDisconnected.emit()
+        except Exception as e:
+            log.warning("signal_bus.disconnected.error", error=str(e))
+
         # Stop any pending handshake timer
         if self._handshake_timer and self._handshake_timer.isActive():
             self._handshake_timer.stop()
@@ -362,7 +381,18 @@ class DTCClientJSON(QtCore.QObject):
         self._handshake_timer = QtCore.QTimer(self)
         self._handshake_timer.setSingleShot(True)
         self._handshake_timer.setInterval(1500)  # ms (adjust if your server is slower)
-        self._handshake_timer.timeout.connect(lambda: (log.info("dtc.session_ready.grace"), self.session_ready.emit()))
+
+        def _emit_session_ready_grace():
+            log.info("dtc.session_ready.grace")
+            self.session_ready.emit()
+            # NEW: Also emit to SignalBus
+            try:
+                signal_bus = get_signal_bus()
+                signal_bus.dtcSessionReady.emit()
+            except Exception as e:
+                log.warning("signal_bus.session_ready.error", error=str(e))
+
+        self._handshake_timer.timeout.connect(_emit_session_ready_grace)
 
         # Preferred path: detect explicit LogonResponse(success)
         def _check_logon(msg: dict) -> None:
@@ -378,6 +408,13 @@ class DTCClientJSON(QtCore.QObject):
                         self._handshake_timer.stop()
                     log.info("dtc.session_ready.logon")
                     self.session_ready.emit()
+                    # NEW: Also emit to SignalBus
+                    try:
+                        signal_bus = get_signal_bus()
+                        signal_bus.dtcSessionReady.emit()
+                    except Exception as e:
+                        log.warning("signal_bus.session_ready.error", error=str(e))
+
                     with contextlib.suppress(Exception):
                         # Kick off initial data requests
                         self._request_initial_data()
@@ -676,29 +713,49 @@ class DTCClientJSON(QtCore.QObject):
             # (Compatibility) If someone listens to messageReceived for app-envelopes, reuse it.
             self.messageReceived.emit(data)  # harmless if no slots connected
 
+        # Get debug flag
         try:
-            try:
-                from config.settings import DEBUG_DATA
-            except Exception:
-                DEBUG_DATA = False
+            from config.settings import DEBUG_DATA
+        except Exception:
+            DEBUG_DATA = False
+
+        # MIGRATION: Emit to both Blinker (deprecated) and SignalBus (new)
+        # This allows gradual migration - once all consumers use SignalBus, remove Blinker
+        try:
+            signal_bus = get_signal_bus()
+
             if app_msg.type == "TRADE_ACCOUNT":
+                # DEPRECATED: Blinker signal
                 signal_trade_account.send(app_msg.payload)
+                # NEW: Qt signal via SignalBus
+                signal_bus.tradeAccountReceived.emit(app_msg.payload)
+
             elif app_msg.type == "BALANCE_UPDATE":
+                # DEPRECATED: Blinker signal
                 signal_balance.send(app_msg.payload)
+                # NEW: Qt signal via SignalBus
+                balance = app_msg.payload.get("CashBalance", 0.0)
+                account = app_msg.payload.get("TradeAccount", "")
+                signal_bus.balanceUpdated.emit(balance, account)
+
             elif app_msg.type == "POSITION_UPDATE":
                 if DEBUG_DATA and self._allow_debug_dump():
                     print("DEBUG [data_bridge]: [POSITION] Sending POSITION_UPDATE signal")
+                # DEPRECATED: Blinker signal
                 signal_position.send(app_msg.payload)
+                # NEW: Qt signal via SignalBus
+                signal_bus.positionUpdated.emit(app_msg.payload)
+
             elif app_msg.type == "ORDER_UPDATE":
                 if DEBUG_DATA and self._allow_debug_dump():
                     print("DEBUG [data_bridge]: [ORDER] Sending ORDER_UPDATE signal")
+                # DEPRECATED: Blinker signal
                 signal_order.send(app_msg.payload)
+                # NEW: Qt signal via SignalBus
+                signal_bus.orderUpdateReceived.emit(app_msg.payload)
+
         except Exception as e:
             log.warning("dtc.signal.error", type=app_msg.type, err=str(e))
-            try:
-                from config.settings import DEBUG_DATA
-            except Exception:
-                DEBUG_DATA = False
             if DEBUG_DATA and self._allow_debug_dump():
                 print(f"DEBUG [data_bridge]: [ERROR] Signal send FAILED: {e}")
 
