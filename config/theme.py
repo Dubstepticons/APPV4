@@ -824,6 +824,114 @@ def validate_all_themes() -> None:
         print(f"[THEME WARNING] {error_msg}")
 
 
+# ========================================================================
+# Backward Compatibility Functions (For tests and legacy code)
+# ========================================================================
+def validate_oklch_tokens() -> list[str]:
+    """
+    Validate all OKLCH color tokens for correct format and ranges.
+
+    Returns:
+        List of error messages (empty if all valid)
+    """
+    import re
+
+    errors = []
+
+    # OKLCH format: oklch(L% C H) where L=0-100%, C=0-0.5, H=0-360
+    oklch_pattern = re.compile(r"oklch\(\s*([\d.]+)%?\s+([\d.]+)\s+([\d.]+)\s*\)")
+
+    for token_name, color in _COLOR_TOKENS.items():
+        if not color.startswith("oklch("):
+            continue
+
+        match = oklch_pattern.match(color.strip())
+        if not match:
+            errors.append(f"Token '{token_name}': Malformed OKLCH format '{color}'")
+            continue
+
+        # Extract values
+        l_str, c_str, h_str = match.groups()
+        l_val = float(l_str)
+        c_val = float(c_str)
+        h_val = float(h_str)
+
+        # Check for percentage sign
+        if "%" not in color:
+            errors.append(f"Token '{token_name}': Missing % in lightness value '{color}'")
+
+        # Validate ranges
+        if not (0 <= l_val <= 100):
+            errors.append(f"Token '{token_name}': Lightness {l_val} out of range [0, 100]")
+        if not (0 <= c_val <= 0.5):
+            errors.append(f"Token '{token_name}': Chroma {c_val} out of typical range [0, 0.5]")
+        if not (0 <= h_val <= 360):
+            errors.append(f"Token '{token_name}': Hue {h_val} out of range [0, 360]")
+
+    return errors
+
+
+def validate_theme_keys_consistency() -> list[str]:
+    """
+    Validate that all three theme modes (DEBUG, SIM, LIVE) have consistent keys.
+
+    Returns:
+        List of error messages (empty if all valid)
+    """
+    errors = []
+
+    # Get keys from all themes
+    debug_keys = set(DEBUG_THEME.keys())
+    sim_keys = set(SIM_THEME.keys())
+    live_keys = set(LIVE_THEME.keys())
+
+    # Check for missing keys in each theme
+    all_keys = debug_keys | sim_keys | live_keys
+
+    for theme_name, theme_keys in [("DEBUG", debug_keys), ("SIM", sim_keys), ("LIVE", live_keys)]:
+        missing = all_keys - theme_keys
+        if missing:
+            errors.append(f"Theme '{theme_name}': Missing keys: {missing}")
+
+    return errors
+
+
+def validate_theme_system() -> None:
+    """
+    Run all theme validations and log errors.
+    Should be called on app startup to catch theme issues early.
+
+    Legacy function for backward compatibility.
+    In v2.0, validation runs automatically at module load.
+    """
+    try:
+        from utils.logger import get_logger
+        log = get_logger(__name__)
+
+        # Validate OKLCH tokens
+        oklch_errors = validate_oklch_tokens()
+        if oklch_errors:
+            log.error(f"OKLCH validation failed with {len(oklch_errors)} errors:")
+            for error in oklch_errors:
+                log.error(f"  - {error}")
+
+        # Validate theme key consistency
+        consistency_errors = validate_theme_keys_consistency()
+        if consistency_errors:
+            log.error(f"Theme consistency validation failed with {len(consistency_errors)} errors:")
+            for error in consistency_errors:
+                log.error(f"  - {error}")
+
+        # Summary
+        total_errors = len(oklch_errors) + len(consistency_errors)
+        if total_errors > 0:
+            log.warning(f"Theme system has {total_errors} validation errors - review config/theme.py")
+        else:
+            log.info("Theme system validation passed - all OKLCH tokens and keys are valid")
+    except:
+        pass
+
+
 # Run validation at module load
 try:
     validate_all_themes()
@@ -831,4 +939,4 @@ except Exception as e:
     print(f"[THEME WARNING] Validation failed: {e}")
 
 
-# -------------------- config/theme_v2.py (end)
+# -------------------- config/theme.py (end)
