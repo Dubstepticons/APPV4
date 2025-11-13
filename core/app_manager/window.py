@@ -70,6 +70,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self._setup_mode_selector()
         self._setup_reset_balance_hotkey()
 
+        # CRITICAL: Emit theme changed signal AFTER UI is built to force initial refresh
+        # This ensures panels get the correct theme on first load (fixes SIM theme showing in DEBUG mode)
+        QtCore.QTimer.singleShot(0, lambda: self.themeChanged.emit(self.current_theme_mode))
+
         if os.getenv("DEBUG_DTC", "0") == "1":
             print("DEBUG: MainWindow.__init__ COMPLETE")
 
@@ -114,7 +118,9 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _setup_theme(self) -> None:
         """Configure theme system and apply initial theme."""
-        self.current_theme_mode: str = "LIVE"  # default to LIVE mode
+        # Get initial mode from settings (defaults to SIM for safety)
+        from config.settings import TRADING_MODE
+        self.current_theme_mode: str = TRADING_MODE  # Use settings default instead of hardcoded LIVE
 
         # Startup guards
         self._post_construct_invoked: bool = False
