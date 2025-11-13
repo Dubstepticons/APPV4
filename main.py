@@ -4,7 +4,7 @@ import sys
 
 from PyQt6 import QtWidgets
 
-from config.theme import THEME, ColorTheme, validate_theme_system
+from config.theme import THEME, ColorTheme
 from core.app_manager import MainWindow
 
 
@@ -16,8 +16,7 @@ if os.getenv("DEBUG_DTC", "0") == "1":
 
 
 def main():
-    # Validate theme system on startup
-    validate_theme_system()
+    # Theme validation now runs automatically at module import (see config/theme.py)
 
     app = QtWidgets.QApplication(sys.argv)
     # Set application font globally from THEME
