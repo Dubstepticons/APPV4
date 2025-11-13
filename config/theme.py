@@ -78,6 +78,7 @@ _COLOR_TOKENS = {
     "chart.grid": "oklch(25% 0.01 250)",  # Subtle grid
     "chart.axis": "oklch(60% 0.02 250)",  # Axis labels
     "chart.equity": "oklch(70% 0.12 250)",  # Equity line
+    "chart.background": "oklch(15% 0.02 250)",  # Dark chart background
     # Connection Status (stoplight)
     "status.connected": "oklch(74% 0.21 150)",  # Healthy green
     "status.warning": "oklch(82% 0.19 95)",  # Caution yellow
@@ -267,11 +268,18 @@ _SEMANTIC_ROLES = {
     "role.bg.surface": "bg.surface",
     "role.bg.elevated": "bg.surface",
     "role.bg.input": "bg.input",
+    "role.bg.card": "bg.surface",
+    "role.bg.tertiary": "neutral.1",
+    "role.bg.table": "bg.panel",
 
     # Border roles
     "role.border.default": "border.divider",
     "role.border.focus": "border.focus",
     "role.border.error": "border.error",
+
+    # Interaction roles
+    "role.interaction.hover": "bg.hover",
+    "role.interaction.selected": "bg.selected",
 
     # PnL roles
     "role.pnl.positive": "profit.vivid",
@@ -296,6 +304,7 @@ _SEMANTIC_ROLES = {
     "role.chart.poc": "chart.poc",
     "role.chart.grid": "chart.grid",
     "role.chart.equity": "chart.equity",
+    "role.chart.background": "chart.background",
 
     # Mode roles
     "role.mode.live": "mode.live",
@@ -364,6 +373,114 @@ def deep_merge(base: dict, override: dict) -> dict:
     return result
 
 
+def validate_semantic_roles() -> list[str]:
+    """
+    Validate that all semantic roles reference valid color tokens or theme keys.
+    Checks for orphaned or broken role references.
+
+    Returns:
+        List of validation errors (empty if all valid)
+
+    Example:
+        >>> errors = validate_semantic_roles()
+        >>> if errors:
+        ...     print("Role validation failed:", errors)
+    """
+    errors = []
+
+    # Known theme keys that roles might reference (not in _COLOR_TOKENS)
+    known_theme_keys = {
+        "graph_bg", "bg_primary", "bg_panel", "bg_elevated",
+        "bg_tertiary", "card_bg", "text_primary", "fg_primary",
+        "fg_muted", "text_dim", "border", "ink", "subtle_ink",
+        "pnl_pos_color", "pnl_neg_color", "pnl_neu_color",
+        "flash_pos_color", "flash_neg_color", "flash_neu_color",
+    }
+
+    for role_key, token_name in _SEMANTIC_ROLES.items():
+        # Check if token exists in _COLOR_TOKENS
+        if token_name in _COLOR_TOKENS:
+            continue  # Valid - token exists
+
+        # Check if it maps to a known theme key (with . → _ conversion)
+        theme_key = token_name.replace(".", "_")
+        if theme_key in known_theme_keys:
+            continue  # Valid - maps to theme key
+
+        # Check if token name itself is in known keys
+        if token_name in known_theme_keys:
+            continue  # Valid
+
+        # Token doesn't exist anywhere - orphaned reference
+        errors.append(
+            f"Role '{role_key}' references unknown token '{token_name}' "
+            f"(not in _COLOR_TOKENS or known theme keys)"
+        )
+
+    return errors
+
+
+def resolve_semantic_roles(theme: dict) -> dict:
+    """
+    Resolve semantic roles and expose them in the theme.
+    Adds role.* keys by looking up token names and converting to colors.
+
+    Args:
+        theme: Compiled theme dictionary
+
+    Returns:
+        Theme with role.* keys added for developer convenience
+    """
+    import re
+
+    for role_key, token_name in _SEMANTIC_ROLES.items():
+        resolved_color = None
+
+        # Check if token is in _COLOR_TOKENS (OKLCH format)
+        if token_name in _COLOR_TOKENS:
+            oklch_value = _COLOR_TOKENS[token_name]
+            # Convert OKLCH to hex for consistency with rest of theme
+            oklch_pattern = re.compile(r"oklch\(\s*([\d.]+)%?\s+([\d.]+)\s+([\d.]+)\s*\)")
+            match = oklch_pattern.match(oklch_value.strip())
+            if match:
+                try:
+                    l, c, h = float(match.group(1)), float(match.group(2)), float(match.group(3))
+                    r, g, b = oklch_to_srgb(l, c, h)
+                    # Convert to hex
+                    r_int = int(round(max(0, min(255, r * 255))))
+                    g_int = int(round(max(0, min(255, g * 255))))
+                    b_int = int(round(max(0, min(255, b * 255))))
+                    resolved_color = f"#{r_int:02X}{g_int:02X}{b_int:02X}"
+                except Exception:
+                    pass
+
+        # Try mapping token name to theme key (e.g., "text.high_contrast" → "text_primary")
+        # This is a heuristic mapping - not all tokens map cleanly to theme keys
+        if not resolved_color:
+            # Common patterns
+            mappings = {
+                "text.high_contrast": "text_primary",
+                "text.medium_contrast": "fg_primary",
+                "text.low_contrast": "fg_muted",
+                "text.disabled": "text_dim",
+                "bg.canvas": "bg_primary",
+                "bg.panel": "bg_panel",
+                "bg.surface": "card_bg",
+                "bg.hover": "bg_elevated",
+                "border.divider": "border",
+            }
+
+            mapped_key = mappings.get(token_name)
+            if mapped_key and mapped_key in theme:
+                resolved_color = theme[mapped_key]
+
+        # Add role to theme if resolved
+        if resolved_color:
+            theme[role_key] = resolved_color
+
+    return theme
+
+
 def compile_theme(mode: str) -> dict[str, Any]:
     """
     Compile a complete theme for the specified mode.
@@ -373,7 +490,7 @@ def compile_theme(mode: str) -> dict[str, Any]:
         mode: One of "debug", "sim", or "live"
 
     Returns:
-        Compiled theme dictionary
+        Compiled theme dictionary with semantic roles resolved
     """
     mode = mode.lower()
 
@@ -514,6 +631,9 @@ def compile_theme(mode: str) -> dict[str, Any]:
     # Apply mode-specific overrides
     if mode in _MODE_OVERRIDES:
         theme.update(_MODE_OVERRIDES[mode])
+
+    # Resolve semantic roles and add role.* keys to theme
+    theme = resolve_semantic_roles(theme)
 
     return theme
 
@@ -938,6 +1058,13 @@ def validate_theme_system() -> None:
 # Run validation at module load
 try:
     validate_all_themes()
+
+    # Validate semantic roles
+    role_errors = validate_semantic_roles()
+    if role_errors:
+        print(f"[THEME WARNING] Semantic role validation found {len(role_errors)} issues:")
+        for error in role_errors:
+            print(f"  - {error}")
 except Exception as e:
     print(f"[THEME WARNING] Validation failed: {e}")
 
