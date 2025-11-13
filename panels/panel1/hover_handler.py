@@ -60,15 +60,14 @@ def init_hover_elements(panel) -> None:
         panel._hover_seg.setVisible(False)
         panel._plot.getPlotItem().scene().addItem(panel._hover_seg)
 
-        # Timestamp text (restored original Y position) - universal skeleton font
-        # Convert OKLCH to hex for PyQtGraph, then create QColor for proper PyQtGraph handling
-        text_hex = normalize_color(THEME.get("ink", "#E5E7EB"))
-        text_qcolor = QtGui.QColor(text_hex)
+        # Timestamp text - always white, smaller font for better visibility
+        # CRITICAL FIX: Hardcode white color for visibility on dark graph backgrounds
+        text_qcolor = QtGui.QColor("#FFFFFF")  # Always white for all themes
         panel._hover_text = pg.TextItem("", color=text_qcolor, anchor=(0.5, 1.0))
-        # Set font to match universal skeleton (16px weight 500)
+        # Smaller font for hover timestamp (12px instead of 16px)
         font = QtGui.QFont(THEME.get("font_family", "Inter, sans-serif"))
-        font.setPixelSize(int(THEME.get("font_size", 16)))
-        font.setWeight(int(THEME.get("font_weight", 500)))
+        font.setPixelSize(12)  # Smaller fixed size for hover timestamp
+        font.setWeight(500)  # Medium weight
         panel._hover_text.setFont(font)
         panel._hover_text.setZValue(101)
         panel._hover_text.setVisible(False)
