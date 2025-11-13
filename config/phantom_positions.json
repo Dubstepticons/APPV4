@@ -1,0 +1,18 @@
+{
+  "$schema": "phantom_positions_schema.json",
+  "description": "Known phantom positions from Sierra Chart that should be filtered out",
+  "phantom_positions": {
+    "F.US.MESM25": {
+      "qty": 1,
+      "avg_entry": 5996.5,
+      "reason": "Historical ghost position from Sierra Chart",
+      "date_added": "2025-01-13"
+    }
+  },
+  "notes": [
+    "Phantom positions are positions that Sierra Chart reports as open but are actually closed.",
+    "This typically happens with historical data or Sierra Chart bugs.",
+    "Each entry maps symbol -> {qty, avg_entry, reason, date_added}",
+    "If both qty and avg_entry match exactly, the position is filtered out."
+  ]
+}

@@ -212,6 +212,194 @@ class MessageRouter:
 
         return True
 
+    # -------------------- Position Processing (Unified) --------------------
+    def _process_position_update(self, payload: dict, source: str = "UNKNOWN") -> bool:
+        """
+        UPGRADE 3: Unified position update processing.
+
+        Handles both Blinker and AppMessage position updates with identical logic.
+        Ensures position closures (qty=0) are always forwarded to Panel2 for trade recording.
+
+        Args:
+            payload: Position update payload (normalized dict)
+            source: Source of update ("BLINKER" or "APP_MESSAGE") for logging
+
+        Returns:
+            True if position was processed, False if filtered/blocked
+        """
+        sym = payload.get("symbol")
+        qty = payload.get("qty", 0)
+        avg = payload.get("avg_entry")
+
+        # CRITICAL: ALWAYS forward position updates to Panel2, including qty=0 (closes)
+        # Panel2 needs qty=0 messages to detect trade closures and record them to database
+
+        # Handle position closure (qty=0)
+        if qty == 0:
+            log.debug(f"router.position.closed: symbol={sym}, source={source}")
+            if self.state:
+                self.state.update_position(sym, 0, None)
+            # CONTINUE to forward to Panel2 (don't return early!)
+
+        # VALIDATION: Open positions (qty > 0) must have valid avg_entry
+        # Sierra sometimes reports positions without proper price data
+        # CRITICAL: Only validate OPEN positions - closes legitimately have avg=0.0
+        if qty > 0 and (avg is None or avg == 0.0):
+            log.warning(
+                "router.position.stale",
+                symbol=sym,
+                qty=qty,
+                avg_entry=avg,
+                source=source,
+                reason="Missing or zero average price - likely stale/ghost position",
+            )
+            return False
+
+        # PHANTOM FILTER: Check against known phantom positions
+        if self._is_phantom_position(sym, qty, avg):
+            log.warning(
+                "router.position.phantom",
+                symbol=sym,
+                qty=qty,
+                avg_entry=avg,
+                source=source,
+                reason="Matches known phantom position - ignoring",
+            )
+            return False
+
+        # Log valid position updates
+        log.debug(f"router.position: symbol={sym}, qty={qty}, avg_entry={avg}, source={source}")
+
+        # Send to Panel2 (live trading panel) with full payload
+        if self.panel_live:
+            with contextlib.suppress(Exception):
+                self.panel_live.on_position_update(payload)
+                # Schedule coalesced UI refresh
+                self._schedule_ui_refresh()
+
+        # Log to trade logger for historical tracking
+        if self._trade_manager:
+            with contextlib.suppress(Exception):
+                self._trade_manager.on_position_update(payload)
+
+        # Store in state manager
+        if self.state:
+            self.state.update_position(sym, qty, avg)
+
+        return True
+
+    def _is_phantom_position(self, symbol: str, qty: int, avg: float) -> bool:
+        """
+        UPGRADE 5: Check if position matches known phantom position pattern.
+
+        Phantom positions are positions Sierra reports as open but are actually closed.
+        Loads phantom position list from config/phantom_positions.json.
+
+        Args:
+            symbol: Symbol name
+            qty: Position quantity
+            avg: Average entry price
+
+        Returns:
+            True if this is a known phantom position
+        """
+        try:
+            import json
+            from pathlib import Path
+
+            # Load phantom positions from config file
+            config_file = Path("config/phantom_positions.json")
+            if not config_file.exists():
+                # No config file, no phantoms
+                return False
+
+            with open(config_file, "r") as f:
+                config = json.load(f)
+                phantom_positions = config.get("phantom_positions", {})
+
+            # Check if symbol matches a phantom position
+            if symbol in phantom_positions:
+                phantom_data = phantom_positions[symbol]
+                phantom_qty = phantom_data.get("qty")
+                phantom_avg = phantom_data.get("avg_entry")
+
+                # Both qty and avg must match exactly
+                if qty == phantom_qty and abs(avg - phantom_avg) < 0.01:  # Allow tiny float difference
+                    return True
+
+        except Exception as e:
+            # If config loading fails, log but don't block
+            log.warning(f"router.phantom_filter.load_failed: {str(e)}")
+
+        return False
+
+    # -------------------- Balance Processing (Unified) --------------------
+    def _process_balance_update(self, balance: float, account: str, source: str = "UNKNOWN") -> bool:
+        """
+        UPGRADE 4: Unified balance update processing.
+
+        Single rule for balance updates:
+        - SIM mode: Use calculated PnL (internal) - SKIP DTC balance updates
+        - LIVE mode: Use DTC-reported balance (external) - ACCEPT DTC balance updates
+
+        Args:
+            balance: Balance value from DTC
+            account: TradeAccount string
+            source: Source of update ("BLINKER" or "APP_MESSAGE") for logging
+
+        Returns:
+            True if balance was processed, False if skipped
+        """
+        from utils.trade_mode import detect_mode_from_account
+
+        # Detect mode from account
+        mode = detect_mode_from_account(account) if account else "SIM"
+
+        log.debug(f"router.balance.received: balance={balance}, account={account}, mode={mode}, source={source}")
+
+        # CRITICAL RULE: Skip DTC balance updates for SIM mode!
+        # SIM mode should only use PnL-calculated balance, not DTC broker balance
+        if mode == "SIM":
+            log.debug(
+                "router.balance.sim_skipped",
+                reason="SIM uses calculated PnL, not DTC balance",
+                dtc_value=float(balance),
+                source=source
+            )
+            return False
+
+        # Update state manager with mode-specific balance (LIVE mode only)
+        if self.state:
+            old_balance = self.state.get_balance_for_mode(mode)
+            log.debug(
+                "router.balance.live_updating",
+                mode=mode,
+                old_balance=old_balance,
+                new_balance=float(balance),
+                source=source
+            )
+            try:
+                self.state.set_balance_for_mode(mode, float(balance))
+                self.state.update_balance(balance)
+                log.debug(f"router.balance.updated: mode={mode}, balance={balance}, source={source}")
+            except Exception as e:
+                log.warning(f"router.balance.state_update_failed: {str(e)}")
+
+        # Update panel UI if this is the active mode
+        if self.panel_balance and self.state and mode == self.state.current_mode:
+            try:
+                # CRITICAL: Marshal UI update to main Qt thread
+                marshal_to_qt_thread(self._update_balance_ui, balance, mode)
+            except Exception as e:
+                # Fallback: try direct call if Qt marshaling fails
+                log.warning(f"router.balance.marshal_failed: {str(e)}, source={source}")
+                try:
+                    self._update_balance_ui(balance, mode)
+                except Exception as e2:
+                    log.error(f"router.balance.direct_call_failed: {str(e2)}")
+
+        return True
+
     # -------------------- Coalesced UI Updates --------------------
     def _schedule_ui_refresh(self) -> None:
         """
@@ -510,20 +698,11 @@ class MessageRouter:
                     except Exception as e:
                         log.warning(f"router.position.mode_switch_failed: {str(e)}")
 
-            # Route to panels via Qt thread
-            if self.panel_live and hasattr(self.panel_live, "on_position_update"):
-                try:
-                    marshal_to_qt_thread(self.panel_live.on_position_update, msg)
-                except Exception as e:
-                    # Fallback: try direct call if Qt marshaling fails
-                    log.warning(f"router.position.marshal_failed: {str(e)}")
-                    try:
-                        self.panel_live.on_position_update(msg)
-                    except Exception as e2:
-                        log.error(f"router.position.direct_call_failed: {str(e2)}")
-
-                # UPGRADE 2: Schedule coalesced UI refresh (10 Hz rate limiting)
-                self._schedule_ui_refresh()
+            # UPGRADE 3: Use unified position processing
+            try:
+                self._process_position_update(msg, source="BLINKER")
+            except Exception as e:
+                log.error(f"router.position.process_failed: {str(e)}")
 
         except Exception as e:
             log.error(f"router.position.handler_failed: {str(e)}")
@@ -549,57 +728,12 @@ class MessageRouter:
             balance_value = msg.get("balance") or msg.get("CashBalance") or msg.get("AccountValue")
             account = msg.get("account") or msg.get("TradeAccount") or ""
 
-            # CLEANUP FIX: Use structured logging
-            log.debug("router.balance.extracted", balance=balance_value, account=account)
-
             if balance_value is not None:
-                # Detect mode from account
-                from utils.trade_mode import detect_mode_from_account
-                mode = detect_mode_from_account(account) if account else "SIM"
-
-                log.debug("router.balance.mode_detected", mode=mode, account=account)
-
-                # NOTE: Do NOT switch mode on balance updates!
-                # Mode only switches when actual ORDERS/TRADES come in
-                # Balance updates are stored but don't trigger mode changes
-
-                # CRITICAL FIX: Skip DTC balance updates for SIM mode!
-                # SIM mode should only use PnL-calculated balance, not DTC broker balance
-                if mode == "SIM":
-                    log.debug(
-                        "router.balance.sim_skipped",
-                        reason="SIM uses calculated PnL, not DTC balance",
-                        dtc_value=float(balance_value)
-                    )
-                    return
-
-                # Update state manager with mode-specific balance (LIVE mode only)
-                if self.state:
-                    old_balance = self.state.get_balance_for_mode(mode)
-                    log.debug(
-                        "router.balance.live_updating",
-                        mode=mode,
-                        old_balance=old_balance,
-                        new_balance=float(balance_value)
-                    )
-                    try:
-                        self.state.set_balance_for_mode(mode, float(balance_value))
-                        log.debug(f"router.balance.updated: mode={mode}, balance={balance_value}")
-                    except Exception as e:
-                        log.warning(f"router.balance.state_update_failed: {str(e)}")
-
-                # Update panel UI if this is the active mode
-                if self.panel_balance and self.state and mode == self.state.current_mode:
-                    try:
-                        # CRITICAL: Marshal UI update to main Qt thread
-                        marshal_to_qt_thread(self._update_balance_ui, balance_value, mode)
-                    except Exception as e:
-                        # Fallback: try direct call if Qt marshaling fails
-                        log.warning(f"router.balance.marshal_failed: {str(e)}")
-                        try:
-                            self._update_balance_ui(balance_value, mode)
-                        except Exception as e2:
-                            log.error(f"router.balance.direct_call_failed: {str(e2)}")
+                # UPGRADE 4: Use unified balance processing
+                try:
+                    self._process_balance_update(balance_value, account, source="BLINKER")
+                except Exception as e:
+                    log.error(f"router.balance.process_failed: {str(e)}")
 
         except Exception as e:
             log.error(f"router.balance.handler_failed: {str(e)}")
@@ -726,101 +860,20 @@ class MessageRouter:
     def _on_balance_update(self, payload: dict):
         bal = payload.get("balance")
         account = payload.get("account") or payload.get("TradeAccount") or ""
-        log.debug(f"router.balance: balance={bal}")
 
-        # Detect mode from account
-        mode = None
-        if account:
-            from utils.trade_mode import detect_mode_from_account
-            mode = detect_mode_from_account(account)
-
-        # Update state manager (store all balances)
-        if self.state:
-            self.state.update_balance(bal)
-            if mode:
-                self.state.set_balance_for_mode(mode, float(bal))
-
-        # CRITICAL: Only update UI if balance is for current mode!
-        if self.panel_balance and self.state:
-            # Only display if this balance is for the CURRENT mode
-            if mode and mode != self.state.current_mode:
-                log.debug(f"router.balance.ui_ignored - balance for {mode}, current is {self.state.current_mode}")
-                return
-
+        if bal is not None:
+            # UPGRADE 4: Use unified balance processing
             try:
-                self.panel_balance.set_account_balance(bal)
-                self.panel_balance.update_equity_series_from_balance(bal, mode=mode)
-                # UPGRADE 2: Schedule coalesced UI refresh
-                self._schedule_ui_refresh()
-            except Exception:
-                pass
+                self._process_balance_update(bal, account, source="APP_MESSAGE")
+            except Exception as e:
+                log.error(f"router.balance_update.process_failed: {str(e)}")
 
     def _on_position_update(self, payload: dict):
-        sym = payload.get("symbol")
-        qty = payload.get("qty", 0)
-        avg = payload.get("avg_entry")
-
-        # CRITICAL FIX: ALWAYS forward position updates to Panel2, including qty=0 (closes)
-        # Panel2 needs qty=0 messages to detect trade closures and record them to database
-        # Old buggy logic: if qty == 0: return (prevented Panel2 from seeing closes!)
-
-        # Update router state for qty=0 (remove position from state tracking)
-        if qty == 0:
-            log.debug(f"router.position.closed: symbol={sym}")
-            if self.state:
-                self.state.update_position(sym, 0, None)
-            # CONTINUE to forward to Panel2 (don't return early!)
-
-        # ADDITIONAL CHECK: Validate OPEN positions have required data (avoid stale positions)
-        # Sierra sometimes reports positions without proper price data
-        # CRITICAL: Only apply this check to OPEN positions (qty > 0)
-        # Closed positions (qty=0) legitimately have avg=0.0, so skip this check for closes
-        if qty > 0 and (avg is None or avg == 0.0):
-            log.warning(
-                "router.position.stale",
-                symbol=sym,
-                qty=qty,
-                avg_entry=avg,
-                reason="Missing or zero average price - likely stale/ghost position",
-            )
-            return
-
-        # PHANTOM POSITION FILTER: Skip known phantom positions from Sierra's historical data
-        # These are positions that Sierra reports as open but are actually closed
-        # Format: symbol -> (qty, avg_price) tuple - if both match, it's phantom
-        PHANTOM_POSITIONS = {
-            "F.US.MESM25": (1, 5996.5),
-        }
-        if sym in PHANTOM_POSITIONS:
-            phantom_qty, phantom_avg = PHANTOM_POSITIONS[sym]
-            if qty == phantom_qty and avg == phantom_avg:
-                log.warning(
-                    "router.position.phantom",
-                    symbol=sym,
-                    qty=qty,
-                    avg_entry=avg,
-                    reason="Matches known phantom position in Sierra - ignoring",
-                )
-                return
-
-        # Log and process open positions only
-        log.debug(f"router.position: symbol={sym}, qty={qty}, avg_entry={avg}")
-
-        # Send to Panel2 (live trading panel) with full payload
-        if self.panel_live:
-            with contextlib.suppress(Exception):
-                self.panel_live.on_position_update(payload)
-                # UPGRADE 2: Schedule coalesced UI refresh
-                self._schedule_ui_refresh()
-
-        # Log to trade logger for historical tracking
-        if self._trade_manager:
-            with contextlib.suppress(Exception):
-                self._trade_manager.on_position_update(payload)
-
-        # Store in state manager
-        if self.state:
-            self.state.update_position(sym, qty, avg)
+        # UPGRADE 3: Use unified position processing
+        try:
+            self._process_position_update(payload, source="APP_MESSAGE")
+        except Exception as e:
+            log.error(f"router.position_update.process_failed: {str(e)}")
 
     def _on_order_update(self, payload: dict):
         log.debug("router.order", payload_preview=str(payload)[:120])
