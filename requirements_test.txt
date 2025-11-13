@@ -1,0 +1,8 @@
+# Testing requirements for APPV4
+# Install with: pip install -r requirements_test.txt
+
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-mock>=3.11.1
+pytest-timeout>=2.1.0
+pytest-qt>=4.2.0

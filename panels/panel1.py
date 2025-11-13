@@ -227,6 +227,9 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
         # Wire balance signal from StateManager
         self._wire_balance_signal()
 
+        # MIGRATION: Connect to SignalBus for event-driven updates
+        self._connect_signal_bus()
+
         # Initialize PnL display to $0.00 (0.00%) in neutral color instead of dashes
         # This happens after wiring so signals are ready
         self.set_pnl_for_timeframe(pnl_value=0.0, pnl_pct=0.0, up=None)
@@ -237,6 +240,102 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
 
         # Schedule size check after UI is fully rendered
         QtCore.QTimer.singleShot(500, self._debug_sizes)
+
+    def _connect_signal_bus(self) -> None:
+        """
+        Connect to SignalBus for event-driven updates.
+
+        MIGRATION: This replaces MessageRouter direct method calls.
+        Panels now subscribe to SignalBus Qt signals instead of being called directly.
+
+        Connected signals:
+        - balanceUpdated → updates StateManager and triggers UI update
+        - modeChanged → set_trading_mode()
+        """
+        try:
+            from core.signal_bus import get_signal_bus
+
+            signal_bus = get_signal_bus()
+
+            # Balance updates from DTC (LIVE mode only)
+            def _on_balance_updated(balance: float, account: str):
+                """
+                Handle balance update from DTC.
+
+                CRITICAL: Only processes LIVE mode balances.
+                SIM mode uses PnL-calculated balance, not DTC broker balance.
+                """
+                try:
+                    from utils.trade_mode import detect_mode_from_account
+                    from core.app_state import get_state_manager
+
+                    mode = detect_mode_from_account(account) if account else "SIM"
+
+                    # Skip SIM mode balance updates from DTC
+                    if mode == "SIM":
+                        log.debug(
+                            "[Panel1] Skipping DTC balance for SIM mode",
+                            dtc_balance=balance
+                        )
+                        return
+
+                    # Update StateManager (LIVE mode only)
+                    state = get_state_manager()
+                    if state:
+                        state.set_balance_for_mode(mode, balance)
+                        log.debug(f"[Panel1] Updated {mode} balance: ${balance:,.2f}")
+
+                        # Update UI if this is the active mode
+                        if mode == state.current_mode:
+                            self.set_account_balance(balance)
+                            self.update_equity_series_from_balance(balance, mode=mode)
+
+                except Exception as e:
+                    log.error(f"[Panel1] Error handling balance update: {e}")
+                    import traceback
+                    traceback.print_exc()
+
+            signal_bus.balanceUpdated.connect(
+                _on_balance_updated,
+                type=QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
+            )
+
+            # Mode changes
+            signal_bus.modeChanged.connect(
+                lambda mode: self.set_trading_mode(mode, None),
+                type=QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
+            )
+
+            # PHASE 4: Balance display requests (replaces direct calls from app_manager)
+            signal_bus.balanceDisplayRequested.connect(
+                lambda balance, mode: self.set_account_balance(balance),
+                type=QtCore.Qt.ConnectionType.QueuedConnection
+            )
+
+            # PHASE 4: Equity point requests (replaces direct calls from app_manager)
+            signal_bus.equityPointRequested.connect(
+                lambda balance, mode: self.update_equity_series_from_balance(balance, mode=mode),
+                type=QtCore.Qt.ConnectionType.QueuedConnection
+            )
+
+            # PHASE 4: Theme change requests (replaces direct calls from app_manager)
+            signal_bus.themeChangeRequested.connect(
+                lambda: self._refresh_theme_colors() if hasattr(self, '_refresh_theme_colors') else None,
+                type=QtCore.Qt.ConnectionType.QueuedConnection
+            )
+
+            # PHASE 4: Timeframe change requests (replaces direct calls from app_manager)
+            signal_bus.timeframeChangeRequested.connect(
+                lambda tf: self.set_timeframe(tf),
+                type=QtCore.Qt.ConnectionType.QueuedConnection
+            )
+
+            log.info("[Panel1] Connected to SignalBus for DTC events and Phase 4 command signals")
+
+        except Exception as e:
+            log.error(f"[Panel1] Failed to connect to SignalBus: {e}")
+            import traceback
+            traceback.print_exc()
 
     # -------------------- UI BUILD (start) -----------------------------------
     def _build_ui(self) -> None:
@@ -429,12 +528,10 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
         plot.setGeometry(self.graph_container.contentsRect())
 
     def resizeEvent(self, e: QtGui.QResizeEvent) -> None:
-        """Keep the plot synced with the container’s inner rect."""
-        try:
+        """Keep the plot synced with the container's inner rect."""
+        with contextlib.suppress(Exception):
             if getattr(self, "_plot", None) and self.graph_container:
                 self._plot.setGeometry(self.graph_container.contentsRect())
-        except Exception:
-            pass
         super().resizeEvent(e)
 
     # -------------------- Graph layout glue (end) --------------------------------
@@ -546,11 +643,9 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
                 self._ripple_items.append(ripple)
 
             # hover hook
-            try:
+            with contextlib.suppress(Exception):
                 self._plot.scene().sigMouseMoved.connect(self._on_mouse_move)
                 self._plot.viewport().installEventFilter(self)
-            except Exception:
-                pass
 
             # layout glue
             lay = self.graph_container.layout()
@@ -630,13 +725,11 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
             return
         # Limit endpoint pulse to LIVE and 1D timeframes
         if self._tf not in ("LIVE", "1D"):
-            try:
+            with contextlib.suppress(Exception):
                 if getattr(self, "_endpoint", None):
                     self._endpoint.setData([], [])
                 for ripple in getattr(self, "_ripple_items", []) or []:
                     ripple.setData([], [])
-            except Exception:
-                pass
             return
 
         import math
@@ -708,14 +801,11 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
     # -------------------- Timeframe helpers (start) --------------------------
     def _ensure_live_pill_dot(self, initial: bool = False) -> None:
         """Ensure the LIVE dot exists and set a sane initial pulsing state."""
-        try:
-            if hasattr(self, "pills") and self.pills:
-                if hasattr(self.pills, "set_live_dot_visible"):
-                    self.pills.set_live_dot_visible(True)
-                if hasattr(self.pills, "set_live_dot_pulsing"):
-                    self.pills.set_live_dot_pulsing(False if initial else (self._tf == "LIVE"))
-        except Exception:
-            pass
+        with contextlib.suppress(Exception):
+            if hasattr(self, "pills") and self.pills and hasattr(self.pills, "set_live_dot_visible"):
+                self.pills.set_live_dot_visible(True)
+            if hasattr(self, "pills") and self.pills and hasattr(self.pills, "set_live_dot_pulsing"):
+                self.pills.set_live_dot_pulsing(False if initial else (self._tf == "LIVE"))
 
     def set_timeframe(self, tf: str) -> None:
         """
@@ -1293,20 +1383,16 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
                 with contextlib.suppress(Exception):
                     self._plot.getPlotItem().enableAutoRange(x=True, y=True)
         else:
-            try:
+            with contextlib.suppress(Exception):
                 self._line.setData([], [])
                 if getattr(self, "_endpoint", None):
                     self._endpoint.setData([], [])
-            except Exception:
-                pass
 
         # Also enforce ripple visibility based on timeframe
-        try:
+        with contextlib.suppress(Exception):
             if self._tf not in ("LIVE", "1D"):
                 for ripple in getattr(self, "_ripple_items", []) or []:
                     ripple.setData([], [])
-        except Exception:
-            pass
 
     def _update_trails_and_glow(self) -> None:
         """Update trailing lines and glow effect with current data."""

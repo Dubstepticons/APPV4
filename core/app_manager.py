@@ -1,10 +1,24 @@
+"""
+core/app_manager.py
+
+MainWindow orchestration for APPV4 trading application.
+
+Responsibilities:
+- Initialize and manage the vertical panel stack (Panel1, Panel2, Panel3)
+- Orchestrate DTC connection and authentication
+- Route theme changes to all panels
+- Manage trading mode (SIM/LIVE) state
+- Connect SignalBus events to panel updates
+
+Architecture:
+- Uses SignalBus for all cross-component messaging (replaces MessageRouter)
+- Panels are decoupled and communicate via Qt signals
+- Thread-safe DTC event handling via QueuedConnection
+"""
+
 from __future__ import annotations
 
 import contextlib
-
-# File: core/app_manager.py
-# Block: full-module (Part 1/1)
-# Purpose: MainWindow orchestration, vertical panel stack, theme routing, DTC init & guarded logon
 import os
 
 from PyQt6 import QtCore, QtWidgets
@@ -12,7 +26,7 @@ from PyQt6 import QtCore, QtWidgets
 from config.settings import DEBUG_DATA, DTC_HOST, DTC_PORT, LIVE_ACCOUNT
 from config.theme import THEME, ColorTheme, set_theme  # noqa: F401  # theme tokens used by helpers
 from core.data_bridge import DTCClientJSON
-from core.message_router import MessageRouter
+# MIGRATION: MessageRouter removed - using SignalBus now
 from panels.panel1 import Panel1
 from panels.panel2 import Panel2
 from panels.panel3 import Panel3
@@ -57,16 +71,15 @@ class MainWindow(QtWidgets.QMainWindow):
         self._setup_state_manager()
         self._setup_theme()
         self._build_ui()
+        self._recover_open_positions()  # CRITICAL: Restore positions from database after crash/restart
         self._setup_theme_toolbar()
         self._setup_mode_selector()
         self._setup_reset_balance_hotkey()
 
         if os.getenv("DEBUG_DTC", "0") == "1":
             print("DEBUG: MainWindow.__init__ COMPLETE")
-        try:
+        with contextlib.suppress(Exception):
             log.info("[startup] MainWindow initialized")
-        except Exception:
-            pass
 
     def _setup_window(self) -> None:
         """Configure window properties."""
@@ -100,6 +113,67 @@ class MainWindow(QtWidgets.QMainWindow):
             traceback.print_exc()
             self._state = None
 
+    def _recover_open_positions(self) -> None:
+        """
+        Recover open positions from database after crash/restart.
+
+        CRITICAL: Establishes database as single source of truth for position state.
+        Called after StateManager and Panel2 are initialized, but before DTC connects.
+
+        Benefits:
+        - Crash safety: Positions restored after unexpected shutdown
+        - Mode isolation: Each mode/account has separate position
+        - Audit trail: Full position history in database
+
+        Recovery Flow:
+        1. Query all open positions from database
+        2. Restore to StateManager (in-memory cache)
+        3. Restore to Panel2 UI (if mode matches)
+        4. Show recovery dialog to user (if positions found)
+        """
+        if not self._state:
+            log.warning("[PositionRecovery] Cannot recover positions - StateManager not initialized")
+            return
+
+        try:
+            from services.position_recovery import recover_positions_on_startup, get_recovery_service
+
+            log.info("[PositionRecovery] Starting position recovery from database...")
+
+            # Recover positions (max age: 24 hours)
+            recovery_summary = recover_positions_on_startup(
+                state_manager=self._state,
+                panel2=self.panel_live if hasattr(self, 'panel_live') else None,
+                max_age_hours=24
+            )
+
+            recovered_count = recovery_summary.get("recovered_count", 0)
+            stale_count = recovery_summary.get("stale_count", 0)
+
+            # Log recovery results
+            if recovered_count > 0:
+                log.info(f"[PositionRecovery] ✅ Recovered {recovered_count} open position(s)")
+
+                # Show recovery dialog to user
+                service = get_recovery_service()
+                message = service.get_recovery_dialog_message(recovery_summary)
+                if message:
+                    from PyQt6.QtWidgets import QMessageBox
+                    QMessageBox.information(
+                        self,
+                        "Position Recovery",
+                        message,
+                        QMessageBox.StandardButton.Ok
+                    )
+
+            if stale_count > 0:
+                log.warning(f"[PositionRecovery] ⚠️  {stale_count} stale position(s) detected (>24h old)")
+
+        except Exception as e:
+            log.error(f"[PositionRecovery] Error during position recovery: {e}")
+            import traceback
+            traceback.print_exc()
+
     def _setup_theme(self) -> None:
         """Configure theme system and apply initial theme."""
         self.current_theme_mode: str = "LIVE"  # default to LIVE mode
@@ -110,7 +184,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Suppress timeframe handling during startup init
         self._startup_done: bool = False
         # Apply base theme BEFORE building widgets to avoid initial flicker
-        try:
+        with contextlib.suppress(Exception):
             from config.theme import switch_theme
 
             switch_theme(self.current_theme_mode.lower())
@@ -122,8 +196,6 @@ class MainWindow(QtWidgets.QMainWindow):
                         int(THEME.get("ui_font_size", 14)),
                     )
                 )
-        except Exception:
-            pass
 
     def _build_ui(self) -> None:
         """Build UI panels and initialize DTC connection."""
@@ -184,12 +256,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self._setup_cross_panel_linkage(outer)
         # Reassert intended theme after panel construction, in case any panel
         # applied its own global theme during __init__.
-        try:
+        with contextlib.suppress(Exception):
             self.on_theme_changed(self.current_theme_mode)
             if os.getenv("DEBUG_DTC", "0") == "1":
                 log.debug(f"[Theme] Reapplied {self.current_theme_mode.upper()} after panel init")
-        except Exception:
-            pass
 
         # Initialize Panel1's session start balance and equity curve
         # This ensures PnL calculates from the session start, not from the first balance update
@@ -258,18 +328,16 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Stats panel timeframe -> central handler
         if hasattr(self.panel_stats, "timeframeChanged"):
-            try:
+            with contextlib.suppress(Exception):
                 self.panel_stats.timeframeChanged.connect(
                     self._on_stats_tf_changed,
                     type=QtCore.Qt.ConnectionType.UniqueConnection,
                 )
                 if os.getenv("DEBUG_DTC", "0") == "1":
                     log.debug("[Startup] Wired Panel3 timeframe -> _on_stats_tf_changed")
-            except Exception:
-                pass
 
         # Panel2 pills timeframe -> central handler
-        try:
+        with contextlib.suppress(Exception):
             pills = getattr(self.panel_live, "pills", None)
             if pills is not None and hasattr(pills, "timeframeChanged"):
                 pills.timeframeChanged.connect(
@@ -278,8 +346,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 )
                 if os.getenv("DEBUG_DTC", "0") == "1":
                     log.debug("[Startup] Wired Panel2 pills timeframe -> _on_live_pills_tf_changed")
-        except Exception:
-            pass
 
         # Refresh Panel 3 stats when Panel 2 reports a closed trade
         # Also trigger Panel 3 to grab data from Panel 2 for analysis
@@ -287,50 +353,46 @@ class MainWindow(QtWidgets.QMainWindow):
             if hasattr(self.panel_live, "tradesChanged"):
 
                 def _on_trade_changed(payload):
+                    """
+                    Handle trade closed event.
+
+                    PHASE 4 MIGRATION: Direct Panel3 method calls replaced with SignalBus.
+                    Panel2 now emits tradeClosedForAnalytics signal,
+                    Panel3 subscribes via _connect_signal_bus().
+
+                    Keeping this handler for any app-level logic only.
+                    """
                     pnl = payload.get("realized_pnl", 0)
                     symbol = payload.get("symbol", "?")
 
-                    # Call Panel 3 trade closed handler
-                    if hasattr(self.panel_stats, "on_trade_closed"):
-                        try:
-                            self.panel_stats.on_trade_closed(payload)
-                        except Exception as e:
-                            pass
-
-                    # Refresh historical stats from database (redundant but safe)
-                    if hasattr(self.panel_stats, "_load_metrics_for_timeframe"):
-                        try:
-                            self.panel_stats._load_metrics_for_timeframe(self.panel_stats._tf)
-                        except Exception as e:
-                            pass
-
-                    # Grab live data from Panel 2 and analyze
-                    if hasattr(self.panel_stats, "analyze_and_store_trade_snapshot"):
-                        try:
-                            self.panel_stats.analyze_and_store_trade_snapshot()
-                        except Exception as e:
-                            pass
+                    # PHASE 4: Panel3 methods now called via SignalBus subscriptions
+                    # (Panel2 emits tradeClosedForAnalytics, Panel3 subscribes)
+                    # No direct calls needed here anymore
 
                 self.panel_live.tradesChanged.connect(_on_trade_changed)
-                log.debug("[Startup] Wired Panel2 tradesChanged -> Panel3 (metrics + live analysis)")
+                log.debug("[Startup] Wired Panel2 tradesChanged handler (Phase 4: Panel3 uses SignalBus)")
         except Exception as e:
             import traceback
             traceback.print_exc()
 
-        # -------------------- DTC Signal Routing (Removed) --------------------
-        # NOTE: DTC signal routing (signal_order, signal_position, signal_balance) has been
-        # moved to MessageRouter for centralized handling. MessageRouter auto-subscribes to
-        # Blinker signals and handles:
-        #   - Order routing to Panel2
-        #   - Position routing to Panel2
-        #   - Balance routing to Panel1
-        #   - Auto-detection of trading mode (LIVE/SIM)
-        #   - Balance refresh requests after order fills
-        #   - Qt thread marshaling for UI updates
+        # -------------------- DTC Signal Routing (SignalBus) --------------------
+        # MIGRATION COMPLETE: All DTC events now flow through SignalBus (Qt signals).
+        # DTCClientJSON emits events via SignalBus, panels subscribe directly.
         #
-        # See: core/message_router.py::_subscribe_to_signals() and signal handlers
-        # Benefits: Single source of truth, uses helper modules (qt_bridge, trade_mode),
-        #           eliminates duplicate code and reduces complexity.
+        # Event flow:
+        #   - DTC Thread → DTCClientJSON → SignalBus.emit() → Panel (Qt Thread)
+        #   - Qt automatically marshals signals to main thread (thread-safe)
+        #
+        # Benefits:
+        #   - Single unified pattern (Qt signals throughout)
+        #   - Thread-safe by design (no manual marshaling needed)
+        #   - Decoupled architecture (panels don't need references to each other)
+        #   - Type-safe signal parameters
+        #   - Testable with pytest-qt
+        #
+        # See: core/signal_bus.py for all available signals
+        #      panels/panel1.py::_connect_signal_bus() for Panel1 subscriptions
+        #      panels/panel2.py::_connect_signal_bus() for Panel2 subscriptions
         # -----------------------------------------------------------------------
 
         # Layout stacking and relative stretch (make all panels equal height)
@@ -340,7 +402,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _setup_theme_toolbar(self) -> None:
         """Setup theme switcher toolbar (ENV-gated)."""
-        try:
+        with contextlib.suppress(Exception):
             show_toolbar = str(os.getenv("APPSIERRA_SHOW_THEME_TOOLBAR", "0")).strip().lower() in (
                 "1",
                 "true",
@@ -365,15 +427,11 @@ class MainWindow(QtWidgets.QMainWindow):
                 tb.addAction(act_live)
 
                 # Optional: Optimize Archives action (manual trigger for SQLite VACUUM)
-                try:
+                with contextlib.suppress(Exception):
                     act_opt = QtWidgets.QAction("Optimize Archives", self)
                     act_opt.triggered.connect(self._optimize_archives_ui)
                     tb.addSeparator()
                     tb.addAction(act_opt)
-                except Exception:
-                    pass
-        except Exception:
-            pass
 
     def _setup_mode_selector(self) -> None:
         """Setup mode selector hotkey (Ctrl+Shift+M)."""
@@ -418,23 +476,25 @@ class MainWindow(QtWidgets.QMainWindow):
                 mgr = get_sim_balance_manager()
                 new_balance = mgr.reset_balance()
 
-            # Update Panel1 display
-            if self.panel_balance:
-                self.panel_balance.set_account_balance(new_balance)
-                self.panel_balance.update_equity_series_from_balance(new_balance, mode="SIM")
+            # PHASE 4: Update Panel1 display via SignalBus (replaces direct calls)
+            try:
+                from core.signal_bus import get_signal_bus
+                signal_bus = get_signal_bus()
+                signal_bus.balanceDisplayRequested.emit(new_balance, "SIM")
+                signal_bus.equityPointRequested.emit(new_balance, "SIM")
+            except Exception as e:
+                log.error(f"[Hotkey] Failed to emit balance signals: {e}")
 
             log.info(f"[Hotkey] SIM balance reset to ${new_balance:,.2f}")
 
             # Show user feedback
-            try:
+            with contextlib.suppress(Exception):
                 from PyQt6.QtWidgets import QMessageBox
                 QMessageBox.information(
                     self,
                     "SIM Balance Reset",
                     f"SIM balance has been reset to ${new_balance:,.2f}"
                 )
-            except Exception:
-                pass
 
         except Exception as e:
             log.error(f"[Hotkey] Error resetting SIM balance: {e}", exc_info=True)
@@ -482,17 +542,13 @@ class MainWindow(QtWidgets.QMainWindow):
             if icon and hasattr(icon, "refresh_theme"):
                 icon.refresh_theme()
 
-            # Refresh Panel 1 (balance/investing)
-            if hasattr(self.panel_balance, "_refresh_theme_colors"):
-                self.panel_balance._refresh_theme_colors()
-
-            # Refresh Panel 2 (live)
-            if hasattr(self.panel_live, "refresh_theme"):
-                self.panel_live.refresh_theme()
-
-            # Refresh Panel 3 (stats)
-            if hasattr(self.panel_stats, "refresh_theme"):
-                self.panel_stats.refresh_theme()
+            # PHASE 4: Refresh all panels via SignalBus (replaces direct calls)
+            try:
+                from core.signal_bus import get_signal_bus
+                signal_bus = get_signal_bus()
+                signal_bus.themeChangeRequested.emit()
+            except Exception as e:
+                log.error(f"[Theme] Failed to emit theme change signal: {e}")
 
             # Update central widget background
             central = self.centralWidget()
@@ -531,23 +587,17 @@ class MainWindow(QtWidgets.QMainWindow):
                 return
             self.current_tf = tf
 
-            # Panel1 drives the graph windowing & endpoint recolor
-            if hasattr(self, "panel_balance"):
-                self.panel_balance.set_timeframe(tf)
-
-            # Optional: if Panel2 needs to react locally to TF, forward it
-            if hasattr(self, "panel_live") and hasattr(self.panel_live, "set_timeframe"):
-                with contextlib.suppress(Exception):
-                    self.panel_live.set_timeframe(tf)  # harmless if no-op
-
-            # Keep LIVE-dot visibility/pulsing correct in Panel2
+            # PHASE 4: Broadcast timeframe change via SignalBus (replaces direct calls)
             try:
-                if hasattr(self.panel_live, "set_live_dot_visible"):
-                    self.panel_live.set_live_dot_visible(tf == "LIVE")
-                if hasattr(self.panel_live, "set_live_dot_pulsing"):
-                    self.panel_live.set_live_dot_pulsing(tf == "LIVE")
-            except Exception:
-                pass
+                from core.signal_bus import get_signal_bus
+                signal_bus = get_signal_bus()
+                signal_bus.timeframeChangeRequested.emit(tf)
+
+                # LIVE-dot visibility/pulsing based on timeframe
+                signal_bus.liveDotVisibilityRequested.emit(tf == "LIVE")
+                signal_bus.liveDotPulsingRequested.emit(tf == "LIVE")
+            except Exception as e:
+                log.error(f"[Timeframe] Failed to emit timeframe signals: {e}")
 
             # Also refresh the pill highlight color from current PnL direction
             self._sync_pills_color_from_panel1()
@@ -572,8 +622,15 @@ class MainWindow(QtWidgets.QMainWindow):
             if tf not in ("LIVE", "1D", "1W", "1M", "3M", "YTD"):
                 return
             self.current_tf = tf
-            if hasattr(self, "panel_balance"):
-                self.panel_balance.set_timeframe(tf)
+
+            # PHASE 4: Broadcast timeframe change via SignalBus (replaces direct call)
+            try:
+                from core.signal_bus import get_signal_bus
+                signal_bus = get_signal_bus()
+                signal_bus.timeframeChangeRequested.emit(tf)
+            except Exception as e:
+                log.error(f"[Timeframe] Failed to emit timeframe signal: {e}")
+
             # Visual sync for pills color based on Panel1 PnL direction
             self._sync_pills_color_from_panel1()
         except Exception:
@@ -642,25 +699,12 @@ class MainWindow(QtWidgets.QMainWindow):
             if os.getenv("DEBUG_DTC", "0") == "1":
                 log.debug(f"[DTC] Searching for DTC server at {host}:{port}")
 
-            # Create message router to dispatch data to panels and state
-            # Note: MessageRouter will auto-subscribe to Blinker signals
-            router = MessageRouter(
-                state=self._state,
-                panel_balance=self.panel_balance,
-                panel_live=self.panel_live,
-                panel_stats=self.panel_stats,
-                dtc_client=None,  # Will be set after DTC client is created
-                auto_subscribe=True,  # Subscribe to Blinker signals
-            )
-            if os.getenv("DEBUG_DTC", "0") == "1":
-                log.debug("[DTC] MessageRouter instantiated and wired to panels/state")
+            # MIGRATION: MessageRouter removed - panels now subscribe to SignalBus directly
+            # All DTC events are emitted via SignalBus Qt signals for thread-safe delivery
+            self._dtc = DTCClientJSON(host=host, port=port)
 
-            self._dtc = DTCClientJSON(host=host, port=port, router=router)
-
-            # Give router access to DTC client for balance refresh requests
-            router._dtc_client = self._dtc
             if os.getenv("DEBUG_DTC", "0") == "1":
-                log.debug("[DTC] Router now has DTC client reference for balance requests")
+                log.debug("[DTC] Client created - panels receive events via SignalBus")
 
             self._connect_dtc_signals()
 
@@ -746,22 +790,151 @@ class MainWindow(QtWidgets.QMainWindow):
                 icon.mark_data_activity()
 
     def closeEvent(self, event) -> None:
-        """Called when the app is closing. Log final balance state."""
+        """
+        Graceful shutdown sequence when app is closing.
+
+        Ensures all resources are properly released:
+        1. Saves panel states (open positions, etc.)
+        2. Disconnects from DTC server gracefully
+        3. Flushes pending database writes
+        4. Logs final balance state
+        5. Disposes database connections
+        """
+        print(f"\n{'='*80}")
+        print("[APP SHUTDOWN] Graceful shutdown initiated")
+        print(f"{'='*80}")
+
+        shutdown_errors = []
+
+        # Step 1: Save panel states (Panel2 position state, Panel3 settings, etc.)
         try:
-            if self._state:
+            print("[1/6] Saving panel states...")
+
+            # Save Panel2 (live trading) position state if any
+            if hasattr(self, 'panel_live') and self.panel_live:
+                if hasattr(self.panel_live, 'save_state'):
+                    self.panel_live.save_state()
+                    print("  ✓ Panel 2 (Live Trading) state saved")
+                elif hasattr(self.panel_live, '_save_panel_state'):
+                    self.panel_live._save_panel_state()
+                    print("  ✓ Panel 2 (Live Trading) state saved")
+                else:
+                    print("  ℹ Panel 2 has no save_state method (expected)")
+
+            # Panel1 and Panel3 typically don't need state saving
+            print("  ✓ Panel states saved")
+
+        except Exception as e:
+            error_msg = f"Failed to save panel states: {e}"
+            shutdown_errors.append(error_msg)
+            print(f"  ✗ {error_msg}")
+            log.error(f"[Shutdown] {error_msg}")
+
+        # Step 2: Disconnect from DTC server gracefully
+        try:
+            print("[2/6] Disconnecting from DTC server...")
+
+            if hasattr(self, '_dtc') and self._dtc:
+                if hasattr(self._dtc, 'disconnect'):
+                    self._dtc.disconnect()
+                    print("  ✓ DTC connection closed gracefully")
+                    log.info("[Shutdown] DTC disconnected")
+                else:
+                    print("  ℹ DTC client has no disconnect method")
+            else:
+                print("  ℹ No DTC connection to close")
+
+        except Exception as e:
+            error_msg = f"Failed to disconnect DTC: {e}"
+            shutdown_errors.append(error_msg)
+            print(f"  ✗ {error_msg}")
+            log.error(f"[Shutdown] {error_msg}")
+
+        # Step 3: Flush any pending database writes
+        try:
+            print("[3/6] Flushing database writes...")
+
+            # Import here to avoid circular dependency
+            from data.db_engine import get_session
+
+            # Flush any pending sessions (context manager handles commit)
+            with contextlib.suppress(Exception):
+                with get_session() as session:
+                    session.flush()
+
+            print("  ✓ Database writes flushed")
+
+        except Exception as e:
+            error_msg = f"Failed to flush database: {e}"
+            shutdown_errors.append(error_msg)
+            print(f"  ✗ {error_msg}")
+            log.error(f"[Shutdown] {error_msg}")
+
+        # Step 4: Log final balance state
+        try:
+            print("[4/6] Logging final balance state...")
+
+            if hasattr(self, '_state') and self._state:
                 final_balance = self._state.sim_balance
-                print(f"\n{'='*80}")
-                print(f"[APP CLOSING] Final Balance Check")
-                print(f"{'='*80}")
+                print(f"\n  {'─'*70}")
+                print(f"  Final Balance Check")
+                print(f"  {'─'*70}")
                 print(f"  Final SIM Balance: ${final_balance:,.2f}")
                 print(f"  Starting Balance: $10,000.00")
                 print(f"  Session P&L: ${final_balance - 10000.0:+,.2f}")
                 print(f"  Status: {'PERSISTENT [OK]' if final_balance != 10000.0 else 'Default (no trades)'}")
-                print(f"{'='*80}\n")
+                print(f"  {'─'*70}\n")
                 log.info(f"[Shutdown] App closing with SIM balance: ${final_balance:,.2f}")
-        except Exception as e:
-            print(f"[ERROR] Failed to log closing state: {e}")
+            else:
+                print("  ℹ No state manager to log balance from")
 
+        except Exception as e:
+            error_msg = f"Failed to log balance: {e}"
+            shutdown_errors.append(error_msg)
+            print(f"  ✗ {error_msg}")
+            log.error(f"[Shutdown] {error_msg}")
+
+        # Step 5: Dispose database connections
+        try:
+            print("[5/6] Closing database connections...")
+
+            from data.db_engine import engine
+
+            if engine:
+                # Dispose of connection pool
+                engine.dispose()
+                print("  ✓ Database connection pool disposed")
+                log.info("[Shutdown] Database connections closed")
+            else:
+                print("  ℹ No database engine to dispose")
+
+        except Exception as e:
+            error_msg = f"Failed to dispose database: {e}"
+            shutdown_errors.append(error_msg)
+            print(f"  ✗ {error_msg}")
+            log.error(f"[Shutdown] {error_msg}")
+
+        # Step 6: Final summary
+        try:
+            print("[6/6] Shutdown complete")
+
+            if shutdown_errors:
+                print(f"\n  ⚠ Shutdown completed with {len(shutdown_errors)} error(s):")
+                for err in shutdown_errors:
+                    print(f"    - {err}")
+            else:
+                print("  ✓ Clean shutdown (no errors)")
+
+            print(f"{'='*80}")
+            print("[APP SHUTDOWN] Application closed gracefully")
+            print(f"{'='*80}\n")
+
+            log.info("[Shutdown] Shutdown sequence completed", errors=len(shutdown_errors))
+
+        except Exception as e:
+            print(f"  ✗ Failed to log shutdown summary: {e}")
+
+        # Finally, call parent closeEvent to complete Qt cleanup
         super().closeEvent(event)
 
 

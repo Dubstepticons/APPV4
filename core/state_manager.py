@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import threading
 from datetime import datetime
 
 # File: core/state_manager.py
@@ -21,6 +22,10 @@ class StateManager(QtCore.QObject):
     account metrics. Should not store persistent data.
 
     Key Invariant: Only ONE active position at a time (SIM OR LIVE, not both)
+
+    Thread Safety: All public methods are thread-safe. Uses reentrant lock (RLock)
+    to protect all mutable state. Signals are emitted OUTSIDE of lock scope to
+    prevent deadlocks.
     """
 
     # ===== SIGNALS =====
@@ -29,6 +34,10 @@ class StateManager(QtCore.QObject):
 
     def __init__(self):
         super().__init__()
+
+        # Thread safety: Reentrant lock protects all mutable state
+        # RLock allows same thread to acquire lock multiple times (needed for nested calls)
+        self._lock = threading.RLock()
 
         # Core dynamic store
         self._state: dict[str, Any] = {}
@@ -70,6 +79,7 @@ class StateManager(QtCore.QObject):
         """
         Load the SIM balance from the database by summing all realized P&L trades.
         This is called on app startup to restore the balance if the app was restarted.
+        Thread-safe.
         """
         try:
             from data.db_engine import get_session
@@ -93,64 +103,84 @@ class StateManager(QtCore.QObject):
                 ).count()
 
                 total_pnl = float(result) if result else 0.0
-                self.sim_balance = 10000.0 + total_pnl
+
+                with self._lock:
+                    self.sim_balance = 10000.0 + total_pnl
+                    new_balance = self.sim_balance
 
                 print(f"\n[DATABASE LOAD] SIM Balance Restored from Trades")
                 print(f"  Trades in Database: {trade_count}")
                 print(f"  Base Balance: $10,000.00")
                 print(f"  Total P&L: {total_pnl:+,.2f}")
-                print(f"  Current Balance: ${self.sim_balance:,.2f}\n")
-                print(f"[DEBUG state_manager.load_sim_balance_from_trades] Total PnL from trades: {total_pnl:+,.2f}, SIM balance: ${self.sim_balance:,.2f}")
+                print(f"  Current Balance: ${new_balance:,.2f}\n")
+                print(f"[DEBUG state_manager.load_sim_balance_from_trades] Total PnL from trades: {total_pnl:+,.2f}, SIM balance: ${new_balance:,.2f}")
 
-                return self.sim_balance
+                return new_balance
         except Exception as e:
             print(f"[DEBUG state_manager.load_sim_balance_from_trades] Error loading balance: {e}")
             # Fall back to default 10k
-            self.sim_balance = 10000.0
-            return self.sim_balance
+            with self._lock:
+                self.sim_balance = 10000.0
+                return self.sim_balance
 
-    # ---- Core API ----
+    # ---- Core API (Thread-Safe) ----
     def set(self, key: str, value: Any) -> None:
-        """Assign a value to the state."""
-        self._state[key] = value
+        """Assign a value to the state. Thread-safe."""
+        with self._lock:
+            self._state[key] = value
 
     def get(self, key: str, default: Optional[Any] = None) -> Any:
-        """Retrieve a value or default."""
-        return self._state.get(key, default)
+        """Retrieve a value or default. Thread-safe."""
+        with self._lock:
+            return self._state.get(key, default)
 
     def delete(self, key: str) -> None:
-        """Remove a key from the state."""
-        if key in self._state:
-            del self._state[key]
+        """Remove a key from the state. Thread-safe."""
+        with self._lock:
+            if key in self._state:
+                del self._state[key]
 
     def clear(self) -> None:
-        """Clear all runtime state."""
-        self._state.clear()
+        """Clear all runtime state. Thread-safe."""
+        with self._lock:
+            self._state.clear()
 
-    # ---- Utility methods ----
+    # ---- Utility methods (Thread-Safe) ----
     def dump(self) -> dict[str, Any]:
-        """Return a shallow copy of state for debugging."""
-        return dict(self._state)
+        """Return a shallow copy of state for debugging. Thread-safe."""
+        with self._lock:
+            return dict(self._state)
 
     def keys(self):
-        return list(self._state.keys())
+        """Return list of keys. Thread-safe."""
+        with self._lock:
+            return list(self._state.keys())
 
     def update(self, mapping: dict[str, Any]) -> None:
-        """Bulk update state."""
-        self._state.update(mapping)
+        """Bulk update state. Thread-safe."""
+        with self._lock:
+            self._state.update(mapping)
 
-    # ---- Convenience accessors ----
+    # ---- Convenience accessors (Thread-Safe) ----
     def get_active_symbol(self) -> Optional[str]:
-        return self._state.get("active_symbol")
+        """Thread-safe."""
+        with self._lock:
+            return self._state.get("active_symbol")
 
     def get_last_price(self) -> Optional[float]:
-        return self._state.get("last_price")
+        """Thread-safe."""
+        with self._lock:
+            return self._state.get("last_price")
 
     def get_positions(self) -> list[dict]:
-        return self._state.get("positions", [])
+        """Thread-safe. Returns a copy."""
+        with self._lock:
+            return list(self._state.get("positions", []))
 
     def set_positions(self, positions: list[dict]) -> None:
-        self._state["positions"] = positions
+        """Thread-safe."""
+        with self._lock:
+            self._state["positions"] = positions
 
     # -------------------- mode properties (backward compatibility) ----
     @property
@@ -178,19 +208,26 @@ class StateManager(QtCore.QObject):
         """
         Detect and update mode based on account string.
         Uses proper mode detection (LIVE/SIM/DEBUG) from utils.trade_mode (single source of truth).
+        Thread-safe.
         """
-        old_mode = self.current_mode
-        self.current_account = account
-
         # CONSOLIDATION FIX: Use canonical mode detection (no inline import needed)
         new_mode = detect_mode_from_account(account or "")
 
-        if new_mode != old_mode:
-            self.current_mode = new_mode
-            self._add_to_mode_history(new_mode, account or "")
-            self._log_mode_change("StateManager.set_mode", new_mode)
+        with self._lock:
+            old_mode = self.current_mode
+            mode_changed = (new_mode != old_mode)
 
-            # Emit modeChanged signal
+            if mode_changed:
+                self.current_mode = new_mode
+                self.current_account = account
+                self._add_to_mode_history_unsafe(new_mode, account or "")
+                self._log_mode_change("StateManager.set_mode", new_mode)
+            else:
+                # Update account even if mode didn't change
+                self.current_account = account
+
+        # Emit signal OUTSIDE lock scope to prevent deadlocks
+        if mode_changed:
             try:
                 self.modeChanged.emit(new_mode)
             except Exception:
@@ -199,9 +236,10 @@ class StateManager(QtCore.QObject):
     # -------------------- mode setter (end)
 
     # -------------------- mode history tracking (start)
-    def _add_to_mode_history(self, mode: str, account: str) -> None:
+    def _add_to_mode_history_unsafe(self, mode: str, account: str) -> None:
         """
-        Add a mode change to history.
+        Add a mode change to history. MUST be called with lock held.
+        Internal helper for use within locked sections.
 
         Args:
             mode: Trading mode ("LIVE", "SIM", "DEBUG")
@@ -215,9 +253,20 @@ class StateManager(QtCore.QObject):
         if len(self.mode_history) > 100:
             self.mode_history = self.mode_history[-100:]
 
+    def _add_to_mode_history(self, mode: str, account: str) -> None:
+        """
+        Add a mode change to history. Thread-safe.
+
+        Args:
+            mode: Trading mode ("LIVE", "SIM", "DEBUG")
+            account: Account identifier
+        """
+        with self._lock:
+            self._add_to_mode_history_unsafe(mode, account)
+
     def get_mode_history(self, limit: Optional[int] = None) -> list[tuple[datetime, str, str]]:
         """
-        Get mode change history.
+        Get mode change history. Thread-safe.
 
         Args:
             limit: Optional limit on number of entries (most recent)
@@ -225,24 +274,27 @@ class StateManager(QtCore.QObject):
         Returns:
             List of (timestamp_utc, mode, account) tuples
         """
-        if limit:
-            return self.mode_history[-limit:]
-        return list(self.mode_history)
+        with self._lock:
+            if limit:
+                return self.mode_history[-limit:]
+            return list(self.mode_history)
 
     def get_last_mode_change(self) -> Optional[tuple[datetime, str, str]]:
         """
-        Get the most recent mode change.
+        Get the most recent mode change. Thread-safe.
 
         Returns:
             Tuple of (timestamp_utc, mode, account) or None if no history
         """
-        if self.mode_history:
-            return self.mode_history[-1]
-        return None
+        with self._lock:
+            if self.mode_history:
+                return self.mode_history[-1]
+            return None
 
     def clear_mode_history(self) -> None:
-        """Clear mode history (useful for testing)."""
-        self.mode_history.clear()
+        """Clear mode history (useful for testing). Thread-safe."""
+        with self._lock:
+            self.mode_history.clear()
 
     # -------------------- mode history tracking (end)
 
@@ -267,78 +319,89 @@ class StateManager(QtCore.QObject):
 
     # -------------------- Trading data persistence (start)
     def update_balance(self, balance: Optional[float]) -> None:
-        """Record current account balance."""
+        """Record current account balance. Thread-safe."""
         if balance is not None:
             with contextlib.suppress(TypeError, ValueError):
-                self._state["balance"] = float(balance)  # Ignore invalid balance values
+                with self._lock:
+                    self._state["balance"] = float(balance)  # Ignore invalid balance values
 
     def update_position(self, symbol: Optional[str], qty: int, avg_price: Optional[float]) -> None:
-        """Record or remove a position."""
+        """Record or remove a position. Thread-safe."""
         if not symbol:
             return
-        positions = self._state.get("positions", {})
-        if qty == 0:
-            # Close position (remove from dict)
-            positions.pop(symbol, None)
-        else:
-            # Update or create position
-            positions[symbol] = {
-                "qty": int(qty),
-                "avg_price": float(avg_price) if avg_price else None,
-            }
-        self._state["positions"] = positions
+
+        with self._lock:
+            positions = self._state.get("positions", {})
+            if qty == 0:
+                # Close position (remove from dict)
+                positions.pop(symbol, None)
+            else:
+                # Update or create position
+                positions[symbol] = {
+                    "qty": int(qty),
+                    "avg_price": float(avg_price) if avg_price else None,
+                }
+            self._state["positions"] = positions
 
     def record_order(self, payload: dict) -> None:
-        """Record an order event for statistics and replay."""
+        """Record an order event for statistics and replay. Thread-safe."""
         if not isinstance(payload, dict):
             return
-        orders = self._state.get("orders", [])
-        orders.append(payload)
-        self._state["orders"] = orders
+
+        with self._lock:
+            orders = self._state.get("orders", [])
+            orders.append(payload)
+            self._state["orders"] = orders
 
     # -------------------- Trading data persistence (end)
 
     # ===== MODE MANAGEMENT =====
     @property
     def active_balance(self) -> float:
-        """Return balance for the currently OPEN trade (not current_mode)"""
-        if self.position_mode == "SIM":
-            return self.sim_balance
-        elif self.position_mode == "LIVE":
-            return self.live_balance
-        else:
-            return self.get_balance_for_mode(self.current_mode)
+        """Return balance for the currently OPEN trade (not current_mode). Thread-safe."""
+        with self._lock:
+            if self.position_mode == "SIM":
+                return self.sim_balance
+            elif self.position_mode == "LIVE":
+                return self.live_balance
+            else:
+                return self.sim_balance if self.current_mode == "SIM" else self.live_balance
 
     def get_balance_for_mode(self, mode: str) -> float:
-        """Get balance for a specific mode"""
-        return self.sim_balance if mode == "SIM" else self.live_balance
+        """Get balance for a specific mode. Thread-safe."""
+        with self._lock:
+            return self.sim_balance if mode == "SIM" else self.live_balance
 
     def set_balance_for_mode(self, mode: str, balance: float) -> None:
-        """Update balance for a specific mode"""
+        """Update balance for a specific mode. Thread-safe."""
         print(f"[DEBUG state_manager.set_balance_for_mode] STEP 1: Called with mode={mode}, balance={balance}")
-        if mode == "SIM":
-            old_balance = self.sim_balance
-            self.sim_balance = balance
-            print(f"[DEBUG state_manager.set_balance_for_mode] STEP 2: SIM balance updated from {old_balance} to {balance}")
-        else:
-            old_balance = self.live_balance
-            self.live_balance = balance
-            print(f"[DEBUG state_manager.set_balance_for_mode] STEP 2: LIVE balance updated from {old_balance} to {balance}")
 
-        # Emit signal so UI can update
+        with self._lock:
+            if mode == "SIM":
+                old_balance = self.sim_balance
+                self.sim_balance = balance
+                print(f"[DEBUG state_manager.set_balance_for_mode] STEP 2: SIM balance updated from {old_balance} to {balance}")
+            else:
+                old_balance = self.live_balance
+                self.live_balance = balance
+                print(f"[DEBUG state_manager.set_balance_for_mode] STEP 2: LIVE balance updated from {old_balance} to {balance}")
+
+        # Emit signal OUTSIDE lock scope to prevent deadlocks
         print(f"[DEBUG state_manager.set_balance_for_mode] STEP 3: Emitting balanceChanged signal with balance={balance}")
         self.balanceChanged.emit(balance)
         print(f"[DEBUG state_manager.set_balance_for_mode] STEP 4: Signal emitted successfully")
 
     def reset_sim_balance_to_10k(self) -> float:
-        """Reset SIM balance to $10,000 (for monthly reset or manual hotkey)"""
-        self.sim_balance = 10000.0
-        self.sim_balance_start_of_month = 10000.0
-        return self.sim_balance
+        """Reset SIM balance to $10,000 (for monthly reset or manual hotkey). Thread-safe."""
+        with self._lock:
+            self.sim_balance = 10000.0
+            self.sim_balance_start_of_month = 10000.0
+            return self.sim_balance
 
     def adjust_sim_balance_by_pnl(self, realized_pnl: float) -> float:
         """
         Adjust SIM balance by realized P&L from a closed trade.
+        Thread-safe - VULN-001 FIX.
 
         Args:
             realized_pnl: The P&L from the closed trade (positive or negative)
@@ -348,23 +411,29 @@ class StateManager(QtCore.QObject):
         """
         try:
             realized_pnl_float = float(realized_pnl)
-            self.sim_balance += realized_pnl_float
+
+            # VULN-001 FIX: Protect read-modify-write operation with lock
+            with self._lock:
+                self.sim_balance += realized_pnl_float
+                new_balance = self.sim_balance
 
             from utils.logger import get_logger
             log = get_logger("StateManager")
-            log.info(f"[SIM Balance] Adjusted by {realized_pnl_float:+,.2f} - New balance: ${self.sim_balance:,.2f}")
+            log.info(f"[SIM Balance] Adjusted by {realized_pnl_float:+,.2f} - New balance: ${new_balance:,.2f}")
 
-            return self.sim_balance
+            return new_balance
         except (TypeError, ValueError) as e:
             from utils.logger import get_logger
             log = get_logger("StateManager")
             log.error(f"[SIM Balance] Error adjusting balance: {e}")
-            return self.sim_balance
+            with self._lock:
+                return self.sim_balance
 
     # ===== MODE DETECTION =====
     def detect_and_set_mode(self, account: str) -> str:
         """
         Detect trading mode from account string and update state.
+        Thread-safe.
 
         CONSOLIDATION FIX: Uses canonical detect_mode_from_account() from utils.trade_mode
         (single source of truth - no duplicate logic).
@@ -378,33 +447,41 @@ class StateManager(QtCore.QObject):
         # CONSOLIDATION FIX: Use canonical mode detection (single source of truth)
         mode = detect_mode_from_account(account or "")
 
-        # Only add to history if mode actually changed
-        if mode != self.current_mode:
-            self._add_to_mode_history(mode, account)
-            self._log_mode_change("StateManager.detect_and_set_mode", mode)
+        with self._lock:
+            mode_changed = (mode != self.current_mode)
 
-            # Emit modeChanged signal so UI (Panel 3) can update
+            # Only add to history if mode actually changed
+            if mode_changed:
+                self._add_to_mode_history_unsafe(mode, account)
+                self._log_mode_change("StateManager.detect_and_set_mode", mode)
+
+            self.current_mode = mode
+            self.current_account = account
+
+        # Emit signal OUTSIDE lock scope to prevent deadlocks
+        if mode_changed:
             try:
                 self.modeChanged.emit(mode)
             except Exception:
                 pass  # Signal emission failure shouldn't crash
 
-        self.current_mode = mode
-        self.current_account = account
         return mode
 
     # ===== POSITION TRACKING =====
     def has_active_position(self) -> bool:
-        """Check if ANY position is currently open"""
-        return self.position_qty != 0
+        """Check if ANY position is currently open. Thread-safe."""
+        with self._lock:
+            return self.position_qty != 0
 
     def get_open_trade_mode(self) -> Optional[str]:
-        """Returns what mode the current open trade is in (SIM, LIVE, or None)"""
-        return self.position_mode if self.has_active_position() else None
+        """Returns what mode the current open trade is in (SIM, LIVE, or None). Thread-safe."""
+        with self._lock:
+            return self.position_mode if self.position_qty != 0 else None
 
     def is_mode_blocked(self, requested_mode: str) -> bool:
         """
         Check if switching to requested_mode is blocked due to open trade.
+        Thread-safe.
 
         Rules:
         1. LIVE mode cannot be blocked (always allowed)
@@ -415,57 +492,60 @@ class StateManager(QtCore.QObject):
             return False  # LIVE always takes precedence
 
         if requested_mode == "SIM":
-            return self.position_mode == "LIVE"  # Blocked only if LIVE position open
+            with self._lock:
+                return self.position_mode == "LIVE"  # Blocked only if LIVE position open
 
         return False
 
     def open_position(self, symbol: str, qty: float, entry_price: float,
                       entry_time: datetime, mode: str) -> None:
-        """Open a new position in the specified mode"""
-        self.position_symbol = symbol
-        self.position_qty = qty
-        self.position_entry_price = entry_price
-        self.position_entry_time = entry_time
-        self.position_side = "LONG" if qty > 0 else "SHORT"
-        self.position_mode = mode  # <-- KEY: Store what mode this position is in
+        """Open a new position in the specified mode. Thread-safe."""
+        with self._lock:
+            self.position_symbol = symbol
+            self.position_qty = qty
+            self.position_entry_price = entry_price
+            self.position_entry_time = entry_time
+            self.position_side = "LONG" if qty > 0 else "SHORT"
+            self.position_mode = mode  # <-- KEY: Store what mode this position is in
 
     def close_position(self) -> Optional[dict]:
         """
         Close the current position and return the complete trade record.
-        Called when position reaches qty = 0.
+        Called when position reaches qty = 0. Thread-safe.
         """
-        if not self.has_active_position():
-            return None
+        with self._lock:
+            if self.position_qty == 0:
+                return None
 
-        trade_record = {
-            "symbol": self.position_symbol,
-            "side": self.position_side,
-            "qty": abs(self.position_qty),
-            "entry_time": self.position_entry_time,
-            "entry_price": self.position_entry_price,
-            "entry_vwap": self.entry_vwap,
-            "entry_cum_delta": self.entry_cum_delta,
-            "mode": self.position_mode,  # <-- Record what mode this was
-        }
+            trade_record = {
+                "symbol": self.position_symbol,
+                "side": self.position_side,
+                "qty": abs(self.position_qty),
+                "entry_time": self.position_entry_time,
+                "entry_price": self.position_entry_price,
+                "entry_vwap": self.entry_vwap,
+                "entry_cum_delta": self.entry_cum_delta,
+                "mode": self.position_mode,  # <-- Record what mode this was
+            }
 
-        # Clear position
-        self.position_symbol = None
-        self.position_qty = 0
-        self.position_entry_price = 0
-        self.position_entry_time = None
-        self.position_side = None
-        self.position_mode = None
+            # Clear position
+            self.position_symbol = None
+            self.position_qty = 0
+            self.position_entry_price = 0
+            self.position_entry_time = None
+            self.position_side = None
+            self.position_mode = None
 
-        # Clear snapshots
-        self.entry_vwap = None
-        self.entry_cum_delta = None
-        self.entry_poc = None
+            # Clear snapshots
+            self.entry_vwap = None
+            self.entry_cum_delta = None
+            self.entry_poc = None
 
-        return trade_record
+            return trade_record
 
     def handle_mode_switch(self, new_mode: str) -> Optional[dict]:
         """
-        Handle switching to a new mode.
+        Handle switching to a new mode. Thread-safe.
 
         Rules:
         1. If switching to LIVE and SIM position is open -> close SIM position
@@ -474,29 +554,53 @@ class StateManager(QtCore.QObject):
 
         Returns: Closed trade record (if any), or None
         """
-        if new_mode == self.current_mode:
-            return None  # No change
+        with self._lock:
+            if new_mode == self.current_mode:
+                return None  # No change
 
-        if new_mode == "LIVE":
-            # Switching to LIVE
-            if self.position_mode == "SIM":
-                # Close SIM position immediately
-                closed_trade = self.close_position()
-                self.current_mode = new_mode
-                return closed_trade
-            else:
-                # No open position or already LIVE
-                self.current_mode = new_mode
-                return None
+            if new_mode == "LIVE":
+                # Switching to LIVE
+                if self.position_mode == "SIM":
+                    # Close SIM position immediately (need to call unsafe version inside lock)
+                    if self.position_qty == 0:
+                        closed_trade = None
+                    else:
+                        closed_trade = {
+                            "symbol": self.position_symbol,
+                            "side": self.position_side,
+                            "qty": abs(self.position_qty),
+                            "entry_time": self.position_entry_time,
+                            "entry_price": self.position_entry_price,
+                            "entry_vwap": self.entry_vwap,
+                            "entry_cum_delta": self.entry_cum_delta,
+                            "mode": self.position_mode,
+                        }
+                        # Clear position
+                        self.position_symbol = None
+                        self.position_qty = 0
+                        self.position_entry_price = 0
+                        self.position_entry_time = None
+                        self.position_side = None
+                        self.position_mode = None
+                        self.entry_vwap = None
+                        self.entry_cum_delta = None
+                        self.entry_poc = None
 
-        elif new_mode == "SIM":
-            # Switching to SIM
-            if self.position_mode == "LIVE":
-                # CANNOT switch - block it
-                return None
-            else:
-                # No open position or already SIM
-                self.current_mode = new_mode
-                return None
+                    self.current_mode = new_mode
+                    return closed_trade
+                else:
+                    # No open position or already LIVE
+                    self.current_mode = new_mode
+                    return None
 
-        return None
+            elif new_mode == "SIM":
+                # Switching to SIM
+                if self.position_mode == "LIVE":
+                    # CANNOT switch - block it
+                    return None
+                else:
+                    # No open position or already SIM
+                    self.current_mode = new_mode
+                    return None
+
+            return None

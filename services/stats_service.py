@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import contextlib
 from datetime import datetime, timedelta
+import threading
 import time
 from typing import Any, Dict, List, Tuple
 
@@ -34,16 +35,20 @@ from utils.timeframe_helpers import timeframe_start
 
 # CRITICAL FIX: Stats calculation cache with 5-second TTL to prevent redundant DB queries
 # Cache structure: {(timeframe, mode): (timestamp, result)}
+# VULN-003 FIX: Added thread safety with Lock
 _stats_cache: Dict[Tuple[str, str], Tuple[float, Dict[str, Any]]] = {}
+_stats_cache_lock = threading.Lock()
 _CACHE_TTL_SECONDS = 5.0
 
 
 def invalidate_stats_cache() -> None:
     """
     Invalidate the stats cache. Call this when new trades are recorded.
+    Thread-safe - VULN-003 FIX.
     """
     global _stats_cache
-    _stats_cache.clear()
+    with _stats_cache_lock:
+        _stats_cache.clear()
 
 
 def compute_trading_stats_for_timeframe(tf: str, mode: str | None = None) -> dict[str, Any]:
@@ -82,18 +87,20 @@ def compute_trading_stats_for_timeframe(tf: str, mode: str | None = None) -> dic
             mode = "SIM"  # Default fallback
 
     # CRITICAL FIX: Check cache before expensive DB query
+    # VULN-003 FIX: Thread-safe cache access
     cache_key = (tf, mode or "")
     now = time.time()
 
-    if cache_key in _stats_cache:
-        cached_time, cached_result = _stats_cache[cache_key]
-        if now - cached_time < _CACHE_TTL_SECONDS:
-            # Cache hit - return cached result
-            print(f"[STATS CACHE HIT] {cache_key} (age: {now - cached_time:.2f}s)")
-            return cached_result
-        else:
-            # Cache expired - remove stale entry
-            del _stats_cache[cache_key]
+    with _stats_cache_lock:
+        if cache_key in _stats_cache:
+            cached_time, cached_result = _stats_cache[cache_key]
+            if now - cached_time < _CACHE_TTL_SECONDS:
+                # Cache hit - return cached result (make a copy to avoid external mutation)
+                print(f"[STATS CACHE HIT] {cache_key} (age: {now - cached_time:.2f}s)")
+                return dict(cached_result)
+            else:
+                # Cache expired - remove stale entry
+                del _stats_cache[cache_key]
 
     pnls: list[float] = []
     commissions_sum = 0.0
@@ -229,7 +236,9 @@ def compute_trading_stats_for_timeframe(tf: str, mode: str | None = None) -> dic
     print(f"\n{'='*80}\n")
 
     # CRITICAL FIX: Store result in cache with current timestamp
-    _stats_cache[cache_key] = (time.time(), result_dict)
+    # VULN-003 FIX: Thread-safe cache write
+    with _stats_cache_lock:
+        _stats_cache[cache_key] = (time.time(), result_dict)
     print(f"[STATS CACHE STORE] {cache_key}")
 
     return result_dict

@@ -1,12 +1,32 @@
+"""
+core/data_bridge.py
+
+DTC Protocol Client for Qt-based trading application.
+
+Responsibilities:
+- Manage TCP connection to DTC Protocol server
+- Handle DTC JSON message framing (null-terminated)
+- Event normalization and routing via SignalBus
+- Heartbeat monitoring and watchdog
+- Auto-reconnect with exponential backoff
+- Handshake and authentication sequencing
+
+Protocol:
+- DTC Protocol JSON encoding (null-terminated messages)
+- Heartbeat exchange for connection health
+- Trade account, position, and order updates
+- Account balance and equity monitoring
+
+Thread Safety:
+- Runs DTC socket operations in background thread
+- Emits Qt signals for thread-safe UI updates
+- Uses QueuedConnection for cross-thread signal delivery
+"""
+
 from __future__ import annotations
 
 import contextlib
 import time
-
-# File: core/data_bridge.py
-# DTC JSON bridge (Qt): null-terminated framing, event normalization,
-# heartbeat, watchdog, auto-reconnect, and handshake-ready signaling.
-# -------------------- Imports (start)
 from typing import Any, Dict, Optional
 
 from blinker import Signal
@@ -32,6 +52,7 @@ from services.dtc_protocol import (
     is_logon_success,
     parse_messages,
 )
+from utils.request_timeout import RequestTimeoutManager
 
 
 # -------------------- Imports (end)
@@ -39,11 +60,15 @@ from services.dtc_protocol import (
 log = structlog.get_logger(__name__)
 
 # -------------------- App-level normalized signals (start)
+# DEPRECATED: Blinker signals (being migrated to SignalBus)
 signal_trade_account = Signal("trade_account")
 signal_balance = Signal("balance")
 signal_position = Signal("position")
 signal_order = Signal("order")
 # -------------------- App-level normalized signals (end)
+
+# MIGRATION: Import SignalBus for Qt signal emission
+from core.signal_bus import get_signal_bus
 
 
 # -------------------- AppMessage model (start)
@@ -164,7 +189,7 @@ def _dtc_to_app_event(dtc: dict) -> Optional[AppMessage]:
         return AppMessage(type="ORDER_UPDATE", payload=_normalize_order(dtc))
 
     # DEBUG: Log unhandled message types (helps identify missing handlers)
-    try:
+    with contextlib.suppress(Exception):
         from config.settings import DEBUG_DTC
 
         # Patch 2: Suppress Type 501 (market data) noise from debug logs
@@ -172,8 +197,6 @@ def _dtc_to_app_event(dtc: dict) -> Optional[AppMessage]:
             import sys
 
             print(f"[UNHANDLED-DTC-TYPE] Type {msg_type} ({name}) - no handler", file=sys.stderr, flush=True)
-    except Exception:
-        pass
 
     return None
 
@@ -192,9 +215,19 @@ class DTCClientJSON(QtCore.QObject):
     session_ready = QtCore.pyqtSignal()  # fires when fully connected (post-logon)
 
     # -------------------- __init__ (start)
-    def __init__(self, host="127.0.0.1", port=11099, router=None, _sim_mode: bool = False):
+    def __init__(self, host="127.0.0.1", port=11099, _sim_mode: bool = False):
+        """
+        Initialize DTC JSON client.
+
+        MIGRATION: router parameter removed - panels now subscribe to SignalBus directly.
+
+        Args:
+            host: DTC server host (default: 127.0.0.1)
+            port: DTC server port (default: 11099)
+            _sim_mode: Internal flag for testing (default: False)
+        """
         super().__init__()
-        self._host, self._port, self._router = host, int(port), router
+        self._host, self._port = host, int(port)
         self._sock = QtNetwork.QTcpSocket(self)
 
         # Socket signal wiring
@@ -221,7 +254,55 @@ class DTCClientJSON(QtCore.QObject):
         # Debug throttle state (ms since monotonic epoch)
         self._debug_dump_next_allowed: float = 0.0
 
+        # Request timeout tracking
+        self._timeout_manager = RequestTimeoutManager(default_timeout=15.0)
+        self._timeout_check_timer: Optional[QtCore.QTimer] = None
+        self._init_timeout_checker()
+
     # -------------------- __init__ (end)
+
+    # -------------------- Timeout Management (start)
+    def _init_timeout_checker(self) -> None:
+        """Initialize periodic timeout checking (every 5 seconds)"""
+        self._timeout_check_timer = QtCore.QTimer(self)
+        self._timeout_check_timer.timeout.connect(self._check_request_timeouts)
+        self._timeout_check_timer.setInterval(5000)  # Check every 5 seconds
+
+    def _check_request_timeouts(self) -> None:
+        """Periodic check for timed out DTC requests"""
+        try:
+            timed_out = self._timeout_manager.check_timeouts()
+
+            for req in timed_out:
+                log.warning(
+                    "dtc.request.timeout",
+                    request_id=req.request_id,
+                    request_type=req.request_type,
+                    timeout=req.timeout,
+                    hint="Sierra Chart may be unresponsive or disconnected"
+                )
+
+                # Emit error signal for UI notification
+                self.errorOccurred.emit(
+                    f"DTC request timeout: {req.request_type} (ID: {req.request_id})"
+                )
+
+        except Exception as e:
+            log.error("timeout_check_failed", error=str(e))
+
+    def _start_timeout_checker(self) -> None:
+        """Start the timeout checking timer"""
+        if self._timeout_check_timer and not self._timeout_check_timer.isActive():
+            self._timeout_check_timer.start()
+            log.debug("timeout_checker_started")
+
+    def _stop_timeout_checker(self) -> None:
+        """Stop the timeout checking timer"""
+        if self._timeout_check_timer and self._timeout_check_timer.isActive():
+            self._timeout_check_timer.stop()
+            log.debug("timeout_checker_stopped")
+
+    # -------------------- Timeout Management (end)
 
     # -------------------- Debug helpers (start)
     def _allow_debug_dump(self, interval_ms: int = 2000) -> bool:
@@ -252,7 +333,18 @@ class DTCClientJSON(QtCore.QObject):
         self._reconnect_attempts = 0
         if self._reconnect_timer and self._reconnect_timer.isActive():
             self._reconnect_timer.stop()
+
+        # Start timeout checking when connected
+        self._start_timeout_checker()
+
+        # Emit connection event
         self.connected.emit()
+        # NEW: Also emit to SignalBus
+        try:
+            signal_bus = get_signal_bus()
+            signal_bus.dtcConnected.emit()
+        except Exception as e:
+            log.warning("signal_bus.connected.error", error=str(e))
 
         # Send DTC LOGON directly (Sierra Chart doesn't support ENCODING_REQUEST negotiation)
         try:
@@ -280,7 +372,20 @@ class DTCClientJSON(QtCore.QObject):
     def _on_disconnected(self) -> None:
         log.info("dtc.tcp.disconnected")
         self._stop_keepalive_system()
+
+        # Stop timeout checking and reset pending requests
+        self._stop_timeout_checker()
+        self._timeout_manager.reset()
+
+        # Emit disconnection event
         self.disconnected.emit()
+        # NEW: Also emit to SignalBus
+        try:
+            signal_bus = get_signal_bus()
+            signal_bus.dtcDisconnected.emit()
+        except Exception as e:
+            log.warning("signal_bus.disconnected.error", error=str(e))
+
         # Stop any pending handshake timer
         if self._handshake_timer and self._handshake_timer.isActive():
             self._handshake_timer.stop()
@@ -304,11 +409,22 @@ class DTCClientJSON(QtCore.QObject):
         self._handshake_timer = QtCore.QTimer(self)
         self._handshake_timer.setSingleShot(True)
         self._handshake_timer.setInterval(1500)  # ms (adjust if your server is slower)
-        self._handshake_timer.timeout.connect(lambda: (log.info("dtc.session_ready.grace"), self.session_ready.emit()))
+
+        def _emit_session_ready_grace():
+            log.info("dtc.session_ready.grace")
+            self.session_ready.emit()
+            # NEW: Also emit to SignalBus
+            try:
+                signal_bus = get_signal_bus()
+                signal_bus.dtcSessionReady.emit()
+            except Exception as e:
+                log.warning("signal_bus.session_ready.error", error=str(e))
+
+        self._handshake_timer.timeout.connect(_emit_session_ready_grace)
 
         # Preferred path: detect explicit LogonResponse(success)
         def _check_logon(msg: dict) -> None:
-            try:
+            with contextlib.suppress(Exception):
                 t = msg.get("Type") or msg.get("type") or msg.get("MessageType")
                 result = msg.get("Result") or msg.get("result") or msg.get("Status")
                 is_logon_resp = (t == LOGON_RESPONSE) or (isinstance(t, str) and t.lower() == "logonresponse")
@@ -320,12 +436,16 @@ class DTCClientJSON(QtCore.QObject):
                         self._handshake_timer.stop()
                     log.info("dtc.session_ready.logon")
                     self.session_ready.emit()
+                    # NEW: Also emit to SignalBus
+                    try:
+                        signal_bus = get_signal_bus()
+                        signal_bus.dtcSessionReady.emit()
+                    except Exception as e:
+                        log.warning("signal_bus.session_ready.error", error=str(e))
+
                     with contextlib.suppress(Exception):
                         # Kick off initial data requests
                         self._request_initial_data()
-            except Exception:
-                # Non-fatal (UI glue)
-                pass
 
         # Wire to our own raw message signal
         with contextlib.suppress(Exception):
@@ -455,6 +575,10 @@ class DTCClientJSON(QtCore.QObject):
             5: "Type 601 (AccountBalanceRequest)",
         }
 
+        # Mark request as completed when response received (timeout tracking)
+        if req_id is not None:
+            self._timeout_manager.mark_completed(req_id)
+
         # Log all responses with RequestID for debugging request/response correlation
         if req_id is not None:
             expected_request = REQUEST_ID_MAP.get(req_id, f"Unknown RequestID {req_id}")
@@ -518,11 +642,9 @@ class DTCClientJSON(QtCore.QObject):
             print(f"[DTC] Type: {msg_type} ({msg_name})")
 
         # Emit raw message for listeners (e.g., handshake detector / app_manager fallback)
-        try:
+        with contextlib.suppress(Exception):
             self.message.emit(dtc)
             self.messageReceived.emit(dtc)
-        except Exception:
-            pass
 
         # Normalize & dispatch app-level event
         app_msg = _dtc_to_app_event(dtc)
@@ -538,6 +660,7 @@ class DTCClientJSON(QtCore.QObject):
         # Stagger requests slightly to avoid burst disconnects
         def send_trade_accounts():
             self.send({"Type": 400, "RequestID": 1})
+            self._timeout_manager.register_request(1, "TRADE_ACCOUNTS_REQUEST", timeout=15.0)
             log.info("dtc.request.trade_accounts")
 
         def send_positions():
@@ -552,6 +675,7 @@ class DTCClientJSON(QtCore.QObject):
 
         def send_open_orders():
             self.send({"Type": 305, "RequestID": 3})
+            self._timeout_manager.register_request(3, "OPEN_ORDERS_REQUEST", timeout=10.0)
             log.info("dtc.request.orders")
 
         def send_fills():
@@ -561,9 +685,12 @@ class DTCClientJSON(QtCore.QObject):
             now = int(time.time())
             start_ts = now - days * 86400
             self.send({"Type": 303, "RequestID": 4, "StartDateTime": start_ts})
+            self._timeout_manager.register_request(4, "HISTORICAL_FILLS_REQUEST", timeout=30.0)
             log.info("dtc.request.fills", days=30)
 
         def send_balance():
+            # Balance request uses request_account_balance which has its own RequestID
+            # We'll register it there
             self.request_account_balance(None)
 
         QtCore.QTimer.singleShot(0, send_trade_accounts)
@@ -579,7 +706,7 @@ class DTCClientJSON(QtCore.QObject):
         """Best-effort detection of Binary DTC frames and log a clear hint once."""
         if self._binary_mode_suspected:
             return
-        try:
+        with contextlib.suppress(Exception):
             if not raw or len(raw) < 4:
                 return
             # DTC binary: [uint16 size][uint16 type] little-endian
@@ -598,9 +725,6 @@ class DTCClientJSON(QtCore.QObject):
                         "DTC server appears to be in BINARY mode. Enable JSON/Compact: "
                         "Global Settings > Data/Trade Service Settings > DTC Protocol Server."
                     )
-        except Exception:
-            # Non-fatal; keep normal flow
-            pass
 
     # -------------------- Dispatch to app (start)
     def _emit_app(self, app_msg: AppMessage) -> None:
@@ -609,37 +733,53 @@ class DTCClientJSON(QtCore.QObject):
             # (Compatibility) If someone listens to messageReceived for app-envelopes, reuse it.
             self.messageReceived.emit(data)  # harmless if no slots connected
 
+        # Get debug flag
         try:
-            try:
-                from config.settings import DEBUG_DATA
-            except Exception:
-                DEBUG_DATA = False
+            from config.settings import DEBUG_DATA
+        except Exception:
+            DEBUG_DATA = False
+
+        # MIGRATION: Emit to both Blinker (deprecated) and SignalBus (new)
+        # This allows gradual migration - once all consumers use SignalBus, remove Blinker
+        try:
+            signal_bus = get_signal_bus()
+
             if app_msg.type == "TRADE_ACCOUNT":
+                # DEPRECATED: Blinker signal
                 signal_trade_account.send(app_msg.payload)
+                # NEW: Qt signal via SignalBus
+                signal_bus.tradeAccountReceived.emit(app_msg.payload)
+
             elif app_msg.type == "BALANCE_UPDATE":
+                # DEPRECATED: Blinker signal
                 signal_balance.send(app_msg.payload)
+                # NEW: Qt signal via SignalBus
+                balance = app_msg.payload.get("CashBalance", 0.0)
+                account = app_msg.payload.get("TradeAccount", "")
+                signal_bus.balanceUpdated.emit(balance, account)
+
             elif app_msg.type == "POSITION_UPDATE":
                 if DEBUG_DATA and self._allow_debug_dump():
                     print("DEBUG [data_bridge]: [POSITION] Sending POSITION_UPDATE signal")
+                # DEPRECATED: Blinker signal
                 signal_position.send(app_msg.payload)
+                # NEW: Qt signal via SignalBus
+                signal_bus.positionUpdated.emit(app_msg.payload)
+
             elif app_msg.type == "ORDER_UPDATE":
                 if DEBUG_DATA and self._allow_debug_dump():
                     print("DEBUG [data_bridge]: [ORDER] Sending ORDER_UPDATE signal")
+                # DEPRECATED: Blinker signal
                 signal_order.send(app_msg.payload)
+                # NEW: Qt signal via SignalBus
+                signal_bus.orderUpdateReceived.emit(app_msg.payload)
+
         except Exception as e:
             log.warning("dtc.signal.error", type=app_msg.type, err=str(e))
-            try:
-                from config.settings import DEBUG_DATA
-            except Exception:
-                DEBUG_DATA = False
             if DEBUG_DATA and self._allow_debug_dump():
                 print(f"DEBUG [data_bridge]: [ERROR] Signal send FAILED: {e}")
 
-        try:
-            if self._router:
-                self._router.route(data)
-        except Exception as e:
-            log.warning("dtc.router.error", type=app_msg.type, err=str(e))
+        # MIGRATION: MessageRouter.route() call removed - panels now receive via SignalBus
 
         # Only log dispatch for meaningful updates (filter out zero-quantity positions)
         if app_msg.type == "POSITION_UPDATE":
@@ -684,6 +824,10 @@ class DTCClientJSON(QtCore.QObject):
             print(f"   Timestamp: {__import__('datetime').datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
             print("=" * 80 + "\n")
         self.send(msg)
+        # Register timeout for this request
+        request_id = msg.get("RequestID", 0)
+        if request_id:
+            self._timeout_manager.register_request(request_id, "ACCOUNT_BALANCE_REQUEST", timeout=10.0)
 
     # -------------------- Outbound (end)
 
