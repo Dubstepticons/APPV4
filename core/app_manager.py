@@ -57,6 +57,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._setup_state_manager()
         self._setup_theme()
         self._build_ui()
+        self._recover_open_positions()  # CRITICAL: Restore positions from database after crash/restart
         self._setup_theme_toolbar()
         self._setup_mode_selector()
         self._setup_reset_balance_hotkey()
@@ -99,6 +100,67 @@ class MainWindow(QtWidgets.QMainWindow):
             import traceback
             traceback.print_exc()
             self._state = None
+
+    def _recover_open_positions(self) -> None:
+        """
+        Recover open positions from database after crash/restart.
+
+        CRITICAL: Establishes database as single source of truth for position state.
+        Called after StateManager and Panel2 are initialized, but before DTC connects.
+
+        Benefits:
+        - Crash safety: Positions restored after unexpected shutdown
+        - Mode isolation: Each mode/account has separate position
+        - Audit trail: Full position history in database
+
+        Recovery Flow:
+        1. Query all open positions from database
+        2. Restore to StateManager (in-memory cache)
+        3. Restore to Panel2 UI (if mode matches)
+        4. Show recovery dialog to user (if positions found)
+        """
+        if not self._state:
+            log.warning("[PositionRecovery] Cannot recover positions - StateManager not initialized")
+            return
+
+        try:
+            from services.position_recovery import recover_positions_on_startup, get_recovery_service
+
+            log.info("[PositionRecovery] Starting position recovery from database...")
+
+            # Recover positions (max age: 24 hours)
+            recovery_summary = recover_positions_on_startup(
+                state_manager=self._state,
+                panel2=self.panel_live if hasattr(self, 'panel_live') else None,
+                max_age_hours=24
+            )
+
+            recovered_count = recovery_summary.get("recovered_count", 0)
+            stale_count = recovery_summary.get("stale_count", 0)
+
+            # Log recovery results
+            if recovered_count > 0:
+                log.info(f"[PositionRecovery] ✅ Recovered {recovered_count} open position(s)")
+
+                # Show recovery dialog to user
+                service = get_recovery_service()
+                message = service.get_recovery_dialog_message(recovery_summary)
+                if message:
+                    from PyQt6.QtWidgets import QMessageBox
+                    QMessageBox.information(
+                        self,
+                        "Position Recovery",
+                        message,
+                        QMessageBox.StandardButton.Ok
+                    )
+
+            if stale_count > 0:
+                log.warning(f"[PositionRecovery] ⚠️  {stale_count} stale position(s) detected (>24h old)")
+
+        except Exception as e:
+            log.error(f"[PositionRecovery] Error during position recovery: {e}")
+            import traceback
+            traceback.print_exc()
 
     def _setup_theme(self) -> None:
         """Configure theme system and apply initial theme."""
