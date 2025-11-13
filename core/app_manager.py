@@ -12,7 +12,7 @@ from PyQt6 import QtCore, QtWidgets
 from config.settings import DEBUG_DATA, DTC_HOST, DTC_PORT, LIVE_ACCOUNT
 from config.theme import THEME, ColorTheme, set_theme  # noqa: F401  # theme tokens used by helpers
 from core.data_bridge import DTCClientJSON
-from core.message_router import MessageRouter
+# MIGRATION: MessageRouter removed - using SignalBus now
 from panels.panel1 import Panel1
 from panels.panel2 import Panel2
 from panels.panel3 import Panel3
@@ -379,20 +379,24 @@ class MainWindow(QtWidgets.QMainWindow):
             import traceback
             traceback.print_exc()
 
-        # -------------------- DTC Signal Routing (Removed) --------------------
-        # NOTE: DTC signal routing (signal_order, signal_position, signal_balance) has been
-        # moved to MessageRouter for centralized handling. MessageRouter auto-subscribes to
-        # Blinker signals and handles:
-        #   - Order routing to Panel2
-        #   - Position routing to Panel2
-        #   - Balance routing to Panel1
-        #   - Auto-detection of trading mode (LIVE/SIM)
-        #   - Balance refresh requests after order fills
-        #   - Qt thread marshaling for UI updates
+        # -------------------- DTC Signal Routing (SignalBus) --------------------
+        # MIGRATION COMPLETE: All DTC events now flow through SignalBus (Qt signals).
+        # DTCClientJSON emits events via SignalBus, panels subscribe directly.
         #
-        # See: core/message_router.py::_subscribe_to_signals() and signal handlers
-        # Benefits: Single source of truth, uses helper modules (qt_bridge, trade_mode),
-        #           eliminates duplicate code and reduces complexity.
+        # Event flow:
+        #   - DTC Thread → DTCClientJSON → SignalBus.emit() → Panel (Qt Thread)
+        #   - Qt automatically marshals signals to main thread (thread-safe)
+        #
+        # Benefits:
+        #   - Single unified pattern (Qt signals throughout)
+        #   - Thread-safe by design (no manual marshaling needed)
+        #   - Decoupled architecture (panels don't need references to each other)
+        #   - Type-safe signal parameters
+        #   - Testable with pytest-qt
+        #
+        # See: core/signal_bus.py for all available signals
+        #      panels/panel1.py::_connect_signal_bus() for Panel1 subscriptions
+        #      panels/panel2.py::_connect_signal_bus() for Panel2 subscriptions
         # -----------------------------------------------------------------------
 
         # Layout stacking and relative stretch (make all panels equal height)
@@ -704,25 +708,12 @@ class MainWindow(QtWidgets.QMainWindow):
             if os.getenv("DEBUG_DTC", "0") == "1":
                 log.debug(f"[DTC] Searching for DTC server at {host}:{port}")
 
-            # Create message router to dispatch data to panels and state
-            # Note: MessageRouter will auto-subscribe to Blinker signals
-            router = MessageRouter(
-                state=self._state,
-                panel_balance=self.panel_balance,
-                panel_live=self.panel_live,
-                panel_stats=self.panel_stats,
-                dtc_client=None,  # Will be set after DTC client is created
-                auto_subscribe=True,  # Subscribe to Blinker signals
-            )
-            if os.getenv("DEBUG_DTC", "0") == "1":
-                log.debug("[DTC] MessageRouter instantiated and wired to panels/state")
+            # MIGRATION: MessageRouter removed - panels now subscribe to SignalBus directly
+            # All DTC events are emitted via SignalBus Qt signals for thread-safe delivery
+            self._dtc = DTCClientJSON(host=host, port=port)
 
-            self._dtc = DTCClientJSON(host=host, port=port, router=router)
-
-            # Give router access to DTC client for balance refresh requests
-            router._dtc_client = self._dtc
             if os.getenv("DEBUG_DTC", "0") == "1":
-                log.debug("[DTC] Router now has DTC client reference for balance requests")
+                log.debug("[DTC] Client created - panels receive events via SignalBus")
 
             self._connect_dtc_signals()
 

@@ -4,7 +4,34 @@ import contextlib
 import os
 
 # File: core/message_router.py
-# Unified message router between DTC client and GUI panels.
+# ============================================================================
+# DEPRECATED: This file is no longer used in the application.
+# ============================================================================
+#
+# MIGRATION COMPLETE: All message routing now handled by SignalBus (Qt signals).
+#
+# This file has been replaced by:
+#   - core/signal_bus.py - Centralized Qt signal-based event bus
+#   - panels/panel1.py::_connect_signal_bus() - Panel1 subscriptions
+#   - panels/panel2.py::_connect_signal_bus() - Panel2 subscriptions
+#
+# Old flow (DEPRECATED):
+#   DTC Thread → Blinker Signal → MessageRouter → Direct Call → Panel
+#
+# New flow (ACTIVE):
+#   DTC Thread → SignalBus (Qt Signal) → Panel (Qt Thread)
+#
+# Benefits of new approach:
+#   - Single unified pattern (Qt signals throughout)
+#   - Thread-safe by design (no manual marshaling needed)
+#   - Decoupled architecture (panels don't need references to each other)
+#   - Type-safe signal parameters
+#   - Testable with pytest-qt
+#
+# This file is kept for reference only and will be deleted in a future cleanup.
+# DO NOT import or use this class in new code.
+# ============================================================================
+
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
 import structlog

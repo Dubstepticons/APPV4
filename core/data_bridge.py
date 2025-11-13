@@ -197,9 +197,19 @@ class DTCClientJSON(QtCore.QObject):
     session_ready = QtCore.pyqtSignal()  # fires when fully connected (post-logon)
 
     # -------------------- __init__ (start)
-    def __init__(self, host="127.0.0.1", port=11099, router=None, _sim_mode: bool = False):
+    def __init__(self, host="127.0.0.1", port=11099, _sim_mode: bool = False):
+        """
+        Initialize DTC JSON client.
+
+        MIGRATION: router parameter removed - panels now subscribe to SignalBus directly.
+
+        Args:
+            host: DTC server host (default: 127.0.0.1)
+            port: DTC server port (default: 11099)
+            _sim_mode: Internal flag for testing (default: False)
+        """
         super().__init__()
-        self._host, self._port, self._router = host, int(port), router
+        self._host, self._port = host, int(port)
         self._sock = QtNetwork.QTcpSocket(self)
 
         # Socket signal wiring
@@ -759,11 +769,7 @@ class DTCClientJSON(QtCore.QObject):
             if DEBUG_DATA and self._allow_debug_dump():
                 print(f"DEBUG [data_bridge]: [ERROR] Signal send FAILED: {e}")
 
-        try:
-            if self._router:
-                self._router.route(data)
-        except Exception as e:
-            log.warning("dtc.router.error", type=app_msg.type, err=str(e))
+        # MIGRATION: MessageRouter.route() call removed - panels now receive via SignalBus
 
         # Only log dispatch for meaningful updates (filter out zero-quantity positions)
         if app_msg.type == "POSITION_UPDATE":
