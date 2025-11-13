@@ -132,6 +132,86 @@ class MessageRouter:
             # Could show yellow banner here (future enhancement)
             # self._show_mode_drift_banner(incoming_mode, incoming_account)
 
+    # -------------------- Centralized Mode Switching --------------------
+    def _apply_mode_from_account(self, account: str, source_msg_type: str, qty: Optional[int] = None) -> bool:
+        """
+        UPGRADE 1: Centralized mode switching logic.
+
+        Detects mode from account, checks precedence, updates state, and broadcasts to all panels.
+        This replaces the duplicated mode logic in _on_order_signal, _on_position_signal, and _on_order_update.
+
+        Args:
+            account: TradeAccount string (e.g., "120005" for LIVE, "Sim1" for SIM)
+            source_msg_type: Source message type for logging ("ORDER", "POSITION", "TRADE_ACCOUNT")
+            qty: Optional position quantity (for debounce logic)
+
+        Returns:
+            True if mode was switched successfully, False if blocked or no change needed
+
+        Called by:
+            - _on_order_signal: Mode detection from order messages
+            - _on_position_signal: Mode detection from position updates
+            - _on_order_update: Mode detection from AppMessage orders
+            - _on_trade_account: Initial mode setup from account enumeration
+        """
+        if not account:
+            return False
+
+        from utils.trade_mode import should_switch_mode_debounced, detect_mode_from_account
+
+        # Detect intended mode from account
+        detected_mode = detect_mode_from_account(account)
+
+        # Check if mode switch is needed (debounced to prevent thrashing)
+        if not should_switch_mode_debounced(account, self._current_mode, qty):
+            return False
+
+        # Check mode precedence (LIVE always wins, SIM blocked if LIVE position open)
+        if self.state and not self._check_mode_precedence(detected_mode):
+            log.warning(
+                "router.mode_switch.blocked",
+                source=source_msg_type,
+                requested_mode=detected_mode,
+                current_mode=self._current_mode,
+                reason="Mode blocked by open position"
+            )
+            return False
+
+        # Update router's current mode/account
+        old_mode = self._current_mode
+        self._current_mode = detected_mode
+        self._current_account = account
+
+        # Update state manager
+        if self.state:
+            self.state.current_mode = detected_mode
+            try:
+                self.state.modeChanged.emit(detected_mode)
+            except Exception:
+                pass  # Signal emission may fail if no Qt event loop
+
+        # Broadcast mode change to all panels (via Qt thread)
+        if self.panel_balance and hasattr(self.panel_balance, "set_trading_mode"):
+            marshal_to_qt_thread(self.panel_balance.set_trading_mode, detected_mode, account)
+
+        if self.panel_live and hasattr(self.panel_live, "set_trading_mode"):
+            marshal_to_qt_thread(self.panel_live.set_trading_mode, detected_mode, account)
+
+        if self.panel_stats and hasattr(self.panel_stats, "set_trading_mode"):
+            marshal_to_qt_thread(self.panel_stats.set_trading_mode, detected_mode, account)
+
+        # Log the switch uniformly
+        log_mode_switch(old_mode, detected_mode, account, log)
+        log.info(
+            "router.mode_switched",
+            source=source_msg_type,
+            old_mode=old_mode,
+            new_mode=detected_mode,
+            account=account
+        )
+
+        return True
+
     # -------------------- Coalesced UI Updates --------------------
     def _schedule_ui_refresh(self) -> None:
         """
@@ -358,38 +438,13 @@ class MessageRouter:
             # Check for mode drift
             self._check_mode_drift(msg)
 
-            # Check mode precedence and auto-detect trading mode
-            try:
-                from utils.trade_mode import should_switch_mode_debounced, detect_mode_from_account
-
-                account = msg.get("TradeAccount", "")
-                if account:
-                    # Use debounced mode switch check
-                    if should_switch_mode_debounced(account, self._current_mode):
-                        detected_mode = detect_mode_from_account(account)
-
-                        # Check if mode switch is allowed
-                        if self.state and not self._check_mode_precedence(detected_mode):
-                            log.warning(f"router.order.blocked: mode={detected_mode}, reason=Mode blocked by open position")
-                            return
-
-                        # Broadcast mode change to all panels
-                        if self.panel_balance and hasattr(self.panel_balance, "set_trading_mode"):
-                            marshal_to_qt_thread(self.panel_balance.set_trading_mode, detected_mode, account)
-
-                        if self.panel_live and hasattr(self.panel_live, "set_trading_mode"):
-                            marshal_to_qt_thread(self.panel_live.set_trading_mode, detected_mode, account)
-
-                        if self.panel_stats and hasattr(self.panel_stats, "set_trading_mode"):
-                            marshal_to_qt_thread(self.panel_stats.set_trading_mode, detected_mode, account)
-
-                        # Update router's current mode/account
-                        self._current_mode = detected_mode
-                        self._current_account = account
-
-                        log_mode_switch(self._current_mode, detected_mode, account, log)
-            except Exception as e:
-                log.warning(f"router.order.mode_detect_failed: {str(e)}")
+            # UPGRADE 1: Use centralized mode switching
+            account = msg.get("TradeAccount", "")
+            if account:
+                try:
+                    self._apply_mode_from_account(account, "ORDER")
+                except Exception as e:
+                    log.warning(f"router.order.mode_switch_failed: {str(e)}")
 
             # Route to panels via Qt thread
             if self.panel_live and hasattr(self.panel_live, "on_order_update"):
@@ -402,6 +457,9 @@ class MessageRouter:
                         self.panel_live.on_order_update(msg)
                     except Exception as e2:
                         log.error(f"router.order.direct_call_failed: {str(e2)}")
+
+                # UPGRADE 2: Schedule coalesced UI refresh (10 Hz rate limiting)
+                self._schedule_ui_refresh()
 
             # Request balance after order is filled (status 3=filled, 7=filled)
             try:
@@ -442,40 +500,15 @@ class MessageRouter:
             # Check for mode drift
             self._check_mode_drift(msg)
 
-            # Auto-detect trading mode ONLY for non-zero positions
+            # UPGRADE 1: Use centralized mode switching (only for non-zero positions)
             qty = msg.get("qty", msg.get("PositionQuantity", 0))
             if qty != 0:
-                try:
-                    from utils.trade_mode import should_switch_mode_debounced, detect_mode_from_account
-
-                    account = msg.get("TradeAccount", "")
-                    if account:
-                        # Use debounced mode switch check
-                        if should_switch_mode_debounced(account, self._current_mode, qty):
-                            detected_mode = detect_mode_from_account(account)
-
-                            # Check if mode switch is allowed
-                            if self.state and not self._check_mode_precedence(detected_mode):
-                                log.warning(f"router.position.blocked: mode={detected_mode}, reason=Mode blocked by open position")
-                                return
-
-                            # Broadcast mode change to all panels
-                            if self.panel_balance and hasattr(self.panel_balance, "set_trading_mode"):
-                                marshal_to_qt_thread(self.panel_balance.set_trading_mode, detected_mode, account)
-
-                            if self.panel_live and hasattr(self.panel_live, "set_trading_mode"):
-                                marshal_to_qt_thread(self.panel_live.set_trading_mode, detected_mode, account)
-
-                            if self.panel_stats and hasattr(self.panel_stats, "set_trading_mode"):
-                                marshal_to_qt_thread(self.panel_stats.set_trading_mode, detected_mode, account)
-
-                            # Update router's current mode/account
-                            self._current_mode = detected_mode
-                            self._current_account = account
-
-                            log_mode_switch(self._current_mode, detected_mode, account, log)
-                except Exception as e:
-                    log.warning(f"router.position.mode_detect_failed: {str(e)}")
+                account = msg.get("TradeAccount", "")
+                if account:
+                    try:
+                        self._apply_mode_from_account(account, "POSITION", qty=qty)
+                    except Exception as e:
+                        log.warning(f"router.position.mode_switch_failed: {str(e)}")
 
             # Route to panels via Qt thread
             if self.panel_live and hasattr(self.panel_live, "on_position_update"):
@@ -488,6 +521,9 @@ class MessageRouter:
                         self.panel_live.on_position_update(msg)
                     except Exception as e2:
                         log.error(f"router.position.direct_call_failed: {str(e2)}")
+
+                # UPGRADE 2: Schedule coalesced UI refresh (10 Hz rate limiting)
+                self._schedule_ui_refresh()
 
         except Exception as e:
             log.error(f"router.position.handler_failed: {str(e)}")
@@ -714,6 +750,8 @@ class MessageRouter:
             try:
                 self.panel_balance.set_account_balance(bal)
                 self.panel_balance.update_equity_series_from_balance(bal, mode=mode)
+                # UPGRADE 2: Schedule coalesced UI refresh
+                self._schedule_ui_refresh()
             except Exception:
                 pass
 
@@ -772,6 +810,8 @@ class MessageRouter:
         if self.panel_live:
             with contextlib.suppress(Exception):
                 self.panel_live.on_position_update(payload)
+                # UPGRADE 2: Schedule coalesced UI refresh
+                self._schedule_ui_refresh()
 
         # Log to trade logger for historical tracking
         if self._trade_manager:
@@ -785,31 +825,27 @@ class MessageRouter:
     def _on_order_update(self, payload: dict):
         log.debug("router.order", payload_preview=str(payload)[:120])
 
-        # CRITICAL: Detect and update mode from order's account
+        # UPGRADE 1: Use centralized mode switching
         account = payload.get("TradeAccount", "")
         if account:
-            from utils.trade_mode import detect_mode_from_account
-            order_mode = detect_mode_from_account(account)
-
-            if self.state and order_mode != self.state.current_mode:
-                old_mode = self.state.current_mode
-                self.state.current_mode = order_mode
-                try:
-                    self.state.modeChanged.emit(order_mode)
-                except Exception as e:
-                    pass
+            try:
+                self._apply_mode_from_account(account, "ORDER_UPDATE")
+            except Exception as e:
+                log.warning(f"router.order_update.mode_switch_failed: {str(e)}")
 
         # Send to Panel2 (live trading panel) for real-time fill handling
         if self.panel_live:
             with contextlib.suppress(Exception):
                 self.panel_live.on_order_update(payload)
-        else:
-            pass
+                # UPGRADE 2: Schedule coalesced UI refresh
+                self._schedule_ui_refresh()
 
         # Send to Panel3 (statistics panel) for trade statistics
         if self.panel_stats:
             with contextlib.suppress(Exception):
                 self.panel_stats.register_order_event(payload)
+                # UPGRADE 2: Schedule coalesced UI refresh
+                self._schedule_ui_refresh()
 
         # Store in state manager for persistence and analytics
         if self.state:
