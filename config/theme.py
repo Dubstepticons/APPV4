@@ -725,13 +725,6 @@ def switch_theme(theme_name: str) -> None:
     """
     global THEME
 
-    try:
-        from utils.logger import get_logger
-        log = get_logger(__name__)
-        log.info(f"[switch_theme] Switching to {theme_name}")
-    except:
-        pass
-
     theme_name = theme_name.lower().strip()
 
     # Get theme from registry
@@ -741,13 +734,6 @@ def switch_theme(theme_name: str) -> None:
     # Update global THEME
     THEME.clear()
     THEME.update(new_theme)
-
-    try:
-        from utils.logger import get_logger
-        log = get_logger(__name__)
-        log.info(f"[switch_theme] Theme switched to {theme_name}")
-    except:
-        pass
 
 
 # ========================================================================
