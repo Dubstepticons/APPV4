@@ -921,6 +921,68 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         except Exception as e:
             log.error(f"[Panel2] Persist write failed: {e}")
 
+    def _load_position_from_database(self) -> bool:
+        """
+        Load open position from database for current mode/account.
+        Called after mode switch to restore position state.
+
+        PHASE 5: Database-backed mode switching.
+        Returns True if position was loaded, False otherwise.
+        """
+        try:
+            from data.position_repository import get_position_repository
+
+            position_repo = get_position_repository()
+            position_data = position_repo.get_open_position(
+                mode=self.current_mode,
+                account=self.current_account
+            )
+
+            if not position_data:
+                # No open position in this mode - clear position state
+                self.entry_qty = 0
+                self.entry_price = None
+                self.is_long = None
+                self.target_price = None
+                self.stop_price = None
+                log.debug(f"[Panel2 DB] No open position for {self.current_mode}/{self.current_account}")
+                return False
+
+            # Restore position to Panel2
+            qty_abs = abs(position_data["qty"])
+            is_long = position_data["qty"] > 0
+
+            self.entry_qty = qty_abs
+            self.entry_price = position_data["entry_price"]
+            self.is_long = is_long
+            self.target_price = position_data.get("target_price")
+            self.stop_price = position_data.get("stop_price")
+
+            # Restore entry snapshots
+            self.entry_vwap = position_data.get("entry_vwap")
+            self.entry_delta = position_data.get("entry_cum_delta")
+            self.entry_poc = position_data.get("entry_poc")
+
+            # Restore trade extremes
+            self._trade_min_price = position_data.get("trade_min_price")
+            self._trade_max_price = position_data.get("trade_max_price")
+
+            # Restore entry time
+            entry_time = position_data.get("entry_time")
+            if entry_time:
+                self.entry_time_epoch = int(entry_time.timestamp())
+
+            log.info(
+                f"[Panel2 DB] Restored position from database: "
+                f"{self.current_mode}/{self.current_account} "
+                f"{'LONG' if is_long else 'SHORT'} {qty_abs}@{self.entry_price}"
+            )
+            return True
+
+        except Exception as e:
+            log.error(f"[Panel2 DB] Error loading position from database: {e}")
+            return False
+
     def set_trading_mode(self, mode: str, account: Optional[str] = None) -> None:
         """
         Update trading mode for this panel.
@@ -928,8 +990,10 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         CRITICAL: This implements the ModeChanged contract:
         1. Freeze current state (save to current scope)
         2. Swap to new (mode, account) scope
-        3. Reload session state from new scope
+        3. Reload session state from new scope (timers + position from DB)
         4. Single repaint
+
+        PHASE 5 COMPLETE: Now queries database for open position in new mode.
 
         Args:
             mode: Trading mode ("SIM", "LIVE", "DEBUG")
@@ -960,8 +1024,12 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         self.current_mode = mode
         self.current_account = account
 
-        # 3. Reload: Load state from new scope
+        # 3a. Reload: Load timer state from JSON (session-scoped)
         self._load_state()
+
+        # 3b. Reload: Load position state from database (PHASE 5)
+        # This ensures position is restored even if app was restarted
+        self._load_position_from_database()
 
         # 4. Single repaint: Refresh all cells
         self._refresh_all_cells()
