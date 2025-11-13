@@ -163,26 +163,41 @@ def on_mouse_move(panel, pos) -> None:
     xs = [p[0] for p in pts]
     ys = [p[1] for p in pts]
 
-    # FIX: Find nearest actual data point instead of snapping to arbitrary intervals
-    # The old logic created timestamps outside the data range
-    idx = find_nearest_index(xs, x_mouse)
-    if idx is None:
-        return
+    # FREE-FLOWING HOVER: Use actual mouse position, interpolate balance value
+    # This allows smooth crosshair movement instead of snapping to data points
+    x = x_mouse
 
-    x = float(xs[idx])
-    y = float(ys[idx])
+    # Interpolate Y value at mouse X position
+    import bisect
+    idx = bisect.bisect_left(xs, x)
+
+    if idx == 0:
+        y = ys[0]  # Before first point, use first value
+    elif idx >= len(xs):
+        y = ys[-1]  # After last point, use last value
+    else:
+        # Linear interpolation between two nearest points
+        x0, x1 = xs[idx-1], xs[idx]
+        y0, y1 = ys[idx-1], ys[idx]
+        if x1 != x0:
+            t = (x - x0) / (x1 - x0)
+            y = y0 + t * (y1 - y0)
+        else:
+            y = y0
+
     panel._hovering = True
     panel._scrub_x = x
 
-    # Hover line -- keep current (85% height)
+    # Hover line -- free-flowing vertical line follows mouse exactly
     if panel._hover_seg:
         y_min, y_max = yr[0], yr[1]
         y_span = y_max - y_min
         frac = 0.85
         y_top = y_min + y_span * frac
 
-        p0 = vb.mapViewToScene(QtCore.QPointF(x, y_min))
-        p1 = vb.mapViewToScene(QtCore.QPointF(x, y_top))
+        # Use x_mouse for free-flowing crosshair
+        p0 = vb.mapViewToScene(QtCore.QPointF(x_mouse, y_min))
+        p1 = vb.mapViewToScene(QtCore.QPointF(x_mouse, y_top))
         panel._hover_seg.setLine(p0.x(), p0.y(), p1.x(), p1.y())
         if not panel._hover_seg.isVisible():
             panel._hover_seg.setVisible(True)
@@ -203,8 +218,9 @@ def on_mouse_move(panel, pos) -> None:
         y_span = y_max - y_min
         y_top = y_min + y_span * 0.92  # raise timestamp higher again
 
+        # Free-flowing timestamp follows mouse exactly (with padding to keep on screen)
         pad = (xr[1] - xr[0]) * 0.02
-        x_clamped = max(xr[0] + pad, min(xr[1] - pad, x))
+        x_clamped = max(xr[0] + pad, min(xr[1] - pad, x_mouse))
 
         panel._hover_text.setText(t)
         panel._hover_text.setPos(x_clamped, y_top)
