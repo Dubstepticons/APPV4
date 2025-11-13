@@ -349,32 +349,24 @@ class MainWindow(QtWidgets.QMainWindow):
             if hasattr(self.panel_live, "tradesChanged"):
 
                 def _on_trade_changed(payload):
+                    """
+                    Handle trade closed event.
+
+                    PHASE 4 MIGRATION: Direct Panel3 method calls replaced with SignalBus.
+                    Panel2 now emits tradeClosedForAnalytics signal,
+                    Panel3 subscribes via _connect_signal_bus().
+
+                    Keeping this handler for any app-level logic only.
+                    """
                     pnl = payload.get("realized_pnl", 0)
                     symbol = payload.get("symbol", "?")
 
-                    # Call Panel 3 trade closed handler
-                    if hasattr(self.panel_stats, "on_trade_closed"):
-                        try:
-                            self.panel_stats.on_trade_closed(payload)
-                        except Exception as e:
-                            pass
-
-                    # Refresh historical stats from database (redundant but safe)
-                    if hasattr(self.panel_stats, "_load_metrics_for_timeframe"):
-                        try:
-                            self.panel_stats._load_metrics_for_timeframe(self.panel_stats._tf)
-                        except Exception as e:
-                            pass
-
-                    # Grab live data from Panel 2 and analyze
-                    if hasattr(self.panel_stats, "analyze_and_store_trade_snapshot"):
-                        try:
-                            self.panel_stats.analyze_and_store_trade_snapshot()
-                        except Exception as e:
-                            pass
+                    # PHASE 4: Panel3 methods now called via SignalBus subscriptions
+                    # (Panel2 emits tradeClosedForAnalytics, Panel3 subscribes)
+                    # No direct calls needed here anymore
 
                 self.panel_live.tradesChanged.connect(_on_trade_changed)
-                log.debug("[Startup] Wired Panel2 tradesChanged -> Panel3 (metrics + live analysis)")
+                log.debug("[Startup] Wired Panel2 tradesChanged handler (Phase 4: Panel3 uses SignalBus)")
         except Exception as e:
             import traceback
             traceback.print_exc()
@@ -484,10 +476,14 @@ class MainWindow(QtWidgets.QMainWindow):
                 mgr = get_sim_balance_manager()
                 new_balance = mgr.reset_balance()
 
-            # Update Panel1 display
-            if self.panel_balance:
-                self.panel_balance.set_account_balance(new_balance)
-                self.panel_balance.update_equity_series_from_balance(new_balance, mode="SIM")
+            # PHASE 4: Update Panel1 display via SignalBus (replaces direct calls)
+            try:
+                from core.signal_bus import get_signal_bus
+                signal_bus = get_signal_bus()
+                signal_bus.balanceDisplayRequested.emit(new_balance, "SIM")
+                signal_bus.equityPointRequested.emit(new_balance, "SIM")
+            except Exception as e:
+                log.error(f"[Hotkey] Failed to emit balance signals: {e}")
 
             log.info(f"[Hotkey] SIM balance reset to ${new_balance:,.2f}")
 
@@ -548,17 +544,13 @@ class MainWindow(QtWidgets.QMainWindow):
             if icon and hasattr(icon, "refresh_theme"):
                 icon.refresh_theme()
 
-            # Refresh Panel 1 (balance/investing)
-            if hasattr(self.panel_balance, "_refresh_theme_colors"):
-                self.panel_balance._refresh_theme_colors()
-
-            # Refresh Panel 2 (live)
-            if hasattr(self.panel_live, "refresh_theme"):
-                self.panel_live.refresh_theme()
-
-            # Refresh Panel 3 (stats)
-            if hasattr(self.panel_stats, "refresh_theme"):
-                self.panel_stats.refresh_theme()
+            # PHASE 4: Refresh all panels via SignalBus (replaces direct calls)
+            try:
+                from core.signal_bus import get_signal_bus
+                signal_bus = get_signal_bus()
+                signal_bus.themeChangeRequested.emit()
+            except Exception as e:
+                log.error(f"[Theme] Failed to emit theme change signal: {e}")
 
             # Update central widget background
             central = self.centralWidget()
@@ -597,23 +589,17 @@ class MainWindow(QtWidgets.QMainWindow):
                 return
             self.current_tf = tf
 
-            # Panel1 drives the graph windowing & endpoint recolor
-            if hasattr(self, "panel_balance"):
-                self.panel_balance.set_timeframe(tf)
-
-            # Optional: if Panel2 needs to react locally to TF, forward it
-            if hasattr(self, "panel_live") and hasattr(self.panel_live, "set_timeframe"):
-                with contextlib.suppress(Exception):
-                    self.panel_live.set_timeframe(tf)  # harmless if no-op
-
-            # Keep LIVE-dot visibility/pulsing correct in Panel2
+            # PHASE 4: Broadcast timeframe change via SignalBus (replaces direct calls)
             try:
-                if hasattr(self.panel_live, "set_live_dot_visible"):
-                    self.panel_live.set_live_dot_visible(tf == "LIVE")
-                if hasattr(self.panel_live, "set_live_dot_pulsing"):
-                    self.panel_live.set_live_dot_pulsing(tf == "LIVE")
-            except Exception:
-                pass
+                from core.signal_bus import get_signal_bus
+                signal_bus = get_signal_bus()
+                signal_bus.timeframeChangeRequested.emit(tf)
+
+                # LIVE-dot visibility/pulsing based on timeframe
+                signal_bus.liveDotVisibilityRequested.emit(tf == "LIVE")
+                signal_bus.liveDotPulsingRequested.emit(tf == "LIVE")
+            except Exception as e:
+                log.error(f"[Timeframe] Failed to emit timeframe signals: {e}")
 
             # Also refresh the pill highlight color from current PnL direction
             self._sync_pills_color_from_panel1()
@@ -638,8 +624,15 @@ class MainWindow(QtWidgets.QMainWindow):
             if tf not in ("LIVE", "1D", "1W", "1M", "3M", "YTD"):
                 return
             self.current_tf = tf
-            if hasattr(self, "panel_balance"):
-                self.panel_balance.set_timeframe(tf)
+
+            # PHASE 4: Broadcast timeframe change via SignalBus (replaces direct call)
+            try:
+                from core.signal_bus import get_signal_bus
+                signal_bus = get_signal_bus()
+                signal_bus.timeframeChangeRequested.emit(tf)
+            except Exception as e:
+                log.error(f"[Timeframe] Failed to emit timeframe signal: {e}")
+
             # Visual sync for pills color based on Panel1 PnL direction
             self._sync_pills_color_from_panel1()
         except Exception:

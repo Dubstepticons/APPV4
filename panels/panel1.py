@@ -306,7 +306,31 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
                 type=QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
             )
 
-            log.info("[Panel1] Connected to SignalBus for DTC events")
+            # PHASE 4: Balance display requests (replaces direct calls from app_manager)
+            signal_bus.balanceDisplayRequested.connect(
+                lambda balance, mode: self.set_account_balance(balance),
+                type=QtCore.Qt.ConnectionType.QueuedConnection
+            )
+
+            # PHASE 4: Equity point requests (replaces direct calls from app_manager)
+            signal_bus.equityPointRequested.connect(
+                lambda balance, mode: self.update_equity_series_from_balance(balance, mode=mode),
+                type=QtCore.Qt.ConnectionType.QueuedConnection
+            )
+
+            # PHASE 4: Theme change requests (replaces direct calls from app_manager)
+            signal_bus.themeChangeRequested.connect(
+                lambda: self._refresh_theme_colors() if hasattr(self, '_refresh_theme_colors') else None,
+                type=QtCore.Qt.ConnectionType.QueuedConnection
+            )
+
+            # PHASE 4: Timeframe change requests (replaces direct calls from app_manager)
+            signal_bus.timeframeChangeRequested.connect(
+                lambda tf: self.set_timeframe(tf),
+                type=QtCore.Qt.ConnectionType.QueuedConnection
+            )
+
+            log.info("[Panel1] Connected to SignalBus for DTC events and Phase 4 command signals")
 
         except Exception as e:
             log.error(f"[Panel1] Failed to connect to SignalBus: {e}")

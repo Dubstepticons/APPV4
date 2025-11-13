@@ -173,7 +173,31 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                 type=QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
             )
 
-            log.info("[Panel2] Connected to SignalBus for DTC events")
+            # PHASE 4: Theme change requests (replaces direct calls from app_manager)
+            signal_bus.themeChangeRequested.connect(
+                lambda: self.refresh_theme() if hasattr(self, 'refresh_theme') else None,
+                type=QtCore.Qt.ConnectionType.QueuedConnection
+            )
+
+            # PHASE 4: Timeframe change requests (replaces direct calls from app_manager)
+            signal_bus.timeframeChangeRequested.connect(
+                lambda tf: self.set_timeframe(tf) if hasattr(self, 'set_timeframe') else None,
+                type=QtCore.Qt.ConnectionType.QueuedConnection
+            )
+
+            # PHASE 4: LIVE dot visibility (replaces direct calls from app_manager)
+            signal_bus.liveDotVisibilityRequested.connect(
+                lambda visible: self.set_live_dot_visible(visible) if hasattr(self, 'set_live_dot_visible') else None,
+                type=QtCore.Qt.ConnectionType.QueuedConnection
+            )
+
+            # PHASE 4: LIVE dot pulsing (replaces direct calls from app_manager)
+            signal_bus.liveDotPulsingRequested.connect(
+                lambda pulsing: self.set_live_dot_pulsing(pulsing) if hasattr(self, 'set_live_dot_pulsing') else None,
+                type=QtCore.Qt.ConnectionType.QueuedConnection
+            )
+
+            log.info("[Panel2] Connected to SignalBus for DTC events and Phase 4 command signals")
 
         except Exception as e:
             log.error(f"[Panel2] Failed to connect to SignalBus: {e}")
@@ -291,6 +315,11 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             payload = dict(trade)
             payload["ok"] = ok
             self.tradesChanged.emit(payload)
+
+            # PHASE 4: Also emit to SignalBus for Panel3 analytics (replaces direct call)
+            from core.signal_bus import get_signal_bus
+            signal_bus = get_signal_bus()
+            signal_bus.tradeClosedForAnalytics.emit(payload)
         except Exception as e:
             pass
 

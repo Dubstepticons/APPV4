@@ -138,6 +138,45 @@ class SignalBus(QtCore.QObject):
     #: Error message to display
     errorMessagePosted = QtCore.pyqtSignal(str)
 
+    #: Theme change requested (Phase 4 - replace direct calls)
+    themeChangeRequested = QtCore.pyqtSignal()
+
+    #: Timeframe change requested (Phase 4 - replace direct calls)
+    timeframeChangeRequested = QtCore.pyqtSignal(str)  # timeframe
+
+    # ========================================================================
+    # BALANCE & EQUITY EVENTS (Phase 4 - Panel1 display updates)
+    # ========================================================================
+
+    #: Request Panel1 to display balance (replaces set_account_balance)
+    balanceDisplayRequested = QtCore.pyqtSignal(float, str)  # balance, mode
+
+    #: Request Panel1 to add equity point (replaces update_equity_series_from_balance)
+    equityPointRequested = QtCore.pyqtSignal(float, str)  # balance, mode
+
+    # ========================================================================
+    # PANEL2 VISUAL INDICATORS (Phase 4 - LIVE mode indicators)
+    # ========================================================================
+
+    #: LIVE dot visibility requested
+    liveDotVisibilityRequested = QtCore.pyqtSignal(bool)  # visible
+
+    #: LIVE dot pulsing requested
+    liveDotPulsingRequested = QtCore.pyqtSignal(bool)  # pulsing
+
+    # ========================================================================
+    # PANEL3 ANALYTICS (Phase 4 - optional)
+    # ========================================================================
+
+    #: Trade closed event for Panel3 (can use positionClosed or separate signal)
+    tradeClosedForAnalytics = QtCore.pyqtSignal(dict)  # trade record
+
+    #: Metrics reload requested
+    metricsReloadRequested = QtCore.pyqtSignal(str)  # timeframe
+
+    #: Snapshot analysis requested
+    snapshotAnalysisRequested = QtCore.pyqtSignal()
+
     # ========================================================================
     # CHART EVENTS
     # ========================================================================
