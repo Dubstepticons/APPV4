@@ -237,10 +237,24 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
             payload: Normalized order update dict from message_router
         """
         try:
-            # Just log for now - Panel 3 updates via _load_metrics_for_timeframe
             from utils.logger import get_logger
-
             log = get_logger(__name__)
+
+            # MODE FILTERING (Phase 2 - Option A): Only process orders for active mode
+            # Get current mode from state manager
+            try:
+                from core.app_state import get_state_manager
+                state = get_state_manager()
+                current_mode = state.current_mode if state else "SIM"
+            except Exception:
+                current_mode = "SIM"
+
+            payload_mode = payload.get("mode")
+            if payload_mode and payload_mode != current_mode:
+                log.debug(f"[panel3] Skipping OrderUpdate for mode={payload_mode} (current={current_mode})")
+                return
+
+            # Just log for now - Panel 3 updates via _load_metrics_for_timeframe
             order_status = payload.get("OrderStatus")
             if order_status in (3, 7):  # Filled status
                 log.debug("[panel3] Order filled detected - will refresh metrics on next timeframe check")

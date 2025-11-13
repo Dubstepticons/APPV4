@@ -133,6 +133,11 @@ def on_order_update(panel, payload: dict) -> None:
         payload: Normalized order update dict from data_bridge (not raw DTC)
     """
     try:
+        # MODE FILTERING (Phase 2 - Option A): Only process orders for active mode
+        payload_mode = payload.get("mode")
+        if payload_mode and payload_mode != panel.current_mode:
+            log.debug(f"[panel2] Skipping OrderUpdate for mode={payload_mode} (current={panel.current_mode})")
+            return
         side = payload.get("BuySell")  # 1=Buy, 2=Sell
         price1 = payload.get("Price1")
         order_status = payload.get("OrderStatus")  # 7=Fully Filled
@@ -195,6 +200,11 @@ def on_position_update(panel, payload: dict) -> None:
         payload: Normalized position update dict from MessageRouter (lowercase keys)
     """
     try:
+        # MODE FILTERING (Phase 2 - Option A): Only process positions for active mode
+        payload_mode = payload.get("mode")
+        if payload_mode and payload_mode != panel.current_mode:
+            log.debug(f"[panel2] Skipping PositionUpdate for mode={payload_mode} (current={panel.current_mode})")
+            return
         # Extract from normalized payload (lowercase keys from data_bridge normalization)
         new_qty = int(payload.get("qty", 0))
         avg_price = payload.get("avg_entry")
