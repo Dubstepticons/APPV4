@@ -135,7 +135,7 @@ def update_pnl_for_current_tf(panel) -> None:
 
         UTC = timezone.utc
         now = datetime.now(UTC)
-        mode = panel._current_display_mode
+        mode = panel.current_mode  # Get from property (derives from _active_scope)
 
         # Define timeframe ranges
         timeframe_ranges = {
