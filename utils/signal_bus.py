@@ -85,7 +85,8 @@ class SignalBus:
         """
         sig = getattr(self, signal_name, None)
         if sig and isinstance(sig, Signal):
-            sig.send(payload)
+            # Emit with self as sender and payload as kwargs
+            sig.send(self, **payload)
         else:
             raise ValueError(f"Unknown signal: {signal_name}")
 
@@ -122,7 +123,8 @@ class SignalBus:
             if mode_ns:
                 mode_signal = getattr(mode_ns, signal_name, None)
                 if mode_signal and isinstance(mode_signal, Signal):
-                    mode_signal.send(payload)
+                    # Emit with self as sender and payload as kwargs
+                    mode_signal.send(self, **payload)
 
 
 # Global singleton bus instance
