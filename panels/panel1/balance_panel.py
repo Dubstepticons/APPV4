@@ -131,6 +131,9 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
         self._hover_seg: Optional[QtWidgets.QGraphicsLineItem] = None
         self._hover_text: Optional[Any] = None  # pg.TextItem
 
+        # Signal connection tracking (prevent duplicate connections)
+        self._signals_connected: bool = False
+
         # Timeframe configs
         self._tf_configs: dict[str, dict[str, Optional[int]]] = {
             "LIVE": {"window_sec": 3600, "snap_sec": 60},
@@ -555,6 +558,11 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
 
     def _wire_balance_signal(self) -> None:
         """Connect StateManager balance and mode signals to update display."""
+        # Prevent duplicate connections
+        if self._signals_connected:
+            log.debug("[Panel1] Signals already connected, skipping")
+            return
+
         try:
             from core.app_state import get_state_manager
 
@@ -569,6 +577,8 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
                 if hasattr(state, "modeChanged"):
                     state.modeChanged.connect(self._on_mode_changed)
                     log.info("[Panel1] Connected mode change signal")
+
+                self._signals_connected = True
         except Exception as e:
             log.error(f"[Panel1] Failed to wire signals: {e}")
 

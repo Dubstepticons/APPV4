@@ -405,11 +405,12 @@ def on_equity_curve_loaded(panel, mode: str, account: str, equity_points: list[t
     finally:
         panel._equity_mutex.unlock()
 
-    # Trigger UI repaint if this is the active scope
+    # Trigger UI repaint and PnL recalculation if this is the active scope
     if panel._active_scope == scope:
         from panels.panel1 import equity_graph
         equity_graph.replot_from_cache(panel)
-        log.debug(f"[Panel1] UI refreshed after equity curve load")
+        update_pnl_for_current_tf(panel)  # CRITICAL: Recalc PnL after async load
+        log.debug(f"[Panel1] UI refreshed and PnL recalculated after equity curve load")
 
 
 # ================================================================================
@@ -471,8 +472,11 @@ def update_equity_series_from_balance(panel, balance: Optional[float], mode: Opt
             # Append new point
             curve.append((now, balance_float))
 
-            # Limit to last 2 hours to avoid memory bloat
-            cutoff_time = now - 7200
+            # Limit based on maximum timeframe window to avoid memory bloat
+            # Use 3M window (90 days) as the cutoff to support all timeframes
+            # (LIVE=1h, 1D=1d, 1W=7d, 1M=30d, 3M=90d, YTD=dynamic)
+            max_window_sec = 7776000  # 90 days (3M timeframe)
+            cutoff_time = now - max_window_sec
             curve = [(x, y) for x, y in curve if x >= cutoff_time]
 
             # Update scoped dict (thread-safe)
@@ -526,12 +530,22 @@ def set_equity_series(panel, points: list[tuple[float, float]]) -> None:
     """
     Store full series in cache and draw only the slice matching the active TF.
 
+    CRITICAL: Updates both _equity_points AND _equity_curves to maintain consistency.
+
     Args:
         panel: Panel1 instance
         points: List of (timestamp, balance) tuples
     """
     panel._equity_points = list(points or [])
     log.debug(f"Cached {len(panel._equity_points)} equity points")
+
+    # CRITICAL FIX: Also update the scoped dict to maintain consistency
+    # Thread-safe update to equity curves
+    panel._equity_mutex.lock()
+    try:
+        panel._equity_curves[panel._active_scope] = panel._equity_points
+    finally:
+        panel._equity_mutex.unlock()
 
     if not getattr(panel, "_line", None) or not getattr(panel, "_plot", None):
         log.warning("No graph or line available!")
