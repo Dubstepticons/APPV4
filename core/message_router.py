@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import contextlib
 import os
+from datetime import datetime
 
 # File: core/message_router.py
 # Unified message router between DTC client and GUI panels.
@@ -238,7 +239,8 @@ class MessageRouter:
         if qty == 0:
             log.debug(f"router.position.closed: symbol={sym}, source={source}")
             if self.state:
-                self.state.update_position(sym, 0, None)
+                # FIXED: Use close_position() instead of deprecated update_position()
+                self.state.close_position()
             # CONTINUE to forward to Panel2 (don't return early!)
 
         # VALIDATION: Open positions (qty > 0) must have valid avg_entry
@@ -283,8 +285,24 @@ class MessageRouter:
                 self._trade_manager.on_position_update(payload)
 
         # Store in state manager
-        if self.state:
-            self.state.update_position(sym, qty, avg)
+        if self.state and qty > 0:  # Only open positions (closes are handled above)
+            # FIXED: Use open_position() instead of deprecated update_position()
+
+            # Extract mode from payload (added by DTC parser)
+            mode = payload.get("mode", self.state.current_mode)
+
+            # Extract entry time if available from DTC, otherwise use current time
+            # Note: DateTime field is optional in DTC messages
+            entry_time_raw = payload.get("DateTime")
+            if entry_time_raw and isinstance(entry_time_raw, datetime):
+                entry_time = entry_time_raw
+            else:
+                # Use current time as best approximation
+                # This is better than None since these are real-time position updates
+                entry_time = datetime.now()
+
+            # Open/update position (duplicate guard prevents redundant signals)
+            self.state.open_position(sym, qty, avg, entry_time, mode)
 
         return True
 

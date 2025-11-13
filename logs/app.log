@@ -6633,3 +6633,34 @@
 [2025-11-12 20:18:56] [INFO] [panels.panel2.live_panel] [panel2] Feed updated -- Delta changed: 4009.0
 [2025-11-12 20:18:57] [INFO] [panels.panel2.live_panel] [panel2] Feed updated -- VWAP changed: 6869.999
 [2025-11-12 20:18:57] [INFO] [panels.panel2.live_panel] [panel2] Feed updated -- Delta changed: 4010.0
+[2025-11-13 04:06:44] [INFO] [StateManager] [Mode] INIT: Application now in SIM mode
+[2025-11-13 04:06:44] [ERROR] [StateManager] update_position() called from DEPRECATED code path!
+  File: /home/user/APPV4/tests/test_state_manager_v2_fixes.py:68
+  Function: test_update_position_disabled
+  Symbol: ESH25, Qty: 2, Price: 5800.25
+  FIX: Replace with open_position() or close_position()
+[2025-11-13 04:07:01] [INFO] [StateManager] [Mode] INIT: Application now in SIM mode
+[2025-11-13 04:07:01] [ERROR] [StateManager] update_position() called from DEPRECATED code path!
+  File: /home/user/APPV4/tests/test_state_manager_v2_fixes.py:68
+  Function: test_update_position_disabled
+  Symbol: ESH25, Qty: 2, Price: 5800.25
+  FIX: Replace with open_position() or close_position()
+[2025-11-13 04:07:01] [INFO] [StateManager] [Mode] INIT: Application now in SIM mode
+[2025-11-13 04:07:01] [WARNING] [StateManager] _state['positions'] is deprecated. Use dedicated fields/methods instead.
+[2025-11-13 04:07:01] [INFO] [StateManager] [Mode] INIT: Application now in SIM mode
+[2025-11-13 04:08:01] [INFO] [StateManager] [Mode] INIT: Application now in SIM mode
+[2025-11-13 04:08:01] [ERROR] [StateManager] update_position() called from DEPRECATED code path!
+  File: /home/user/APPV4/tests/test_state_manager_v2_fixes.py:68
+  Function: test_update_position_disabled
+  Symbol: ESH25, Qty: 2, Price: 5800.25
+  FIX: Replace with open_position() or close_position()
+[2025-11-13 04:08:01] [INFO] [StateManager] [Mode] INIT: Application now in SIM mode
+[2025-11-13 04:08:01] [WARNING] [StateManager] _state['positions'] is deprecated. Use dedicated fields/methods instead.
+[2025-11-13 04:08:01] [INFO] [StateManager] [Mode] INIT: Application now in SIM mode
+[2025-11-13 04:08:01] [INFO] [StateManager] [Mode] INIT: Application now in SIM mode
+[2025-11-13 04:08:01] [INFO] [StateManager] [Mode] INIT: Application now in SIM mode
+[2025-11-13 04:08:01] [WARNING] [StateManager] [StateManager] Position recovered from DTC without entry_time: symbol=ESH25, qty=2, mode=SIM
+[2025-11-13 04:08:01] [INFO] [StateManager] [Mode] INIT: Application now in SIM mode
+[2025-11-13 04:08:01] [INFO] [StateManager] [Mode] INIT: Application now in SIM mode
+[2025-11-13 04:08:01] [INFO] [StateManager] [Mode] INIT: Application now in SIM mode
+[2025-11-13 04:08:01] [INFO] [StateManager] [Mode] INIT: Application now in SIM mode

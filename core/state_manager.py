@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import contextlib
+import warnings
 from datetime import datetime
 
 # File: core/state_manager.py
@@ -11,6 +12,14 @@ from PyQt6 import QtCore
 
 # CONSOLIDATION FIX: Import canonical mode detection (single source of truth)
 from utils.trade_mode import detect_mode_from_account
+
+# Logger setup
+try:
+    from utils.logger import get_logger
+    log = get_logger("StateManager")
+except Exception:
+    import structlog
+    log = structlog.get_logger(__name__)
 
 
 class StateManager(QtCore.QObject):
@@ -97,13 +106,13 @@ class StateManager(QtCore.QObject):
 
         # -------------------- mode awareness (start)
         self.current_account: Optional[str] = None
-        self.current_mode: str = "SIM"  # "SIM", "LIVE", or "DEBUG"
+        self._current_mode: str = "SIM"  # PRIVATE: Use property to enforce invariants
 
         # Mode history: list of (timestamp_utc, mode, account) tuples
         self.mode_history: list[tuple[datetime, str, str]] = []
-        self._add_to_mode_history(self.current_mode, self.current_account or "")
+        self._add_to_mode_history(self._current_mode, self.current_account or "")
 
-        self._log_mode_change("INIT", self.current_mode)
+        self._log_mode_change("INIT", self._current_mode)
         # -------------------- mode awareness (end)
 
         # ===== MODE-SPECIFIC BALANCE =====
@@ -117,7 +126,8 @@ class StateManager(QtCore.QObject):
         self.position_entry_price: float = 0
         self.position_entry_time: Optional[datetime] = None
         self.position_side: Optional[str] = None  # "LONG" or "SHORT"
-        self.position_mode: Optional[str] = None  # "SIM" or "LIVE" - what mode this position is in
+        self._position_mode: Optional[str] = None  # PRIVATE: Use property to enforce invariants
+        self.position_recovered_from_dtc: bool = False  # Flag for recovered positions with unknown entry_time
 
         # ===== ENTRY SNAPSHOTS (for closed trade record) =====
         self.entry_vwap: Optional[float] = None
@@ -138,17 +148,32 @@ class StateManager(QtCore.QObject):
         self._state_update_depth += 1
 
     def end_state_update(self):
-        """End atomic state update - emit all buffered signals"""
+        """
+        End atomic state update - emit all buffered signals in STRICT ORDER.
+
+        CRITICAL: Signals are emitted in this order regardless of buffering order:
+            1. mode (modeChanged)
+            2. balance (balanceChanged)
+            3. position (positionChanged)
+
+        This ensures Panels always see mode changes BEFORE balance/position updates,
+        preventing stale data from wrong mode contaminating the display.
+        """
         self._state_update_depth -= 1
         if self._state_update_depth == 0:
-            # Emit all buffered signals
-            for signal_name, value in self._pending_signals:
-                if signal_name == "balance":
-                    self.balanceChanged.emit(value)
-                elif signal_name == "mode":
-                    self.modeChanged.emit(value)
-                elif signal_name == "position":
-                    self.positionChanged.emit(value)
+            # STRICT ORDER: mode → balance → position
+            SIGNAL_ORDER = ["mode", "balance", "position"]
+
+            for signal_name in SIGNAL_ORDER:
+                for buffered_signal, value in self._pending_signals:
+                    if buffered_signal == signal_name:
+                        if signal_name == "balance":
+                            self.balanceChanged.emit(value)
+                        elif signal_name == "mode":
+                            self.modeChanged.emit(value)
+                        elif signal_name == "position":
+                            self.positionChanged.emit(value)
+
             self._pending_signals.clear()
 
     def _emit_signal(self, signal_name: str, value: Any):
@@ -170,6 +195,79 @@ class StateManager(QtCore.QObject):
                 self.modeChanged.emit(value)
             elif signal_name == "position":
                 self.positionChanged.emit(value)
+
+    # ===== MODE PROPERTIES (PROTECTED ACCESS) =====
+    @property
+    def current_mode(self) -> str:
+        """
+        Read-only access to current trading mode.
+
+        To change mode, use request_mode_change() to ensure invariants are maintained.
+        """
+        return self._current_mode
+
+    @current_mode.setter
+    def current_mode(self, value: str):
+        """
+        Block direct mode writes - use request_mode_change() instead.
+
+        This setter is kept for internal use within request_mode_change() and open_position().
+        External callers should use request_mode_change() to ensure mode validation.
+        """
+        # Allow internal writes (from request_mode_change, open_position, etc.)
+        # Log warning if called from outside this class
+        import inspect
+        frame = inspect.currentframe()
+        if frame and frame.f_back:
+            caller = frame.f_back.f_code.co_name
+            # Allow writes from StateManager methods
+            if caller not in ['request_mode_change', 'open_position', 'set_mode',
+                             'detect_and_set_mode', 'handle_mode_switch', '__init__',
+                             '__setattr__']:
+                try:
+                    from utils.logger import get_logger
+                    log = get_logger("StateManager")
+                    log.warning(
+                        f"Direct mode write from {caller}. "
+                        f"Use request_mode_change() instead to ensure invariants."
+                    )
+                except Exception:
+                    pass
+        self._current_mode = value
+
+    @property
+    def position_mode(self) -> Optional[str]:
+        """
+        Read-only access to position mode.
+
+        Returns the mode of the currently open position, or None if flat.
+        """
+        return self._position_mode
+
+    @position_mode.setter
+    def position_mode(self, value: Optional[str]):
+        """
+        Block direct position_mode writes - managed by open_position()/close_position().
+
+        This setter is kept for internal use within position management methods.
+        """
+        # Allow internal writes (from open_position, close_position, etc.)
+        import inspect
+        frame = inspect.currentframe()
+        if frame and frame.f_back:
+            caller = frame.f_back.f_code.co_name
+            # Allow writes from StateManager methods
+            if caller not in ['open_position', 'close_position', '__init__', '__setattr__']:
+                try:
+                    from utils.logger import get_logger
+                    log = get_logger("StateManager")
+                    log.warning(
+                        f"Direct position_mode write from {caller}. "
+                        f"Managed automatically by open_position()/close_position()."
+                    )
+                except Exception:
+                    pass
+        self._position_mode = value
 
     def load_sim_balance_from_trades(self) -> float:
         """
@@ -214,10 +312,58 @@ class StateManager(QtCore.QObject):
             self.sim_balance = 10000.0
             return self.sim_balance
 
+    # ===== STATE DICTIONARY (STRICT WHITELIST) =====
+    # Allowed keys for _state dictionary
+    # All other keys raise ValueError to prevent misuse
+    _STATE_ALLOWED_KEYS = frozenset([
+        "last_update",      # Last update timestamp
+        "balance",          # Legacy balance field (use get_balance_for_mode instead)
+        "active_symbol",    # Currently viewed symbol
+        "last_price",       # Last market price
+        "orders",           # Order history (legacy, being phased out)
+    ])
+
+    _STATE_DEPRECATED_KEYS = frozenset([
+        "positions",        # DEPRECATED: Use position_symbol/position_qty fields
+        "balance",          # DEPRECATED: Use sim_balance/live_balance
+    ])
+
     # ---- Core API ----
     def set(self, key: str, value: Any) -> None:
-        """Assign a value to the state."""
-        self._state[key] = value
+        """
+        Assign a value to the state dictionary.
+
+        STRICT WHITELIST: Only allowed keys can be written.
+        Deprecated keys trigger warnings, unknown keys raise ValueError.
+        """
+        if key in self._STATE_DEPRECATED_KEYS:
+            # Log deprecation warning
+            try:
+                from utils.logger import get_logger
+                import warnings
+                log = get_logger("StateManager")
+                log.warning(f"_state['{key}'] is deprecated. Use dedicated fields/methods instead.")
+                warnings.warn(
+                    f"StateManager._state['{key}'] is deprecated",
+                    DeprecationWarning,
+                    stacklevel=2
+                )
+            except Exception:
+                pass
+            # Still allow write (for now) to maintain compatibility
+            self._state[key] = value
+
+        elif key in self._STATE_ALLOWED_KEYS:
+            # Allowed key - write normally
+            self._state[key] = value
+
+        else:
+            # Unknown key - BLOCK
+            raise ValueError(
+                f"StateManager._state key '{key}' is not allowed. "
+                f"Use dedicated methods/properties instead. "
+                f"Allowed keys: {sorted(self._STATE_ALLOWED_KEYS)}"
+            )
 
     def get(self, key: str, default: Optional[Any] = None) -> Any:
         """Retrieve a value or default."""
@@ -241,8 +387,13 @@ class StateManager(QtCore.QObject):
         return list(self._state.keys())
 
     def update(self, mapping: dict[str, Any]) -> None:
-        """Bulk update state."""
-        self._state.update(mapping)
+        """
+        Bulk update state.
+
+        Validates each key against whitelist before updating.
+        """
+        for key, value in mapping.items():
+            self.set(key, value)  # Use set() to enforce whitelist
 
     # ---- Convenience accessors ----
     def get_active_symbol(self) -> Optional[str]:
@@ -252,10 +403,60 @@ class StateManager(QtCore.QObject):
         return self._state.get("last_price")
 
     def get_positions(self) -> list[dict]:
-        return self._state.get("positions", [])
+        """
+        DEPRECATED: Use position_symbol/position_qty fields instead.
+
+        This method is kept for backward compatibility only.
+        Returns current position as dict for legacy callers.
+        """
+        import warnings
+        warnings.warn(
+            "get_positions() is deprecated. Use position_symbol/position_qty instead.",
+            DeprecationWarning,
+            stacklevel=2
+        )
+        # Return current position in legacy format
+        if self.has_active_position():
+            return [{
+                "symbol": self.position_symbol,
+                "qty": self.position_qty,
+                "avg_price": self.position_entry_price,
+                "side": self.position_side,
+                "mode": self._position_mode
+            }]
+        return []
 
     def set_positions(self, positions: list[dict]) -> None:
-        self._state["positions"] = positions
+        """
+        DEPRECATED: Use open_position() or close_position() instead.
+
+        This method is kept for backward compatibility only.
+        Raises RuntimeError to prevent misuse.
+        """
+        raise RuntimeError(
+            "set_positions() is deprecated and disabled. "
+            "Use open_position() or close_position() instead. "
+            "See StateManager v2.0 documentation."
+        )
+
+    @property
+    def positions(self) -> dict:
+        """
+        DEPRECATED: Read-only property for legacy _state["positions"] access.
+
+        Returns current position in legacy format for backward compatibility.
+        New code should use position_symbol/position_qty fields directly.
+        """
+        if self.has_active_position():
+            return {
+                self.position_symbol: {
+                    "qty": self.position_qty,
+                    "avg_price": self.position_entry_price,
+                    "side": self.position_side,
+                    "mode": self._position_mode
+                }
+            }
+        return {}
 
     # -------------------- mode properties (backward compatibility) ----
     @property
@@ -534,20 +735,51 @@ class StateManager(QtCore.QObject):
                 self._state["balance"] = float(balance)  # Ignore invalid balance values
 
     def update_position(self, symbol: Optional[str], qty: int, avg_price: Optional[float]) -> None:
-        """Record or remove a position."""
-        if not symbol:
-            return
-        positions = self._state.get("positions", {})
-        if qty == 0:
-            # Close position (remove from dict)
-            positions.pop(symbol, None)
-        else:
-            # Update or create position
-            positions[symbol] = {
-                "qty": int(qty),
-                "avg_price": float(avg_price) if avg_price else None,
-            }
-        self._state["positions"] = positions
+        """
+        DISABLED: This method is incompatible with v2.0 architecture.
+
+        This method bypasses critical v2.0 invariants:
+        - Doesn't update position_mode
+        - Doesn't fire positionChanged signal
+        - Doesn't synchronize current_mode
+        - Doesn't clear entry snapshots
+        - Doesn't follow DTC rules
+        - Creates phantom positions
+
+        Use open_position() or close_position() instead.
+        """
+        # Log the caller for debugging
+        import inspect
+        try:
+            from utils.logger import get_logger
+            log = get_logger("StateManager")
+
+            frame = inspect.currentframe()
+            if frame and frame.f_back:
+                caller_frame = frame.f_back
+                caller_file = caller_frame.f_code.co_filename
+                caller_func = caller_frame.f_code.co_name
+                caller_line = caller_frame.f_lineno
+
+                log.error(
+                    f"update_position() called from DEPRECATED code path!\n"
+                    f"  File: {caller_file}:{caller_line}\n"
+                    f"  Function: {caller_func}\n"
+                    f"  Symbol: {symbol}, Qty: {qty}, Price: {avg_price}\n"
+                    f"  FIX: Replace with open_position() or close_position()"
+                )
+        except Exception:
+            pass
+
+        # HARD BLOCK with clear error message
+        raise RuntimeError(
+            f"update_position() is DISABLED (v2.0 incompatible).\n"
+            f"Called with: symbol={symbol}, qty={qty}, avg_price={avg_price}\n\n"
+            f"REQUIRED CHANGES:\n"
+            f"  - To open position: state.open_position(symbol, qty, price, time, mode)\n"
+            f"  - To close position: state.close_position()\n\n"
+            f"See StateManager v2.0 documentation for migration guide."
+        )
 
     def record_order(self, payload: dict) -> None:
         """Record an order event for statistics and replay."""
@@ -738,16 +970,50 @@ class StateManager(QtCore.QObject):
         return False
 
     def open_position(self, symbol: str, qty: float, entry_price: float,
-                      entry_time: datetime, mode: str) -> None:
+                      entry_time: Optional[datetime], mode: str) -> None:
         """
         Open a new position in the specified mode.
 
         ENFORCES INVARIANT: current_mode == position_mode when position is open
+
+        Args:
+            symbol: Contract symbol
+            qty: Position quantity (positive for LONG, negative for SHORT)
+            entry_price: Average entry price
+            entry_time: Entry timestamp (None if recovered from DTC without timestamp)
+            mode: Trading mode (SIM, LIVE, DEBUG)
+
+        Notes:
+            - If entry_time is None, position is marked as recovered from DTC
+            - This happens when reconnecting and DTC doesn't provide entry timestamp
         """
+        # DUPLICATE GUARD: Skip if position already matches exactly
+        # This prevents redundant signal emissions when DTC sends duplicate POSITION_UPDATE messages
+        if (self.has_active_position() and
+            self.position_symbol == symbol and
+            abs(self.position_qty - qty) < 0.0001 and  # Float tolerance
+            abs(self.position_entry_price - entry_price) < 0.01 and  # 1 cent tolerance
+            self._position_mode == mode):
+            log.debug(
+                f"[StateManager] Skipping duplicate open_position call: "
+                f"symbol={symbol}, qty={qty}, price={entry_price}, mode={mode}"
+            )
+            return  # Already in this exact position - skip redundant update
+
         # Begin atomic state update
         self.begin_state_update()
 
         try:
+            # Mark if position was recovered from DTC without entry_time
+            if entry_time is None:
+                self.position_recovered_from_dtc = True
+                log.warning(
+                    f"[StateManager] Position recovered from DTC without entry_time: "
+                    f"symbol={symbol}, qty={qty}, mode={mode}"
+                )
+            else:
+                self.position_recovered_from_dtc = False
+
             # CRITICAL: Synchronize current_mode with position_mode (single invariant)
             self.current_mode = mode
             self.position_mode = mode
@@ -756,7 +1022,7 @@ class StateManager(QtCore.QObject):
             self.position_symbol = symbol
             self.position_qty = qty
             self.position_entry_price = entry_price
-            self.position_entry_time = entry_time
+            self.position_entry_time = entry_time  # May be None if recovered
             self.position_side = "LONG" if qty > 0 else "SHORT"
 
             # Emit positionChanged signal
@@ -781,7 +1047,10 @@ class StateManager(QtCore.QObject):
 
         ENFORCES INVARIANT: position_mode = None when flat (no position)
         """
+        # DUPLICATE GUARD: Skip if no position to close
+        # Prevents redundant signal emissions if close_position() is called multiple times
         if not self.has_active_position():
+            log.debug("[StateManager] Skipping close_position call - no active position")
             return None
 
         # Begin atomic state update
@@ -935,11 +1204,13 @@ class StateManager(QtCore.QObject):
                         pos_mode = detect_mode_from_account(pos_account or "")
 
                         # Open position (will enforce mode invariant)
+                        # NOTE: entry_time is None because DTC doesn't provide it during recovery
+                        # The position will be marked with position_recovered_from_dtc = True
                         self.open_position(
                             symbol=symbol,
                             qty=float(qty),
                             entry_price=float(avg_entry),
-                            entry_time=datetime.now(),
+                            entry_time=None,  # No timestamp available from DTC
                             mode=pos_mode
                         )
                         recovery_report["positions_recovered"] += 1
