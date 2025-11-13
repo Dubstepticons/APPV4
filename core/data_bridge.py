@@ -32,6 +32,7 @@ from services.dtc_protocol import (
     is_logon_success,
     parse_messages,
 )
+from utils.request_timeout import RequestTimeoutManager
 
 
 # -------------------- Imports (end)
@@ -221,7 +222,55 @@ class DTCClientJSON(QtCore.QObject):
         # Debug throttle state (ms since monotonic epoch)
         self._debug_dump_next_allowed: float = 0.0
 
+        # Request timeout tracking
+        self._timeout_manager = RequestTimeoutManager(default_timeout=15.0)
+        self._timeout_check_timer: Optional[QtCore.QTimer] = None
+        self._init_timeout_checker()
+
     # -------------------- __init__ (end)
+
+    # -------------------- Timeout Management (start)
+    def _init_timeout_checker(self) -> None:
+        """Initialize periodic timeout checking (every 5 seconds)"""
+        self._timeout_check_timer = QtCore.QTimer(self)
+        self._timeout_check_timer.timeout.connect(self._check_request_timeouts)
+        self._timeout_check_timer.setInterval(5000)  # Check every 5 seconds
+
+    def _check_request_timeouts(self) -> None:
+        """Periodic check for timed out DTC requests"""
+        try:
+            timed_out = self._timeout_manager.check_timeouts()
+
+            for req in timed_out:
+                log.warning(
+                    "dtc.request.timeout",
+                    request_id=req.request_id,
+                    request_type=req.request_type,
+                    timeout=req.timeout,
+                    hint="Sierra Chart may be unresponsive or disconnected"
+                )
+
+                # Emit error signal for UI notification
+                self.errorOccurred.emit(
+                    f"DTC request timeout: {req.request_type} (ID: {req.request_id})"
+                )
+
+        except Exception as e:
+            log.error("timeout_check_failed", error=str(e))
+
+    def _start_timeout_checker(self) -> None:
+        """Start the timeout checking timer"""
+        if self._timeout_check_timer and not self._timeout_check_timer.isActive():
+            self._timeout_check_timer.start()
+            log.debug("timeout_checker_started")
+
+    def _stop_timeout_checker(self) -> None:
+        """Stop the timeout checking timer"""
+        if self._timeout_check_timer and self._timeout_check_timer.isActive():
+            self._timeout_check_timer.stop()
+            log.debug("timeout_checker_stopped")
+
+    # -------------------- Timeout Management (end)
 
     # -------------------- Debug helpers (start)
     def _allow_debug_dump(self, interval_ms: int = 2000) -> bool:
@@ -252,6 +301,10 @@ class DTCClientJSON(QtCore.QObject):
         self._reconnect_attempts = 0
         if self._reconnect_timer and self._reconnect_timer.isActive():
             self._reconnect_timer.stop()
+
+        # Start timeout checking when connected
+        self._start_timeout_checker()
+
         self.connected.emit()
 
         # Send DTC LOGON directly (Sierra Chart doesn't support ENCODING_REQUEST negotiation)
@@ -280,6 +333,11 @@ class DTCClientJSON(QtCore.QObject):
     def _on_disconnected(self) -> None:
         log.info("dtc.tcp.disconnected")
         self._stop_keepalive_system()
+
+        # Stop timeout checking and reset pending requests
+        self._stop_timeout_checker()
+        self._timeout_manager.reset()
+
         self.disconnected.emit()
         # Stop any pending handshake timer
         if self._handshake_timer and self._handshake_timer.isActive():
@@ -455,6 +513,10 @@ class DTCClientJSON(QtCore.QObject):
             5: "Type 601 (AccountBalanceRequest)",
         }
 
+        # Mark request as completed when response received (timeout tracking)
+        if req_id is not None:
+            self._timeout_manager.mark_completed(req_id)
+
         # Log all responses with RequestID for debugging request/response correlation
         if req_id is not None:
             expected_request = REQUEST_ID_MAP.get(req_id, f"Unknown RequestID {req_id}")
@@ -538,6 +600,7 @@ class DTCClientJSON(QtCore.QObject):
         # Stagger requests slightly to avoid burst disconnects
         def send_trade_accounts():
             self.send({"Type": 400, "RequestID": 1})
+            self._timeout_manager.register_request(1, "TRADE_ACCOUNTS_REQUEST", timeout=15.0)
             log.info("dtc.request.trade_accounts")
 
         def send_positions():
@@ -552,6 +615,7 @@ class DTCClientJSON(QtCore.QObject):
 
         def send_open_orders():
             self.send({"Type": 305, "RequestID": 3})
+            self._timeout_manager.register_request(3, "OPEN_ORDERS_REQUEST", timeout=10.0)
             log.info("dtc.request.orders")
 
         def send_fills():
@@ -561,9 +625,12 @@ class DTCClientJSON(QtCore.QObject):
             now = int(time.time())
             start_ts = now - days * 86400
             self.send({"Type": 303, "RequestID": 4, "StartDateTime": start_ts})
+            self._timeout_manager.register_request(4, "HISTORICAL_FILLS_REQUEST", timeout=30.0)
             log.info("dtc.request.fills", days=30)
 
         def send_balance():
+            # Balance request uses request_account_balance which has its own RequestID
+            # We'll register it there
             self.request_account_balance(None)
 
         QtCore.QTimer.singleShot(0, send_trade_accounts)
@@ -684,6 +751,10 @@ class DTCClientJSON(QtCore.QObject):
             print(f"   Timestamp: {__import__('datetime').datetime.now().strftime('%H:%M:%S.%f')[:-3]}")
             print("=" * 80 + "\n")
         self.send(msg)
+        # Register timeout for this request
+        request_id = msg.get("RequestID", 0)
+        if request_id:
+            self._timeout_manager.register_request(request_id, "ACCOUNT_BALANCE_REQUEST", timeout=10.0)
 
     # -------------------- Outbound (end)
 

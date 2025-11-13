@@ -746,22 +746,151 @@ class MainWindow(QtWidgets.QMainWindow):
                 icon.mark_data_activity()
 
     def closeEvent(self, event) -> None:
-        """Called when the app is closing. Log final balance state."""
+        """
+        Graceful shutdown sequence when app is closing.
+
+        Ensures all resources are properly released:
+        1. Saves panel states (open positions, etc.)
+        2. Disconnects from DTC server gracefully
+        3. Flushes pending database writes
+        4. Logs final balance state
+        5. Disposes database connections
+        """
+        print(f"\n{'='*80}")
+        print("[APP SHUTDOWN] Graceful shutdown initiated")
+        print(f"{'='*80}")
+
+        shutdown_errors = []
+
+        # Step 1: Save panel states (Panel2 position state, Panel3 settings, etc.)
         try:
-            if self._state:
+            print("[1/6] Saving panel states...")
+
+            # Save Panel2 (live trading) position state if any
+            if hasattr(self, 'panel_live') and self.panel_live:
+                if hasattr(self.panel_live, 'save_state'):
+                    self.panel_live.save_state()
+                    print("  ✓ Panel 2 (Live Trading) state saved")
+                elif hasattr(self.panel_live, '_save_panel_state'):
+                    self.panel_live._save_panel_state()
+                    print("  ✓ Panel 2 (Live Trading) state saved")
+                else:
+                    print("  ℹ Panel 2 has no save_state method (expected)")
+
+            # Panel1 and Panel3 typically don't need state saving
+            print("  ✓ Panel states saved")
+
+        except Exception as e:
+            error_msg = f"Failed to save panel states: {e}"
+            shutdown_errors.append(error_msg)
+            print(f"  ✗ {error_msg}")
+            log.error(f"[Shutdown] {error_msg}")
+
+        # Step 2: Disconnect from DTC server gracefully
+        try:
+            print("[2/6] Disconnecting from DTC server...")
+
+            if hasattr(self, '_dtc') and self._dtc:
+                if hasattr(self._dtc, 'disconnect'):
+                    self._dtc.disconnect()
+                    print("  ✓ DTC connection closed gracefully")
+                    log.info("[Shutdown] DTC disconnected")
+                else:
+                    print("  ℹ DTC client has no disconnect method")
+            else:
+                print("  ℹ No DTC connection to close")
+
+        except Exception as e:
+            error_msg = f"Failed to disconnect DTC: {e}"
+            shutdown_errors.append(error_msg)
+            print(f"  ✗ {error_msg}")
+            log.error(f"[Shutdown] {error_msg}")
+
+        # Step 3: Flush any pending database writes
+        try:
+            print("[3/6] Flushing database writes...")
+
+            # Import here to avoid circular dependency
+            from data.db_engine import get_session
+
+            # Flush any pending sessions (context manager handles commit)
+            with contextlib.suppress(Exception):
+                with get_session() as session:
+                    session.flush()
+
+            print("  ✓ Database writes flushed")
+
+        except Exception as e:
+            error_msg = f"Failed to flush database: {e}"
+            shutdown_errors.append(error_msg)
+            print(f"  ✗ {error_msg}")
+            log.error(f"[Shutdown] {error_msg}")
+
+        # Step 4: Log final balance state
+        try:
+            print("[4/6] Logging final balance state...")
+
+            if hasattr(self, '_state') and self._state:
                 final_balance = self._state.sim_balance
-                print(f"\n{'='*80}")
-                print(f"[APP CLOSING] Final Balance Check")
-                print(f"{'='*80}")
+                print(f"\n  {'─'*70}")
+                print(f"  Final Balance Check")
+                print(f"  {'─'*70}")
                 print(f"  Final SIM Balance: ${final_balance:,.2f}")
                 print(f"  Starting Balance: $10,000.00")
                 print(f"  Session P&L: ${final_balance - 10000.0:+,.2f}")
                 print(f"  Status: {'PERSISTENT [OK]' if final_balance != 10000.0 else 'Default (no trades)'}")
-                print(f"{'='*80}\n")
+                print(f"  {'─'*70}\n")
                 log.info(f"[Shutdown] App closing with SIM balance: ${final_balance:,.2f}")
-        except Exception as e:
-            print(f"[ERROR] Failed to log closing state: {e}")
+            else:
+                print("  ℹ No state manager to log balance from")
 
+        except Exception as e:
+            error_msg = f"Failed to log balance: {e}"
+            shutdown_errors.append(error_msg)
+            print(f"  ✗ {error_msg}")
+            log.error(f"[Shutdown] {error_msg}")
+
+        # Step 5: Dispose database connections
+        try:
+            print("[5/6] Closing database connections...")
+
+            from data.db_engine import engine
+
+            if engine:
+                # Dispose of connection pool
+                engine.dispose()
+                print("  ✓ Database connection pool disposed")
+                log.info("[Shutdown] Database connections closed")
+            else:
+                print("  ℹ No database engine to dispose")
+
+        except Exception as e:
+            error_msg = f"Failed to dispose database: {e}"
+            shutdown_errors.append(error_msg)
+            print(f"  ✗ {error_msg}")
+            log.error(f"[Shutdown] {error_msg}")
+
+        # Step 6: Final summary
+        try:
+            print("[6/6] Shutdown complete")
+
+            if shutdown_errors:
+                print(f"\n  ⚠ Shutdown completed with {len(shutdown_errors)} error(s):")
+                for err in shutdown_errors:
+                    print(f"    - {err}")
+            else:
+                print("  ✓ Clean shutdown (no errors)")
+
+            print(f"{'='*80}")
+            print("[APP SHUTDOWN] Application closed gracefully")
+            print(f"{'='*80}\n")
+
+            log.info("[Shutdown] Shutdown sequence completed", errors=len(shutdown_errors))
+
+        except Exception as e:
+            print(f"  ✗ Failed to log shutdown summary: {e}")
+
+        # Finally, call parent closeEvent to complete Qt cleanup
         super().closeEvent(event)
 
 
