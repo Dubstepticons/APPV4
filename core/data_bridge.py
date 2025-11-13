@@ -56,6 +56,30 @@ from core.dtc_parser import AppMessage, parse_dtc_message
 # All normalization logic has been moved to core/dtc_parser.py (Phase 2)
 # These are kept for backward compatibility only and will be removed in Phase 3
 
+# ===== DTC ENUM CONVERSION MAPS =====
+# DTC sends integer codes that need to be converted to strings for Pydantic validation
+
+DTC_SIDE_MAP = {
+    1: "BUY",
+    2: "SELL",
+}
+
+DTC_ORDER_TYPE_MAP = {
+    1: "MARKET",
+    2: "LIMIT",
+    3: "STOP",
+    4: "STOP_LIMIT",
+    5: "MARKET_IF_TOUCHED",
+}
+
+DTC_TIME_IN_FORCE_MAP = {
+    1: "DAY",
+    2: "GTC",  # Good Till Cancel
+    3: "IOC",  # Immediate Or Cancel
+    4: "FOK",  # Fill Or Kill
+    5: "GOOD_TILL_DATE_TIME",
+}
+
 
 # -------------------- DTC Client (start)
 class DTCClientJSON(QtCore.QObject):
@@ -597,11 +621,16 @@ class DTCClientJSON(QtCore.QObject):
         # ===== Phase 2C: Track order state transitions =====
         elif app_msg.type == "ORDER_UPDATE":
             try:
+                # Convert DTC integer codes to strings for Pydantic validation
+                side_int = payload.get("BuySell")
+                order_type_int = payload.get("OrderType")
+                tif_int = payload.get("TimeInForce")
+
                 self._order_tracker.update(
                     server_order_id=payload.get("ServerOrderID"),
                     client_order_id=payload.get("ClientOrderID"),
                     symbol=payload.get("Symbol"),
-                    side=payload.get("BuySell"),
+                    side=DTC_SIDE_MAP.get(side_int) if side_int else None,
                     qty=payload.get("Quantity"),
                     filled_qty=payload.get("FilledQuantity"),
                     price=payload.get("Price1"),
@@ -609,8 +638,8 @@ class DTCClientJSON(QtCore.QObject):
                     dtc_status=payload.get("OrderStatus"),
                     mode=payload.get("mode", "SIM"),
                     account=payload.get("TradeAccount"),
-                    order_type=payload.get("OrderType"),
-                    time_in_force=payload.get("TimeInForce"),
+                    order_type=DTC_ORDER_TYPE_MAP.get(order_type_int) if order_type_int else None,
+                    time_in_force=DTC_TIME_IN_FORCE_MAP.get(tif_int) if tif_int else None,
                     text=payload.get("Text"),
                 )
 

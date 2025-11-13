@@ -110,6 +110,10 @@ class MessageRouter:
 
         incoming_mode = detect_mode_from_account(incoming_account)
 
+        # Skip drift check if mode hasn't been initialized yet (first message)
+        if not self._mode_initialized:
+            return
+
         # Check for drift
         if (incoming_mode, incoming_account) != (self._current_mode, self._current_account):
             # Log structured event
@@ -164,7 +168,7 @@ class MessageRouter:
         detected_mode = detect_mode_from_account(account)
 
         # Check if mode switch is needed (debounced to prevent thrashing)
-        if not should_switch_mode_debounced(account, self._current_mode, qty):
+        if not should_switch_mode_debounced(detected_mode, self._current_mode):
             return False
 
         # Check mode precedence (LIVE always wins, SIM blocked if LIVE position open)
