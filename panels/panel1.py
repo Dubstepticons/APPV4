@@ -528,12 +528,10 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
         plot.setGeometry(self.graph_container.contentsRect())
 
     def resizeEvent(self, e: QtGui.QResizeEvent) -> None:
-        """Keep the plot synced with the container’s inner rect."""
-        try:
+        """Keep the plot synced with the container's inner rect."""
+        with contextlib.suppress(Exception):
             if getattr(self, "_plot", None) and self.graph_container:
                 self._plot.setGeometry(self.graph_container.contentsRect())
-        except Exception:
-            pass
         super().resizeEvent(e)
 
     # -------------------- Graph layout glue (end) --------------------------------
@@ -645,11 +643,9 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
                 self._ripple_items.append(ripple)
 
             # hover hook
-            try:
+            with contextlib.suppress(Exception):
                 self._plot.scene().sigMouseMoved.connect(self._on_mouse_move)
                 self._plot.viewport().installEventFilter(self)
-            except Exception:
-                pass
 
             # layout glue
             lay = self.graph_container.layout()
