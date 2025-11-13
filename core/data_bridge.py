@@ -638,17 +638,21 @@ class DTCClientJSON(QtCore.QObject):
                 DEBUG_DATA = False
 
             if app_msg.type == "TRADE_ACCOUNT":
-                signal_trade_account.send(payload)
+                # Emit to both global and mode-specific signal
+                bus.emit_with_mode("trade_account", payload)
             elif app_msg.type == "BALANCE_UPDATE":
-                signal_balance.send(payload)
+                # Emit to both global and mode-specific signal
+                bus.emit_with_mode("balance", payload)
             elif app_msg.type == "POSITION_UPDATE":
                 if DEBUG_DATA and self._allow_debug_dump(key="position"):
                     print("DEBUG [data_bridge]: [POSITION] Sending POSITION_UPDATE signal")
-                signal_position.send(payload)
+                # Emit to both global and mode-specific signal
+                bus.emit_with_mode("position", payload)
             elif app_msg.type == "ORDER_UPDATE":
                 if DEBUG_DATA and self._allow_debug_dump(key="order"):
                     print("DEBUG [data_bridge]: [ORDER] Sending ORDER_UPDATE signal")
-                signal_order.send(payload)
+                # Emit to both global and mode-specific signal
+                bus.emit_with_mode("order", payload)
         except Exception as e:
             log.warning("dtc.signal.error", type=app_msg.type, err=str(e))
 

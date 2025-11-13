@@ -28,6 +28,26 @@ from __future__ import annotations
 from blinker import Signal
 
 
+class ModeNamespace:
+    """
+    Mode-specific signal namespace (e.g., SIM, LIVE).
+
+    Allows subscribers to listen only to signals for a specific trading mode.
+
+    Usage:
+        bus.sim.position.connect(handler)  # Only SIM position updates
+        bus.live.order.connect(handler)    # Only LIVE order updates
+    """
+
+    def __init__(self, mode: str):
+        self.mode = mode
+        # Create mode-specific signals
+        self.position = Signal(f"{mode.lower()}.position")
+        self.order = Signal(f"{mode.lower()}.order")
+        self.balance = Signal(f"{mode.lower()}.balance")
+        self.trade_account = Signal(f"{mode.lower()}.trade_account")
+
+
 class SignalBus:
     """
     Centralized signal registry for APPV4.
@@ -49,10 +69,11 @@ class SignalBus:
         self.seed_ready = Signal("seed_ready")  # Initial data queries completed
         self.connection_lost = Signal("connection_lost")  # DTC disconnected
 
-        # ===== MODE-AWARE SIGNALS (Future Enhancement) =====
-        # These will be added when mode partitioning is implemented
-        # self.sim = ModeNamespace("SIM")
-        # self.live = ModeNamespace("LIVE")
+        # ===== MODE-AWARE SIGNALS =====
+        # Mode-specific signal namespaces for filtered subscriptions
+        self.sim = ModeNamespace("SIM")
+        self.live = ModeNamespace("LIVE")
+        self.debug = ModeNamespace("DEBUG")
 
     def emit_all(self, signal_name: str, payload: dict):
         """
@@ -67,6 +88,41 @@ class SignalBus:
             sig.send(payload)
         else:
             raise ValueError(f"Unknown signal: {signal_name}")
+
+    def emit_with_mode(self, signal_name: str, payload: dict):
+        """
+        Emit to both global signal and mode-specific signal.
+
+        Emits to:
+        1. Global signal (e.g., bus.position) - all subscribers
+        2. Mode-specific signal (e.g., bus.sim.position) - mode-filtered subscribers
+
+        Args:
+            signal_name: Base signal name ("position", "order", "balance", "trade_account")
+            payload: Signal payload dict (must include 'mode' field)
+
+        Examples:
+            >>> bus.emit_with_mode("position", {"mode": "SIM", "symbol": "ESH25", "qty": 2})
+            # Emits to both bus.position and bus.sim.position
+        """
+        # Emit to global signal
+        self.emit_all(signal_name, payload)
+
+        # Emit to mode-specific signal if mode is present
+        mode = payload.get("mode")
+        if mode:
+            mode_ns = None
+            if mode == "SIM":
+                mode_ns = self.sim
+            elif mode == "LIVE":
+                mode_ns = self.live
+            elif mode == "DEBUG":
+                mode_ns = self.debug
+
+            if mode_ns:
+                mode_signal = getattr(mode_ns, signal_name, None)
+                if mode_signal and isinstance(mode_signal, Signal):
+                    mode_signal.send(payload)
 
 
 # Global singleton bus instance
