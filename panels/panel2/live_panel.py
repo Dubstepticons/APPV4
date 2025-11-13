@@ -155,7 +155,8 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
     # -------------------- UI Build (start)
     def _build(self):
         self.setObjectName("Panel2")
-        self.setStyleSheet(f"QWidget#Panel2 {{ background:{THEME.get('bg_panel', '#0B0F14')}; }}")
+        # NOTE: Stylesheet set by refresh_theme() via ThemeAwareMixin
+        # Do NOT set here - it will override theme changes!
 
         # Outer column layout for header + grid
         outer = QtWidgets.QVBoxLayout(self)
@@ -214,7 +215,7 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                 int(THEME.get("title_font_size", 16)),
             )
         )
-        self.symbol_banner.setStyleSheet(f"color: {THEME.get('ink', '#E5E7EB')};")
+        # NOTE: Color set in _on_theme_refresh()
 
         # Live price label (right) - shows "FLAT" when not in position, current market price when in position
         # Uses heading font (Lato in LIVE/SIM)
@@ -226,7 +227,7 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                 int(THEME.get("title_font_size", 16)),
             )
         )
-        self.live_banner.setStyleSheet(f"color: {THEME.get('ink', '#E5E7EB')};")
+        # NOTE: Color set in _on_theme_refresh()
 
         # Center both header items in a single row
         hdr.addStretch(1)
