@@ -393,14 +393,14 @@ panels/
 - ✅ Phase 1 Complete: Message passing audit (2h) **DONE**
 - ✅ Phase 2 Complete: SignalBus creation (2h) **DONE**
 - ✅ Phase 3 Complete: MessageRouter migration (4h) **DONE**
-- ⏳ Phase 4 Pending: Replace direct calls (10h)
-- ⏳ Phase 5 Pending: Code cleanup (10h)
-- ⏳ Phase 6 Pending: Panel2 Position model refactor (10h)
+- ⏳ Phase 4 Pending: Replace direct calls (10h) **SKIPPED**
+- ⏳ Phase 5 Pending: Code cleanup (10h) **SKIPPED**
+- ✅ Phase 6 Complete: Panel2 Position model refactor (3h) **DONE**
 - ⏳ Phase 7 Pending: Panel2 modularization (6h)
 
-**Progress**: 3/7 phases complete (43%)
-**Time Spent**: ~8 hours
-**Time Remaining**: ~36 hours
+**Progress**: 4/7 phases complete (57%)
+**Time Spent**: ~11 hours
+**Time Remaining**: ~6 hours (Phase 7 only)
 
 ## Completed Work Summary
 
@@ -438,18 +438,48 @@ panels/
 - **Files Modified**: `core/app_manager.py`, `core/data_bridge.py`, `core/message_router.py`
 - **Result**: MessageRouter fully deprecated, SignalBus is now the only message passing system
 
-### Key Achievements
-✅ **Eliminated fragmented messaging** - Single pattern throughout
-✅ **Thread-safe communication** - Qt handles DTC thread → main thread marshaling
-✅ **Decoupled architecture** - Panels don't need references to each other
-✅ **Type-safe signals** - Compile-time error detection
-✅ **Testable design** - pytest-qt compatible
-✅ **Removed 600+ lines** of routing boilerplate (MessageRouter deprecated)
+### Phase 6: Panel2 Position Domain Model Integration ✅
+**Part 1: Foundation (Commit 9659b89)**
+- Replaced 12+ scattered position fields with single `_position: Position` object
+- Added 11 compatibility `@property` methods for gradual migration
+- Used `Position.flat()` factory for initialization
+- **Files Modified**: `panels/panel2.py` (+65 lines, -12 fields)
+
+**Part 2: P&L Migration (Commit 035f98b)**
+- Migrated all manual P&L calculations to use Position domain methods:
+  - `unrealized_pnl(price)` - Replaces manual gross P&L calculation
+  - `realized_pnl(exit_price)` - Replaces exit P&L calculation
+  - `mae()` - Maximum Adverse Excursion (from tracked extremes)
+  - `mfe()` - Maximum Favorable Excursion (from tracked extremes)
+  - `efficiency(price)` - Trade efficiency ratio [0, 1.5]
+  - `r_multiple(price)` - Risk-adjusted return
+- Eliminated ~60 lines of duplicate P&L logic across 3 locations
+- **Files Modified**: `panels/panel2.py` (3 sections: exit method, order handler, current data)
+
+**Benefits**:
+- ✅ Single source of truth for P&L calculations
+- ✅ Consistent gross P&L methodology throughout
+- ✅ Testable in isolation (no UI dependencies)
+- ✅ Reduced code duplication (eliminated 3 identical calculation blocks)
+- ✅ Type-safe with full documentation
+
+### Key Achievements (Phases 1-6)
+✅ **Eliminated fragmented messaging** - Single pattern throughout (Phase 3)
+✅ **Thread-safe communication** - Qt handles DTC thread → main thread marshaling (Phase 3)
+✅ **Decoupled architecture** - Panels don't need references to each other (Phase 3)
+✅ **Type-safe signals** - Compile-time error detection (Phase 3)
+✅ **Testable design** - pytest-qt compatible (Phase 3)
+✅ **Removed 600+ lines** of routing boilerplate (MessageRouter deprecated, Phase 3)
+✅ **Consolidated position logic** - 12 fields → 1 Position object (Phase 6)
+✅ **Eliminated duplicate P&L** - Single source of truth in domain model (Phase 6)
 
 ### Commits Made
 1. `f75a5a0` - OPTION 2 PHASE 1-2: Message passing audit + SignalBus created
 2. `98e68a0` - PHASE 3 (Part 1): DTCClientJSON now emits to SignalBus
 3. `6570bb4` - PHASE 3 (Part 2): Panels now subscribe to SignalBus
 4. `a7841f3` - PHASE 3 COMPLETE: MessageRouter fully deprecated
+5. `0010a78` - Update OPTION_2_REFACTOR_PLAN.md with Phase 1-3 completion status
+6. `9659b89` - PHASE 6 (Foundation): Panel2 now uses Position domain model
+7. `035f98b` - PHASE 6 COMPLETE: Panel2 P&L calculations now use Position domain methods
 
-**Next Action**: Continue with Phase 4 (replace direct calls) or Phase 5 (code cleanup)
+**Next Action**: Phase 7 (Modularize Panel2 into 6 smaller files)
