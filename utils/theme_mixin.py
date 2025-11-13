@@ -60,25 +60,118 @@ class ThemeAwareMixin:
         This is the main entry point called when theme changes.
         Override _build_theme_stylesheet() to customize behavior.
         """
+        widget_name = getattr(self, 'objectName', lambda: 'Unknown')()
+
+        # Use both print and logging to ensure we see the output
+        print(f"[ThemeAwareMixin.refresh_theme] START: {widget_name}", flush=True)
+
+        try:
+            from utils.logger import get_logger
+            log = get_logger(__name__)
+            log.info(f"[ThemeAwareMixin.refresh_theme] START: {widget_name}")
+        except Exception as e:
+            print(f"[ThemeAwareMixin] Logger error: {e}", flush=True)
+
         # Step 1: Update this widget's stylesheet
-        stylesheet = self._build_theme_stylesheet()
-        if stylesheet:
-            if isinstance(self, QtWidgets.QWidget):
-                self.setStyleSheet(stylesheet)
+        try:
+            stylesheet = self._build_theme_stylesheet()
+
+            try:
+                from utils.logger import get_logger
+                log = get_logger(__name__)
+                log.debug(f"[ThemeAwareMixin] {widget_name}._build_theme_stylesheet() returned {len(stylesheet) if stylesheet else 0} chars")
+            except:
+                pass
+
+            if stylesheet:
+                if isinstance(self, QtWidgets.QWidget):
+                    print(f"[ThemeAwareMixin] {widget_name}.setStyleSheet() - applying {len(stylesheet)} chars", flush=True)
+                    self.setStyleSheet(stylesheet)
+                    try:
+                        from utils.logger import get_logger
+                        log = get_logger(__name__)
+                        log.info(f"[ThemeAwareMixin] {widget_name}.setStyleSheet() applied ({len(stylesheet)} chars)")
+                    except:
+                        pass
+            else:
+                try:
+                    from utils.logger import get_logger
+                    log = get_logger(__name__)
+                    log.debug(f"[ThemeAwareMixin] {widget_name} returned empty stylesheet")
+                except:
+                    pass
+        except Exception as e:
+            try:
+                from utils.logger import get_logger
+                log = get_logger(__name__)
+                log.error(f"[ThemeAwareMixin] Error in _build_theme_stylesheet for {widget_name}: {e}")
+            except:
+                pass
 
         # Step 2: Refresh child widgets
-        children = self._get_theme_children()
-        if children:
-            for child in children:
-                if hasattr(child, "refresh_theme"):
-                    child.refresh_theme()
+        try:
+            children = self._get_theme_children()
+            if children:
+                try:
+                    from utils.logger import get_logger
+                    log = get_logger(__name__)
+                    log.debug(f"[ThemeAwareMixin] {widget_name} has {len(children)} themed children")
+                except:
+                    pass
+
+                for i, child in enumerate(children):
+                    child_name = getattr(child, 'objectName', lambda: 'Unknown')()
+                    try:
+                        from utils.logger import get_logger
+                        log = get_logger(__name__)
+                        log.debug(f"[ThemeAwareMixin] {widget_name} refreshing child {i}: {child_name}")
+                    except:
+                        pass
+
+                    if hasattr(child, "refresh_theme"):
+                        child.refresh_theme()
+        except Exception as e:
+            try:
+                from utils.logger import get_logger
+                log = get_logger(__name__)
+                log.error(f"[ThemeAwareMixin] Error refreshing children for {widget_name}: {e}")
+            except:
+                pass
 
         # Step 3: Custom refresh logic (hook for subclasses)
-        self._on_theme_refresh()
+        try:
+            self._on_theme_refresh()
+            try:
+                from utils.logger import get_logger
+                log = get_logger(__name__)
+                log.debug(f"[ThemeAwareMixin] {widget_name}._on_theme_refresh() completed")
+            except:
+                pass
+        except Exception as e:
+            try:
+                from utils.logger import get_logger
+                log = get_logger(__name__)
+                log.error(f"[ThemeAwareMixin] Error in _on_theme_refresh for {widget_name}: {e}")
+            except:
+                pass
 
         # Step 4: Trigger repaint if this is a widget
-        if isinstance(self, QtWidgets.QWidget):
-            self.update()
+        try:
+            if isinstance(self, QtWidgets.QWidget):
+                self.update()
+                try:
+                    from utils.logger import get_logger
+                    log = get_logger(__name__)
+                    log.debug(f"[ThemeAwareMixin.refresh_theme] END: {widget_name} - update() called")
+                except:
+                    pass
+        except Exception as e:
+            try:
+                from utils.logger import get_logger
+                log = get_logger(__name__)
+                log.error(f"[ThemeAwareMixin] Error calling update() for {widget_name}: {e}")
+            except:
+                pass
 
     def _build_theme_stylesheet(self) -> str:
         """

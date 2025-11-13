@@ -47,29 +47,30 @@ def invalidate_stats_cache() -> None:
 
 
 def compute_trading_stats_for_timeframe(tf: str, mode: str | None = None) -> dict[str, Any]:
-    """Compute Panel 3 stats for the given timeframe using DB trades.
+    """Compute Panel 3 stats for the given timeframe using TradeRepository.
 
     Args:
         tf: Timeframe ("1D", "1W", "1M", "3M", "YTD")
         mode: Filter by mode ("SIM", "LIVE", or None for all)
 
     Returns a dict keyed by PANEL3_METRICS friendly labels.
-    Uses TradeRecord.exit_time when present; falls back to timestamp.
+    Uses TradeRecord.exit_time for time-based filtering.
     """
     print(f"  timeframe={tf}, mode={mode}")
 
     # Local imports to avoid hard dependency at import time
     try:
         import statistics as stats
+        from datetime import datetime, timezone
 
-        from data.db_engine import get_session
-        from data.schema import TradeRecord
+        from services.repositories.trade_repository import TradeRepository
         from services.trade_math import TradeMath
     except Exception as e:
         return {}
 
     # CONSOLIDATION FIX: Use canonical timeframe_start function
     start = timeframe_start(tf)
+    now_dt = datetime.now(timezone.utc)
 
     # Get active mode from state manager if not provided
     if mode is None:
@@ -95,6 +96,16 @@ def compute_trading_stats_for_timeframe(tf: str, mode: str | None = None) -> dic
             # Cache expired - remove stale entry
             del _stats_cache[cache_key]
 
+    # Use TradeRepository for data access
+    repo = TradeRepository()
+
+    # Get closed trades within timeframe, filtered by mode
+    filters = {"is_closed": True}
+    if mode:
+        filters["mode"] = mode
+
+    rows = repo.get_range(start, now_dt, **filters)
+
     pnls: list[float] = []
     commissions_sum = 0.0
     r_mults: list[float] = []
@@ -102,38 +113,24 @@ def compute_trading_stats_for_timeframe(tf: str, mode: str | None = None) -> dic
     mae_list: list[float] = []
     mfe_list: list[float] = []
 
-    with get_session() as s:  # type: ignore
-        time_field = getattr(TradeRecord, "exit_time", None) or getattr(TradeRecord, "timestamp")
-        query = (
-            s.query(TradeRecord)
-            .filter(TradeRecord.realized_pnl.isnot(None))
-            .filter(time_field >= start)
-        )
+    if not rows:
+        pass
 
-        # Filter by mode if provided
-        if mode:
-            query = query.filter(TradeRecord.mode == mode)
-
-        rows = query.order_by(time_field.asc()).all()
-
-        if not rows:
-            pass
-
-        for idx, r in enumerate(rows, 1):
-            if r.realized_pnl is not None:
-                pnls.append(float(r.realized_pnl))
-                print(f"  -> Added to PnL list: {r.realized_pnl}")
-            if getattr(r, "commissions", None) is not None:
-                commissions_sum += float(r.commissions)
-            if getattr(r, "r_multiple", None) is not None:
-                r_mults.append(float(r.r_multiple))
-            if getattr(r, "entry_time", None) and getattr(r, "exit_time", None):
-                with contextlib.suppress(Exception):
-                    durations.append((r.exit_time - r.entry_time).total_seconds())
-            if getattr(r, "mae", None) is not None:
-                mae_list.append(float(r.mae))
-            if getattr(r, "mfe", None) is not None:
-                mfe_list.append(float(r.mfe))
+    for idx, r in enumerate(rows, 1):
+        if r.realized_pnl is not None:
+            pnls.append(float(r.realized_pnl))
+            print(f"  -> Added to PnL list: {r.realized_pnl}")
+        if getattr(r, "commissions", None) is not None:
+            commissions_sum += float(r.commissions)
+        if getattr(r, "r_multiple", None) is not None:
+            r_mults.append(float(r.r_multiple))
+        if getattr(r, "entry_time", None) and getattr(r, "exit_time", None):
+            with contextlib.suppress(Exception):
+                durations.append((r.exit_time - r.entry_time).total_seconds())
+        if getattr(r, "mae", None) is not None:
+            mae_list.append(float(r.mae))
+        if getattr(r, "mfe", None) is not None:
+            mfe_list.append(float(r.mfe))
 
     print(f"  Total PnL values collected: {len(pnls)}")
     print(f"  PnL list: {pnls}")

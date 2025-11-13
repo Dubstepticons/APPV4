@@ -81,7 +81,8 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
 
     def _build_ui(self) -> None:
         self.setObjectName("Panel3")
-        self.setStyleSheet(f"QWidget#Panel3 {{ background:{THEME.get('bg_panel', '#0B0F14')}; }}")
+        # NOTE: Stylesheet set by refresh_theme() via ThemeAwareMixin
+        # Do NOT set here - it will override theme changes!
 
         root = QtWidgets.QVBoxLayout(self)
         # Match Panel 2 margins/spacing

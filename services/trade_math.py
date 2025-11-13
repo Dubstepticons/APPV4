@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 # File: services/trade_math.py
-# Block 32/?? Ã¢â‚¬â€ TradeMath utility functions for PnL and trade stats
+# Block 32/?? – TradeMath utility functions for PnL and trade stats
 from typing import List, Tuple, Optional
 
 
@@ -79,40 +79,37 @@ class TradeMath:
         trade_min_price: float,
         trade_max_price: float,
         is_long: bool,
-        qty: int,
-        dollars_per_point: float,
     ) -> tuple[Optional[float], Optional[float]]:
         """
-        Calculate MAE (Maximum Adverse Excursion) and MFE (Maximum Favorable Excursion).
+        Calculate MAE (Maximum Adverse Excursion) and MFE (Maximum Favorable Excursion) in points.
+
+        Formula:
+        - Long:  MFE = trade_max - entry, MAE = entry - trade_min
+        - Short: MFE = entry - trade_min, MAE = trade_max - entry
 
         Args:
             entry_price: Entry price
             trade_min_price: Lowest price during trade
             trade_max_price: Highest price during trade
             is_long: True if long, False if short
-            qty: Position quantity
-            dollars_per_point: Dollar value per point
 
         Returns:
-            Tuple of (MAE, MFE) in dollars, or (None, None) if calculation not possible
+            Tuple of (MAE, MFE) in points, or (None, None) if calculation not possible
         """
         if trade_min_price is None or trade_max_price is None:
             return None, None
 
         try:
             if is_long:
-                # Long: MAE = entry - trade_min (adverse = price fell), MFE = trade_max - entry (favorable = price rose)
-                mae_pts = entry_price - trade_min_price
+                # Long: MFE = trade_max - entry, MAE = entry - trade_min
                 mfe_pts = trade_max_price - entry_price
+                mae_pts = entry_price - trade_min_price
             else:
-                # Short: MAE = trade_max - entry (adverse = price rose), MFE = entry - trade_min (favorable = price fell)
-                mae_pts = trade_max_price - entry_price
+                # Short: MFE = entry - trade_min, MAE = trade_max - entry
                 mfe_pts = entry_price - trade_min_price
+                mae_pts = trade_max_price - entry_price
 
-            # Convert to positive magnitudes and dollars
-            mae = abs(mae_pts) * dollars_per_point * qty
-            mfe = abs(mfe_pts) * dollars_per_point * qty
-            return mae, mfe
+            return mae_pts, mfe_pts
         except Exception:
             return None, None
 
@@ -140,16 +137,6 @@ class TradeMath:
             max_dd = max(max_dd, peak - p)
             max_ru = max(max_ru, p - trough)
         return max_dd, max_ru
-
-    @staticmethod
-    def mfe_mae(prices: list[float], entry_price: float) -> tuple[float, float]:
-        """Return (MFE, MAE) Ã¢â‚¬â€ max favorable/adverse excursion."""
-        if not prices:
-            return 0.0, 0.0
-        deltas = [p - entry_price for p in prices]
-        mfe = max(deltas)
-        mae = abs(min(deltas))
-        return mfe, mae
 
     @staticmethod
     def expectancy(pnls: list[float]) -> float:

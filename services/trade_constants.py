@@ -11,7 +11,10 @@ import os
 
 
 # Trading math constants
-DOLLARS_PER_POINT = float(os.getenv("APPSIERRA_DOLLARS_PER_POINT", "50.0"))  # ES: $50/pt
-COMM_PER_CONTRACT = float(os.getenv("APPSIERRA_COMM_PER_CONTRACT", "2.25"))  # per contract, round-turn approx
-DOLLARS_PER_POINT = float(os.getenv("APPSIERRA_DOLLARS_PER_POINT", "5.00"))  # MES: $50/pt
-COMM_PER_CONTRACT = float(os.getenv("APPSIERRA_COMM_PER_CONTRACT", "0.62"))  # per contract, round-turn approx
+# MES (Micro E-mini S&P 500): $5 per point, $0.62 commission per contract
+DOLLARS_PER_POINT = float(os.getenv("APPSIERRA_DOLLARS_PER_POINT", "5.00"))
+COMM_PER_CONTRACT = float(os.getenv("APPSIERRA_COMM_PER_CONTRACT", "0.62"))
+
+# NOTE: For ES (E-mini S&P 500), use:
+# DOLLARS_PER_POINT = 50.0
+# COMM_PER_CONTRACT = 2.25

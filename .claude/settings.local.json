@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(git checkout:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(dir /b /s)",
+      "Bash(dir:*)",
+      "Bash(nul)",
+      "Bash(python3:*)",
+      "Bash(timeout 10 python:*)",
+      "Bash(timeout 5 python:*)",
+      "Bash(timeout 6 python:*)",
+      "Bash(timeout 7 python:*)",
+      "Bash(tee:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

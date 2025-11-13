@@ -5,19 +5,17 @@ import os
 
 # File: core/message_router.py
 # Unified message router between DTC client and GUI panels.
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Dict, Optional
 
 import structlog
 
 from core.state_manager import StateManager
 from services.trade_service import TradeManager
 
-# CRITICAL FIX: Use TYPE_CHECKING to avoid runtime panel imports (dependency injection pattern)
-# Panel references are only needed for type hints, not at runtime
-if TYPE_CHECKING:
-    from panels.panel1 import Panel1
-    from panels.panel2 import Panel2
-    from panels.panel3 import Panel3
+# ARCHITECTURAL FIX: Use protocol interfaces instead of concrete panel imports
+# This breaks circular dependency: core → interfaces ← panels (Dependency Inversion Principle)
+from core.interfaces import BalancePanel, TradingPanel, StatsPanel, DTCClient
+
 from utils.debug_flags import debug_data, debug_signal
 from utils.qt_bridge import marshal_to_qt_thread
 from utils.trade_mode import auto_detect_mode_from_order, auto_detect_mode_from_position, log_mode_switch
@@ -38,10 +36,10 @@ class MessageRouter:
         self,
         state: Optional[StateManager] = None,
         panels: Optional[dict[str, Any]] = None,
-        panel_balance: Optional[Panel1] = None,
-        panel_live: Optional[Panel2] = None,
-        panel_stats: Optional[Panel3] = None,
-        dtc_client: Optional[Any] = None,
+        panel_balance: Optional[BalancePanel] = None,
+        panel_live: Optional[TradingPanel] = None,
+        panel_stats: Optional[StatsPanel] = None,
+        dtc_client: Optional[DTCClient] = None,
         auto_subscribe: bool = True,
     ):
         # Core wiring
@@ -75,6 +73,11 @@ class MessageRouter:
         # Mode tracking for drift detection
         self._current_mode: str = "DEBUG"
         self._current_account: str = ""
+
+        # Account enumeration tracking (prevents duplicate mode switching during init)
+        self._accounts_seen: set[str] = set()
+        self._primary_account: Optional[str] = None
+        self._mode_initialized: bool = False
 
         # Coalesced UI updates (10Hz refresh rate)
         self._ui_refresh_pending: bool = False
@@ -631,6 +634,9 @@ class MessageRouter:
         if os.getenv("DEBUG_DTC", "0") == "1":
             log.debug(f"router.trade_account.{acct}")
 
+        # Track this account
+        self._accounts_seen.add(acct)
+
         # Update trade logger with current account
         if self._trade_manager:
             self._trade_manager.set_account(acct)
@@ -639,9 +645,47 @@ class MessageRouter:
             with contextlib.suppress(Exception):
                 self.panel_balance.set_account(acct)
 
-        # Update state manager mode (uses proper mode detection)
+        # CRITICAL FIX: Smart mode switching to prevent duplicate switches during initialization
+        # Strategy: Only switch mode ONCE to match the account that corresponds to configured TRADING_MODE
+        # This prevents the "repeat" issue where mode switches multiple times during account enumeration
         if self.state:
-            self.state.set_mode(acct)
+            from config import settings
+            from utils.trade_mode import detect_mode_from_account
+
+            detected_mode = detect_mode_from_account(acct)
+
+            # Get the user's configured trading mode preference from settings
+            configured_mode = getattr(settings, 'TRADING_MODE', 'SIM')
+
+            # Switch mode only if:
+            # 1. We haven't initialized mode yet, AND
+            # 2. This account matches the user's configured TRADING_MODE preference
+            #
+            # This ensures we switch exactly ONCE, to the account that matches user's config
+            should_switch = (
+                not self._mode_initialized and
+                detected_mode == configured_mode
+            )
+
+            if should_switch:
+                self.state.set_mode(acct)
+                self._primary_account = acct
+                self._mode_initialized = True
+                log.info(
+                    f"[Mode] Mode initialized from account: {acct} -> {detected_mode} "
+                    f"(matches configured TRADING_MODE={configured_mode}, accounts seen: {len(self._accounts_seen)})"
+                )
+            else:
+                if not self._mode_initialized:
+                    log.debug(
+                        f"[Mode] Account {acct} ({detected_mode}) does not match configured "
+                        f"TRADING_MODE={configured_mode}, waiting for matching account..."
+                    )
+                else:
+                    log.debug(
+                        f"[Mode] Account {acct} ({detected_mode}) skipped - mode already initialized "
+                        f"to {self.state.current_mode} via account {self._primary_account}"
+                    )
 
     def _on_balance_update(self, payload: dict):
         bal = payload.get("balance")
@@ -678,18 +722,22 @@ class MessageRouter:
         qty = payload.get("qty", 0)
         avg = payload.get("avg_entry")
 
-        # CRITICAL: Only process OPEN positions (qty != 0)
-        # Ignore zero-quantity positions from initial sync or position closures
+        # CRITICAL FIX: ALWAYS forward position updates to Panel2, including qty=0 (closes)
+        # Panel2 needs qty=0 messages to detect trade closures and record them to database
+        # Old buggy logic: if qty == 0: return (prevented Panel2 from seeing closes!)
+
+        # Update router state for qty=0 (remove position from state tracking)
         if qty == 0:
             log.debug(f"router.position.closed: symbol={sym}")
-            # Remove from state if it exists
             if self.state:
                 self.state.update_position(sym, 0, None)
-            return
+            # CONTINUE to forward to Panel2 (don't return early!)
 
-        # ADDITIONAL CHECK: Validate position has required data (avoid stale positions)
+        # ADDITIONAL CHECK: Validate OPEN positions have required data (avoid stale positions)
         # Sierra sometimes reports positions without proper price data
-        if avg is None or avg == 0.0:
+        # CRITICAL: Only apply this check to OPEN positions (qty > 0)
+        # Closed positions (qty=0) legitimately have avg=0.0, so skip this check for closes
+        if qty > 0 and (avg is None or avg == 0.0):
             log.warning(
                 "router.position.stale",
                 symbol=sym,
