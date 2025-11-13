@@ -38,12 +38,16 @@ from services.dtc_protocol import (
 
 log = structlog.get_logger(__name__)
 
-# -------------------- App-level normalized signals (start)
-signal_trade_account = Signal("trade_account")
-signal_balance = Signal("balance")
-signal_position = Signal("position")
-signal_order = Signal("order")
-# -------------------- App-level normalized signals (end)
+# ===== NEW UTILITIES (v2.0 Architecture) =====
+from utils.signal_bus import bus, signal_trade_account, signal_balance, signal_position, signal_order
+from utils.debug_throttle import DebugThrottle
+from utils.position_state import PositionStateMachine
+from utils.order_state import OrderStateMachine
+
+# ===== BACKWARD COMPATIBILITY =====
+# Module-level signal aliases for existing code (deprecated)
+# TODO: Migrate all imports to use `bus` directly
+# signal_trade_account, signal_balance, signal_position, signal_order imported above
 
 
 # -------------------- AppMessage model (start)
@@ -197,6 +201,10 @@ class DTCClientJSON(QtCore.QObject):
     message = QtCore.pyqtSignal(dict)  # raw DTC dict (added for app_manager fallback)
     messageReceived = QtCore.pyqtSignal(dict)  # same payload for compatibility
     errorOccurred = QtCore.pyqtSignal(str)
+    handshake_ready = QtCore.pyqtSignal()  # fires when DTC logon successful (handshake complete)
+    seed_ready = QtCore.pyqtSignal()  # fires when initial data queries complete (positions/orders/balance)
+
+    # DEPRECATED: Use handshake_ready instead
     session_ready = QtCore.pyqtSignal()  # fires when fully connected (post-logon)
 
     # -------------------- __init__ (start)
@@ -226,19 +234,41 @@ class DTCClientJSON(QtCore.QObject):
         self._binary_mode_suspected: bool = False
         self._awaiting_encoding_ack: bool = False
         self._encoding_ack_timer: Optional[QtCore.QTimer] = None
-        # Debug throttle state (ms since monotonic epoch)
-        self._debug_dump_next_allowed: float = 0.0
+
+        # ===== v2.0 ARCHITECTURE COMPONENTS =====
+        # Debug throttle (replaces _debug_dump_next_allowed)
+        self._debug_throttle = DebugThrottle()
+
+        # State machines for lifecycle tracking
+        self._position_tracker = PositionStateMachine()
+        self._order_tracker = OrderStateMachine()
+
+        # Initial data seeding tracker
+        self._seed_requests_pending: set[str] = set()  # Track which requests are pending
+        self._seed_requests_completed: set[str] = set()  # Track which completed
+
+        # Router error containment
+        self._router_error_count: int = 0
+        self._router_error_window_start: float = 0.0  # Monotonic clock
+        self._router_error_suppression_active: bool = False
 
     # -------------------- __init__ (end)
 
     # -------------------- Debug helpers (start)
-    def _allow_debug_dump(self, interval_ms: int = 2000) -> bool:
-        now_ms = time.monotonic() * 1000.0
-        next_allowed = getattr(self, "_debug_dump_next_allowed", 0.0)
-        if now_ms >= next_allowed:
-            self._debug_dump_next_allowed = now_ms + float(interval_ms)
-            return True
-        return False
+    def _allow_debug_dump(self, interval_ms: int = 2000, key: str = "default") -> bool:
+        """
+        Check if debug output is allowed (rate-limited).
+
+        UPGRADED (v2.0): Uses DebugThrottle utility for cleaner throttling.
+
+        Args:
+            interval_ms: Minimum milliseconds between outputs
+            key: Throttle key for independent rate limiting
+
+        Returns:
+            True if debug output is allowed
+        """
+        return self._debug_throttle.allow(key, interval_ms)
 
     # -------------------- Debug helpers (end)
 
@@ -304,7 +334,12 @@ class DTCClientJSON(QtCore.QObject):
     # -------------------- Handshake readiness (start)
     def _init_handshake_detector(self) -> None:
         """
-        Emit `session_ready` once fully connected.
+        UPGRADED (v2.0): Emit handshake_ready when DTC logon succeeds.
+
+        Separates handshake completion from data seeding completion.
+        - handshake_ready: DTC logon successful (transport layer ready)
+        - seed_ready: Initial data queries completed (application layer ready)
+
         Preferred: detect DTC LogonResponse(success) on the message stream.
         Fallback: short grace timer after raw TCP connect.
         """
@@ -312,7 +347,7 @@ class DTCClientJSON(QtCore.QObject):
         self._handshake_timer = QtCore.QTimer(self)
         self._handshake_timer.setSingleShot(True)
         self._handshake_timer.setInterval(1500)  # ms (adjust if your server is slower)
-        self._handshake_timer.timeout.connect(lambda: (log.info("dtc.session_ready.grace"), self.session_ready.emit()))
+        self._handshake_timer.timeout.connect(self._on_handshake_grace_timeout)
 
         # Preferred path: detect explicit LogonResponse(success)
         def _check_logon(msg: dict) -> None:
@@ -326,11 +361,7 @@ class DTCClientJSON(QtCore.QObject):
                 if result in ok_tokens or (isinstance(result, str) and result.upper() in ok_tokens):
                     if self._handshake_timer.isActive():
                         self._handshake_timer.stop()
-                    log.info("dtc.session_ready.logon")
-                    self.session_ready.emit()
-                    with contextlib.suppress(Exception):
-                        # Kick off initial data requests
-                        self._request_initial_data()
+                    self._on_handshake_complete()
             except Exception:
                 # Non-fatal (UI glue)
                 pass
@@ -338,6 +369,28 @@ class DTCClientJSON(QtCore.QObject):
         # Wire to our own raw message signal
         with contextlib.suppress(Exception):
             self.message.connect(_check_logon, type=QtCore.Qt.ConnectionType.UniqueConnection)
+
+    def _on_handshake_grace_timeout(self) -> None:
+        """Fallback: handshake timeout (no LogonResponse seen)."""
+        log.info("dtc.handshake_ready.grace_timeout")
+        self._on_handshake_complete()
+
+    def _on_handshake_complete(self) -> None:
+        """
+        Handshake complete - DTC logon successful.
+        Emit handshake_ready signal and kick off initial data requests.
+        """
+        log.info("dtc.handshake_ready.logon")
+
+        # Emit new signal
+        self.handshake_ready.emit()
+
+        # Emit deprecated signal for backward compatibility
+        self.session_ready.emit()
+
+        # Kick off initial data seeding
+        with contextlib.suppress(Exception):
+            self._request_initial_data()
 
     # -------------------- Handshake readiness (end)
 
