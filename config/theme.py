@@ -394,6 +394,7 @@ def compile_theme(mode: str) -> dict[str, Any]:
             "bg_elevated": "#000000",
             "bg_tertiary": "#0F0F1A",
             "card_bg": "#1A1F2E",
+            "graph_bg": "#0F0F1A",  # Graph background (always dark for visibility)
             # Muted text (grayscale)
             "ink": "#C0C0C0",
             "subtle_ink": "#9CA3AF",
@@ -432,6 +433,7 @@ def compile_theme(mode: str) -> dict[str, Any]:
             "bg_elevated": "#FFFFFF",
             "bg_tertiary": "#FAFAFA",
             "card_bg": "#FFFFFF",
+            "graph_bg": "#1A1F2E",  # Graph background (dark for readability even in light mode)
             # Dark text (for light mode)
             "ink": "#000000",
             "subtle_ink": "#4B5563",
@@ -465,6 +467,7 @@ def compile_theme(mode: str) -> dict[str, Any]:
             "bg_elevated": "#000000",
             "bg_tertiary": "#0F0F1A",
             "card_bg": "#1A1F2E",
+            "graph_bg": "#0F0F1A",  # Graph background (dark)
             # Gold text
             "ink": "#FFD700",
             "subtle_ink": "#9CA3AF",

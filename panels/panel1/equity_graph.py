@@ -85,8 +85,8 @@ def init_graph(panel) -> None:
         # Plot widget
         pg.setConfigOptions(antialias=True)
         panel._plot = pg.PlotWidget()
-        # CLEANUP FIX: Use theme color for graph background (removed hardcoded hex)
-        graph_bg = THEME.get("bg_tertiary", "#0F0F1A")  # Dark blue-gray for contrast
+        # Use dedicated graph_bg theme key for consistent dark background across all modes
+        graph_bg = THEME.get("graph_bg", "#0F0F1A")  # Dark background for graph visibility
         panel._plot.setBackground(graph_bg)
         panel._plot.setAttribute(QtCore.Qt.WidgetAttribute.WA_TranslucentBackground)
         panel._plot.setStyleSheet("background: transparent; border: none;")
