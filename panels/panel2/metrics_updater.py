@@ -338,31 +338,31 @@ def update_secondary_metrics(panel) -> None:
         panel.c_mfe.set_value_text("--")
         panel.c_mfe.set_value_color(THEME.get("text_dim", "#5B6C7A"))
 
-    # VWAP (LIVE from CSV feed) - updates every 500ms
+    # VWAP (ENTRY SNAPSHOT from CSV at position open) - frozen at entry time
     has_position = bool(getattr(panel, "entry_qty", 0) and panel.entry_qty > 0)
-    if has_position and panel.vwap is not None:
-        panel.c_vwap.set_value_text(f"{panel.vwap:.2f}")
+    if has_position and panel.entry_vwap is not None:
+        panel.c_vwap.set_value_text(f"{panel.entry_vwap:.2f}")
         color = THEME.get("text_primary", "#E6F6FF")
         if panel.entry_price is not None and panel.is_long is not None:
             if panel.is_long:
                 color = (
-                    THEME.get("pnl_neg_color", "#EF4444") if panel.vwap > panel.entry_price else THEME.get("pnl_pos_color", "#22C55E")
+                    THEME.get("pnl_neg_color", "#EF4444") if panel.entry_vwap > panel.entry_price else THEME.get("pnl_pos_color", "#22C55E")
                 )
             else:
                 color = (
-                    THEME.get("pnl_pos_color", "#22C55E") if panel.vwap > panel.entry_price else THEME.get("pnl_neg_color", "#EF4444")
+                    THEME.get("pnl_pos_color", "#22C55E") if panel.entry_vwap > panel.entry_price else THEME.get("pnl_neg_color", "#EF4444")
                 )
         panel.c_vwap.set_value_color(color)
     else:
         panel.c_vwap.set_value_text("--")
         panel.c_vwap.set_value_color(THEME.get("text_dim", "#5B6C7A"))
 
-    # Delta (LIVE from CSV feed) - updates every 500ms
-    if has_position and panel.cum_delta is not None:
-        panel.c_delta.set_value_text(f"{panel.cum_delta:,.0f}")
-        if panel.cum_delta > 0:
+    # Delta (ENTRY SNAPSHOT from CSV at position open) - frozen at entry time
+    if has_position and panel.entry_delta is not None:
+        panel.c_delta.set_value_text(f"{panel.entry_delta:,.0f}")
+        if panel.entry_delta > 0:
             panel.c_delta.set_value_color(THEME.get("pnl_pos_color", "#22C55E"))
-        elif panel.cum_delta < 0:
+        elif panel.entry_delta < 0:
             panel.c_delta.set_value_color(THEME.get("pnl_neg_color", "#EF4444"))
         else:
             panel.c_delta.set_value_color(THEME.get("pnl_neu_color", "#C9CDD0"))
@@ -413,19 +413,19 @@ def update_secondary_metrics(panel) -> None:
         panel.c_pts.set_value_text("--")
         panel.c_pts.set_value_color(THEME.get("text_dim", "#5B6C7A"))
 
-    # POC (LIVE from CSV feed) - updates every 500ms
+    # POC (ENTRY SNAPSHOT from CSV at position open) - frozen at entry time
     # Uses same color logic as VWAP (quality signal based on entry vs POC)
-    if has_position and panel.poc is not None:
-        panel.c_poc.set_value_text(f"{panel.poc:.2f}")
+    if has_position and panel.entry_poc is not None:
+        panel.c_poc.set_value_text(f"{panel.entry_poc:.2f}")
         color = THEME.get("text_primary", "#E6F6FF")
         if panel.entry_price is not None and panel.is_long is not None:
             if panel.is_long:
                 color = (
-                    THEME.get("pnl_neg_color", "#EF4444") if panel.poc > panel.entry_price else THEME.get("pnl_pos_color", "#22C55E")
+                    THEME.get("pnl_neg_color", "#EF4444") if panel.entry_poc > panel.entry_price else THEME.get("pnl_pos_color", "#22C55E")
                 )
             else:
                 color = (
-                    THEME.get("pnl_pos_color", "#22C55E") if panel.poc > panel.entry_price else THEME.get("pnl_neg_color", "#EF4444")
+                    THEME.get("pnl_pos_color", "#22C55E") if panel.entry_poc > panel.entry_price else THEME.get("pnl_neg_color", "#EF4444")
                 )
         panel.c_poc.set_value_color(color)
     else:
