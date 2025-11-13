@@ -64,7 +64,7 @@ class PositionDisplay:
         self.c_heat = MetricCell("Heat", "--")
         self.grid_layout.addWidget(self.c_heat, self.row_offset + 1, 1)
 
-        log.info("position_display.initialized", msg="Position display cells created")
+        log.info("Position display cells created")
 
     def update_from_position(self, position: Position):
         """

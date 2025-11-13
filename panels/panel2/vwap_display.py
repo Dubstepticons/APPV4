@@ -53,7 +53,7 @@ class VWAPDisplay:
         self.c_entry_delta = MetricCell("Entry Delta", "--")
         self.grid_layout.addWidget(self.c_entry_delta, self.row_offset + 0, 2)
 
-        log.info("vwap_display.initialized", msg="VWAP display cells created")
+        log.info("VWAP display cells created")
 
     def update_entry_snapshots(self, position: Position):
         """

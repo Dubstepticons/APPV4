@@ -66,7 +66,7 @@ class PnLDisplay:
         self.c_risk = MetricCell("Risk", "--")
         self.grid_layout.addWidget(self.c_risk, self.row_offset + 1, 2)
 
-        log.info("pnl_display.initialized", msg="P&L display cells created")
+        log.info("P&L display cells created")
 
     def update_from_position(self, position: Position, last_price: Optional[float]):
         """

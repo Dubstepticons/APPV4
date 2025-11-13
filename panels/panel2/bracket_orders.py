@@ -50,7 +50,7 @@ class BracketOrders:
         self.c_stop = MetricCell("Stop", "--")
         self.grid_layout.addWidget(self.c_stop, self.row_offset + 0, 1)
 
-        log.info("bracket_orders.initialized", msg="Bracket order cells created")
+        log.info("Bracket order cells created")
 
     def update_from_position(self, position: Position):
         """

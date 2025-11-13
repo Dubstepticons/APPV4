@@ -146,7 +146,7 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         # Chart integration (no UI cells, handles data feed)
         self.chart_integration = ChartIntegration(self, CSV_FEED_PATH)
 
-        log.info("panel2.built", msg="Panel2 UI built with modular architecture")
+        log.info("Panel2 UI built with modular architecture")
 
     def _setup_timers(self):
         """Setup CSV feed timer (500ms) and clock timer (1s)."""
