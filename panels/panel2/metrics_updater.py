@@ -1,12 +1,19 @@
 """
 Metrics Updater Module
 
-Handles live metrics calculation and cell updates for Panel2 (Trading panel).
-Extracted from panels/panel2.py for modularity.
+PURE CALCULATION MODULE for Panel2 metrics.
+
+Architecture Contract:
+- All functions accept Panel2State as clean input
+- NO state mutations (read-only access to state)
+- NO panel field access (except for UI widget updates)
+- Returns computed values or updates UI widgets directly
+- Heat timer logic returns start/stop signals, doesn't mutate state
 
 Functions:
 - refresh_all_cells(): Orchestrate all cell updates
 - update_price_cell(): Update qty @ entry display
+- calculate_heat(): Calculate heat duration and start/stop signals
 - update_time_and_heat_cells(): Duration and heat state machine
 - update_target_stop_cells(): Target and stop prices with proximity alerts
 - update_secondary_metrics(): Complex metrics (R-multiple, MAE/MFE, efficiency, etc.)
@@ -20,11 +27,12 @@ Constants:
 """
 
 import time
-from typing import Optional
+from typing import Optional, Tuple
 from config.theme import THEME, ColorTheme
 from config.trading_specs import match_spec
 from services.trade_math import TradeMath
 from utils.logger import get_logger
+from panels.panel2.state_manager import Panel2State
 
 log = get_logger(__name__)
 
@@ -34,7 +42,7 @@ HEAT_ALERT_FLASH_SEC = 4 * 60 + 30  # 4:30 m (start flashing)
 HEAT_ALERT_SOLID_SEC = 5 * 60  # 5:00 m (red + flash remain)
 
 
-def refresh_all_cells(panel, initial: bool = False) -> None:
+def refresh_all_cells(panel, state: Panel2State, initial: bool = False) -> None:
     """
     Orchestrate refresh of all metric cells.
 
@@ -42,11 +50,12 @@ def refresh_all_cells(panel, initial: bool = False) -> None:
     If in position, calculates and updates all metrics.
 
     Args:
-        panel: Panel2 instance
+        panel: Panel2 instance (for UI widget access only)
+        state: Panel2State instance (read-only)
         initial: True if this is the initial UI setup
     """
     # If flat (no position), set all cells to dashes and exit
-    if not (getattr(panel, "entry_qty", 0) and panel.entry_price is not None):
+    if state.is_flat():
         dim_color = THEME.get("text_dim", "#5B6C7A")
         # Set all 15 cells to "--"
         panel.c_price.set_value_text("--")
@@ -83,46 +92,102 @@ def refresh_all_cells(panel, initial: bool = False) -> None:
         panel.c_pts.set_value_color(dim_color)
 
         # Update banner to show "LIVE POSITION" and "FLAT"
-        update_live_banner(panel)
+        update_live_banner(panel, state)
         return
 
     # Only calculate values if we have a position
     # Price cell: "QTY @ ENTRY" all green/red by direction
-    update_price_cell(panel)
+    update_price_cell(panel, state)
 
     # Time & Heat (text & color thresholds)
-    update_time_and_heat_cells(panel)
+    update_time_and_heat_cells(panel, state)
 
     # Target / Stop (and stop flashing if within 1.0 pt)
-    update_target_stop_cells(panel)
+    update_target_stop_cells(panel, state)
 
     # Risk, R, Range, MAE, MFE, VWAP, Delta, Efficiency, Pts, $PnL
-    update_secondary_metrics(panel)
+    update_secondary_metrics(panel, state)
 
     # Keep the banner in sync with the latest price
-    update_live_banner(panel)
+    update_live_banner(panel, state)
 
     if initial:
         log.info("[panel2] UI initialized -- metrics grid active")
 
 
-def update_price_cell(panel) -> None:
+def update_price_cell(panel, state: Panel2State) -> None:
     """
     Update price cell with qty @ entry price.
 
     Color: Green for long, red for short.
 
     Args:
-        panel: Panel2 instance
+        panel: Panel2 instance (for UI widget access only)
+        state: Panel2State instance (read-only)
     """
     # Position guaranteed to exist when this is called
-    txt = f"{panel.entry_qty} @ {panel.entry_price:.2f}"
-    color = ColorTheme.pnl_color_from_direction(panel.is_long)
+    txt = f"{state.entry_qty} @ {state.entry_price:.2f}"
+    color = ColorTheme.pnl_color_from_direction(state.is_long)
     panel.c_price.set_value_text(txt)
     panel.c_price.set_value_color(color)
 
 
-def update_time_and_heat_cells(panel) -> None:
+def calculate_heat(state: Panel2State) -> Tuple[int, bool, bool]:
+    """
+    Calculate heat duration and determine if heat timer should start/stop.
+
+    PURE FUNCTION: Does NOT mutate state.heat_start_epoch.
+    Returns signals for caller to update state.
+
+    Heat logic:
+    - Heat starts when price goes underwater (below entry for long, above for short)
+    - Heat pauses when price goes back above water
+    - Heat is cumulative over the trade lifetime
+
+    Args:
+        state: Panel2State instance (read-only)
+
+    Returns:
+        Tuple of (heat_seconds, should_start, should_stop)
+        - heat_seconds: Current heat duration (0 if not in heat)
+        - should_start: True if heat timer should start now
+        - should_stop: True if heat timer should stop now
+    """
+    heat_sec = 0
+    should_start = False
+    should_stop = False
+
+    # Check if we have all data needed for heat calculation
+    if state.entry_price is None or state.last_price is None or state.is_long is None:
+        # Can't calculate heat without price data
+        return (0, False, bool(state.heat_start_epoch))  # Stop if running
+
+    # Calculate if position is in drawdown (underwater)
+    in_dd = (state.last_price < state.entry_price) if state.is_long else (state.last_price > state.entry_price)
+
+    if in_dd:
+        # Underwater - heat should be running
+        if state.heat_start_epoch is None:
+            # Heat not running - signal to start
+            should_start = True
+            heat_sec = 0
+        else:
+            # Heat already running - calculate duration
+            heat_sec = int(time.time() - state.heat_start_epoch)
+    else:
+        # Above water - heat should be paused
+        if state.heat_start_epoch is not None:
+            # Heat running - signal to stop
+            should_stop = True
+            heat_sec = 0
+        else:
+            # Heat not running - stay paused
+            heat_sec = 0
+
+    return (heat_sec, should_start, should_stop)
+
+
+def update_time_and_heat_cells(panel, state: Panel2State) -> None:
     """
     Update duration and heat cells.
 
@@ -135,12 +200,16 @@ def update_time_and_heat_cells(panel) -> None:
     - ALERT FLASH (4:30 - 5:00): orange color, flashing border
     - ALERT SOLID (>= 5:00): red color, flashing border
 
+    CRITICAL: This function does NOT mutate state. It calculates heat and returns
+    signals for the caller to update state_manager.
+
     Args:
-        panel: Panel2 instance
+        panel: Panel2 instance (for UI widget access only)
+        state: Panel2State instance (read-only)
     """
     # Duration
-    if panel.entry_time_epoch:
-        dur_sec = int(time.time() - panel.entry_time_epoch)
+    if state.entry_time_epoch:
+        dur_sec = int(time.time() - state.entry_time_epoch)
         panel.c_time.set_value_text(TradeMath.fmt_time_human(dur_sec))
         panel.c_time.set_value_color(THEME.get("text_primary", "#E6F6FF"))
     else:
@@ -148,45 +217,25 @@ def update_time_and_heat_cells(panel) -> None:
         panel.c_time.set_value_color(THEME.get("text_dim", "#5B6C7A"))
 
     # Heat: measured only when in drawdown relative to entry
-    has_position = bool(getattr(panel, "entry_qty", 0) and panel.entry_qty > 0)
-
-    if not has_position:
+    if state.is_flat():
         # No position - show "--"
         panel.c_heat.set_value_text("--")
         panel.c_heat.set_value_color(THEME.get("text_dim", "#5B6C7A"))
         panel.c_heat.stop_flashing()
     else:
-        # In position - calculate and display heat
-        heat_sec = 0
+        # In position - calculate heat (pure function, no mutations)
+        heat_sec, should_start, should_stop = calculate_heat(state)
 
-        # CRITICAL FIX: Check conditions separately for better debugging
-        if panel.entry_price is not None and panel.last_price is not None and panel.is_long is not None:
-            # Calculate if position is in drawdown (underwater)
-            in_dd = (panel.last_price < panel.entry_price) if panel.is_long else (panel.last_price > panel.entry_price)
+        # Log heat transitions (informational only, doesn't mutate state)
+        if should_start:
+            log.info(f"[panel2] Heat timer should START (entry: {state.entry_price}, last: {state.last_price}, {'LONG' if state.is_long else 'SHORT'})")
+        elif should_stop:
+            log.info(f"[panel2] Heat timer should PAUSE (back above water)")
 
-            # DEBUG: Log drawdown state on transitions
-            if in_dd and panel.heat_start_epoch is None:
-                log.info(f"[panel2] Heat timer STARTING - Underwater (entry: {panel.entry_price}, last: {panel.last_price}, {'LONG' if panel.is_long else 'SHORT'})")
-
-            if in_dd:
-                # Start heat timer if underwater
-                if panel.heat_start_epoch is None:
-                    panel.heat_start_epoch = int(time.time())
-                    log.info("[panel2] Heat timer started (drawdown detected)")
-            else:
-                # Pause heat timer if back above water
-                if panel.heat_start_epoch is not None:
-                    elapsed = int(time.time() - panel.heat_start_epoch)
-                    log.info(f"[panel2] Heat timer paused (drawdown ended) - was underwater for {elapsed}s")
-                panel.heat_start_epoch = None
-        else:
-            # CRITICAL: Log missing data that prevents heat timer
-            if panel.entry_price is None or panel.last_price is None or panel.is_long is None:
-                log.warning(f"[panel2] Heat timer BLOCKED - Missing: entry_price={panel.entry_price}, last_price={panel.last_price}, is_long={panel.is_long}")
-
-        # Calculate heat duration
-        if panel.heat_start_epoch is not None:
-            heat_sec = int(time.time() - panel.heat_start_epoch)
+        # Store signals in panel for caller to handle
+        # This is a temporary bridge until we refactor the timer to be state-manager driven
+        panel._heat_should_start = should_start
+        panel._heat_should_stop = should_stop
 
         panel.c_heat.set_value_text(TradeMath.fmt_time_human(heat_sec))
 
@@ -209,7 +258,7 @@ def update_time_and_heat_cells(panel) -> None:
                 panel.c_heat.start_flashing(border_color=flash_color)
 
 
-def update_target_stop_cells(panel) -> None:
+def update_target_stop_cells(panel, state: Panel2State) -> None:
     """
     Update target and stop cells with proximity alerts.
 
@@ -217,21 +266,22 @@ def update_target_stop_cells(panel) -> None:
     Stop: Show stop price, flash red when within 1.0 point
 
     Args:
-        panel: Panel2 instance
+        panel: Panel2 instance (for UI widget access only)
+        state: Panel2State instance (read-only)
     """
     # Target
-    if panel.target_price is not None:
-        panel.c_target.set_value_text(f"{panel.target_price:.2f}")
+    if state.target_price is not None:
+        panel.c_target.set_value_text(f"{state.target_price:.2f}")
         panel.c_target.set_value_color(THEME.get("text_primary", "#E6F6FF"))
     else:
         panel.c_target.set_value_text("--")
         panel.c_target.set_value_color(THEME.get("text_dim", "#5B6C7A"))
 
     # Stop (flash when price within 1.0 point of stop)
-    if panel.stop_price is not None:
-        panel.c_stop.set_value_text(f"{panel.stop_price:.2f}")
+    if state.stop_price is not None:
+        panel.c_stop.set_value_text(f"{state.stop_price:.2f}")
         near = False
-        if panel.last_price is not None and abs(panel.last_price - panel.stop_price) <= 1.0:
+        if state.last_price is not None and abs(state.last_price - state.stop_price) <= 1.0:
             near = True
         if near:
             panel.c_stop.set_value_color(THEME.get("accent_alert", "#DC2626"))
@@ -245,7 +295,7 @@ def update_target_stop_cells(panel) -> None:
         panel.c_stop.stop_flashing()
 
 
-def update_secondary_metrics(panel) -> None:
+def update_secondary_metrics(panel, state: Panel2State) -> None:
     """
     Update all secondary metrics cells.
 
@@ -261,13 +311,14 @@ def update_secondary_metrics(panel) -> None:
     - POC: Point of control at entry
 
     Args:
-        panel: Panel2 instance
+        panel: Panel2 instance (for UI widget access only)
+        state: Panel2State instance (read-only)
     """
     # Position guaranteed to exist when this is called
 
     # CRITICAL: Validate that we have all necessary data from PositionUpdate
     # before calculating risk metrics (entry_price, stop_price, target_price)
-    if panel.entry_price is None:
+    if state.entry_price is None:
         # No entry price from PositionUpdate - cannot calculate risk
         panel.c_risk.set_value_text("--")
         panel.c_risk.set_value_color(THEME.get("text_dim", "#5B6C7A"))
@@ -277,11 +328,11 @@ def update_secondary_metrics(panel) -> None:
 
     # Planned Risk (always red, no negative sign shown)
     # Formula: |entry - stop| * pt_value * qty + commission (symbol-aware)
-    if panel.stop_price is not None:
-        spec = match_spec(panel.symbol)
-        dist_pts = abs(panel.entry_price - panel.stop_price)
-        dollars = dist_pts * spec["pt_value"] * panel.entry_qty
-        comm = spec["rt_fee"] * panel.entry_qty
+    if state.stop_price is not None:
+        spec = match_spec(state.symbol)
+        dist_pts = abs(state.entry_price - state.stop_price)
+        dollars = dist_pts * spec["pt_value"] * state.entry_qty
+        comm = spec["rt_fee"] * state.entry_qty
         planned = dollars + comm
         panel.c_risk.set_value_text(f"${planned:,.2f}")
         panel.c_risk.set_value_color(THEME.get("pnl_neg_color", "#EF4444"))
@@ -291,10 +342,10 @@ def update_secondary_metrics(panel) -> None:
 
     # R-Multiple = (Current - Entry) / (Entry - Stop)
     # Only calculate if we have all required values from PositionUpdate
-    if panel.stop_price is not None and panel.last_price is not None and panel.entry_price is not None:
-        denom = panel.entry_price - panel.stop_price
+    if state.stop_price is not None and state.last_price is not None and state.entry_price is not None:
+        denom = state.entry_price - state.stop_price
         if abs(denom) > 1e-9:
-            r_mult = (panel.last_price - panel.entry_price) / denom
+            r_mult = (state.last_price - state.entry_price) / denom
             panel.c_rmult.set_value_text(f"{r_mult:.2f} R")
             if r_mult > 0:
                 panel.c_rmult.set_value_color(THEME.get("pnl_pos_color", "#22C55E"))
@@ -310,8 +361,8 @@ def update_secondary_metrics(panel) -> None:
         panel.c_rmult.set_value_color(THEME.get("text_dim", "#5B6C7A"))
 
     # Range = distance from target compared to live price (signed with +/−)
-    if panel.target_price is not None and panel.last_price is not None:
-        dist = (panel.target_price - panel.last_price) * (1 if panel.is_long else -1)
+    if state.target_price is not None and state.last_price is not None:
+        dist = (state.target_price - state.last_price) * (1 if state.is_long else -1)
         sign_char = "+" if dist >= 0 else "-"
         panel.c_range.set_value_text(f"{sign_char}{abs(dist):.2f} pt")
         panel.c_range.set_value_color(THEME.get("text_primary", "#E6F6FF"))
@@ -321,10 +372,10 @@ def update_secondary_metrics(panel) -> None:
 
     # MAE / MFE using TradeMath
     mae_pts, mfe_pts = TradeMath.calculate_mae_mfe(
-        entry_price=panel.entry_price,
-        trade_min_price=panel._trade_min_price,
-        trade_max_price=panel._trade_max_price,
-        is_long=panel.is_long,
+        entry_price=state.entry_price,
+        trade_min_price=state.trade_min_price,
+        trade_max_price=state.trade_max_price,
+        is_long=state.is_long,
     )
     if mae_pts is not None and mfe_pts is not None:
         panel.c_mae.set_value_text(f"{mae_pts:.2f} pt")
@@ -339,18 +390,17 @@ def update_secondary_metrics(panel) -> None:
         panel.c_mfe.set_value_color(THEME.get("text_dim", "#5B6C7A"))
 
     # VWAP (ENTRY SNAPSHOT from CSV at position open) - frozen at entry time
-    has_position = bool(getattr(panel, "entry_qty", 0) and panel.entry_qty > 0)
-    if has_position and panel.entry_vwap is not None:
-        panel.c_vwap.set_value_text(f"{panel.entry_vwap:.2f}")
+    if state.has_position() and state.entry_vwap is not None:
+        panel.c_vwap.set_value_text(f"{state.entry_vwap:.2f}")
         color = THEME.get("text_primary", "#E6F6FF")
-        if panel.entry_price is not None and panel.is_long is not None:
-            if panel.is_long:
+        if state.entry_price is not None and state.is_long is not None:
+            if state.is_long:
                 color = (
-                    THEME.get("pnl_neg_color", "#EF4444") if panel.entry_vwap > panel.entry_price else THEME.get("pnl_pos_color", "#22C55E")
+                    THEME.get("pnl_neg_color", "#EF4444") if state.entry_vwap > state.entry_price else THEME.get("pnl_pos_color", "#22C55E")
                 )
             else:
                 color = (
-                    THEME.get("pnl_pos_color", "#22C55E") if panel.entry_vwap > panel.entry_price else THEME.get("pnl_neg_color", "#EF4444")
+                    THEME.get("pnl_pos_color", "#22C55E") if state.entry_vwap > state.entry_price else THEME.get("pnl_neg_color", "#EF4444")
                 )
         panel.c_vwap.set_value_color(color)
     else:
@@ -358,11 +408,11 @@ def update_secondary_metrics(panel) -> None:
         panel.c_vwap.set_value_color(THEME.get("text_dim", "#5B6C7A"))
 
     # Delta (ENTRY SNAPSHOT from CSV at position open) - frozen at entry time
-    if has_position and panel.entry_delta is not None:
-        panel.c_delta.set_value_text(f"{panel.entry_delta:,.0f}")
-        if panel.entry_delta > 0:
+    if state.has_position() and state.entry_delta is not None:
+        panel.c_delta.set_value_text(f"{state.entry_delta:,.0f}")
+        if state.entry_delta > 0:
             panel.c_delta.set_value_color(THEME.get("pnl_pos_color", "#22C55E"))
-        elif panel.entry_delta < 0:
+        elif state.entry_delta < 0:
             panel.c_delta.set_value_color(THEME.get("pnl_neg_color", "#EF4444"))
         else:
             panel.c_delta.set_value_color(THEME.get("pnl_neu_color", "#C9CDD0"))
@@ -374,16 +424,16 @@ def update_secondary_metrics(panel) -> None:
     # Position guaranteed, so entry_price, last_price, is_long exist
     # Uses TRADE max price (not session high) for accurate MFE
     eff_val: Optional[float] = None
-    if panel.last_price is not None:
+    if state.last_price is not None:
         # Calculate current P&L in points
-        pnl_pts = (panel.last_price - panel.entry_price) if panel.is_long else (panel.entry_price - panel.last_price)
+        pnl_pts = (state.last_price - state.entry_price) if state.is_long else (state.entry_price - state.last_price)
 
         # Get MFE using TradeMath
         _, mfe_pts = TradeMath.calculate_mae_mfe(
-            entry_price=panel.entry_price,
-            trade_min_price=panel._trade_min_price,
-            trade_max_price=panel._trade_max_price,
-            is_long=panel.is_long,
+            entry_price=state.entry_price,
+            trade_min_price=state.trade_min_price,
+            trade_max_price=state.trade_max_price,
+            is_long=state.is_long,
         )
 
         # Calculate efficiency if MFE is positive
@@ -404,8 +454,8 @@ def update_secondary_metrics(panel) -> None:
 
     # Points PnL
     # Position guaranteed, so entry_price, is_long exist
-    if panel.last_price is not None:
-        pnl_pts = (panel.last_price - panel.entry_price) * (1 if panel.is_long else -1)
+    if state.last_price is not None:
+        pnl_pts = (state.last_price - state.entry_price) * (1 if state.is_long else -1)
         sign_char = "+" if pnl_pts >= 0 else "-"
         panel.c_pts.set_value_text(f"{sign_char}{abs(pnl_pts):.2f} pt")
         panel.c_pts.set_value_color(ColorTheme.pnl_color_from_value(pnl_pts))
@@ -415,17 +465,17 @@ def update_secondary_metrics(panel) -> None:
 
     # POC (ENTRY SNAPSHOT from CSV at position open) - frozen at entry time
     # Uses same color logic as VWAP (quality signal based on entry vs POC)
-    if has_position and panel.entry_poc is not None:
-        panel.c_poc.set_value_text(f"{panel.entry_poc:.2f}")
+    if state.has_position() and state.entry_poc is not None:
+        panel.c_poc.set_value_text(f"{state.entry_poc:.2f}")
         color = THEME.get("text_primary", "#E6F6FF")
-        if panel.entry_price is not None and panel.is_long is not None:
-            if panel.is_long:
+        if state.entry_price is not None and state.is_long is not None:
+            if state.is_long:
                 color = (
-                    THEME.get("pnl_neg_color", "#EF4444") if panel.entry_poc > panel.entry_price else THEME.get("pnl_pos_color", "#22C55E")
+                    THEME.get("pnl_neg_color", "#EF4444") if state.entry_poc > state.entry_price else THEME.get("pnl_pos_color", "#22C55E")
                 )
             else:
                 color = (
-                    THEME.get("pnl_pos_color", "#22C55E") if panel.entry_poc > panel.entry_price else THEME.get("pnl_neg_color", "#EF4444")
+                    THEME.get("pnl_pos_color", "#22C55E") if state.entry_poc > state.entry_price else THEME.get("pnl_neg_color", "#EF4444")
                 )
         panel.c_poc.set_value_color(color)
     else:
@@ -433,7 +483,7 @@ def update_secondary_metrics(panel) -> None:
         panel.c_poc.set_value_color(THEME.get("text_dim", "#5B6C7A"))
 
 
-def update_live_banner(panel) -> None:
+def update_live_banner(panel, state: Panel2State) -> None:
     """
     Update symbol and live price display in banner.
 
@@ -441,44 +491,46 @@ def update_live_banner(panel) -> None:
     Live Price: Shows "FLAT" when not in position, current price when in position
 
     Args:
-        panel: Panel2 instance
+        panel: Panel2 instance (for UI widget access only)
+        state: Panel2State instance (read-only)
     """
     if not hasattr(panel, "live_banner") or not hasattr(panel, "symbol_banner"):
         return
 
     # Check if we have an active position
-    has_position = bool(panel.entry_qty and panel.entry_qty > 0)
+    has_position = state.has_position()
 
     # Symbol (left) - shows "--" when flat, symbol when in position
     if has_position:
-        panel.symbol_banner.setText(panel.symbol)
+        panel.symbol_banner.setText(state.symbol)
     else:
         panel.symbol_banner.setText("--")
 
     # Live price (right) - shows "FLAT" when not in position, current market price when in position
     if has_position:
-        if panel.last_price is not None:
-            panel.live_banner.setText(f"{panel.last_price:.2f}")
+        if state.last_price is not None:
+            panel.live_banner.setText(f"{state.last_price:.2f}")
         else:
             panel.live_banner.setText("--")
     else:
         panel.live_banner.setText("FLAT")
 
 
-def update_proximity_alerts(panel) -> None:
+def update_proximity_alerts(panel, state: Panel2State) -> None:
     """
     Update proximity alerts for stop loss.
 
     Logs when price transitions into/out of proximity range (within 1.0 point).
 
     Args:
-        panel: Panel2 instance
+        panel: Panel2 instance (for UI widget access only)
+        state: Panel2State instance (read-only)
     """
     # Stop proximity already handled in update_target_stop_cells;
     # here we only emit logs on transitions to reduce noise.
-    if panel.stop_price is None or panel.last_price is None:
+    if state.stop_price is None or state.last_price is None:
         return
-    near = abs(panel.last_price - panel.stop_price) <= 1.0
+    near = abs(state.last_price - state.stop_price) <= 1.0
     prev_key = "_stop_near_prev"
     was_near = getattr(panel, prev_key, None)
     if was_near is None or was_near != near:
@@ -487,5 +539,3 @@ def update_proximity_alerts(panel) -> None:
             log.warning("[panel2] Stop proximity detected -- flashing active")
         else:
             log.info("[panel2] Stop proximity cleared -- flashing off")
-
-
