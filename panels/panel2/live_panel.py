@@ -322,12 +322,6 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         if not updated:
             return
 
-        # Log state changes only
-        if self.vwap != prev[3]:
-            log.info(f"[panel2] Feed updated -- VWAP changed: {self.vwap}")
-        if self.cum_delta != prev[4]:
-            log.info(f"[panel2] Feed updated -- Delta changed: {self.cum_delta}")
-
         # Track per-trade min/max while in position for MAE/MFE
         try:
             if self.entry_qty and self.last_price is not None:
