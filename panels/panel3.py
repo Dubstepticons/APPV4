@@ -193,15 +193,16 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
         Called when trading mode switches (DEBUG/SIM/LIVE) to update pill colors.
         """
         with contextlib.suppress(Exception):
-            if hasattr(self.tf_pills, "set_active_color"):
-                # Clear cached color to force refresh
-                if hasattr(self.tf_pills, "_last_active_hex"):
-                    delattr(self.tf_pills, "_last_active_hex")
-                # Re-read color from THEME based on Total PnL (done in _load_metrics_for_timeframe)
-                # For now, just force a re-application by calling set_active_color with neutral
-                from config.theme import ColorTheme
+            if not hasattr(self.tf_pills, "set_active_color"):
+                return
+            # Clear cached color to force refresh
+            if hasattr(self.tf_pills, "_last_active_hex"):
+                delattr(self.tf_pills, "_last_active_hex")
+            # Re-read color from THEME based on Total PnL (done in _load_metrics_for_timeframe)
+            # For now, just force a re-application by calling set_active_color with neutral
+            from config.theme import ColorTheme
 
-                self.tf_pills.set_active_color(THEME.get("pnl_neu_color", "#9CA3AF"))
+            self.tf_pills.set_active_color(THEME.get("pnl_neu_color", "#9CA3AF"))
 
     # -------------------- Public API -----------------------------------------
     def update_metrics(self, data: dict[str, Any]) -> None:

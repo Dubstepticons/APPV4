@@ -1283,7 +1283,7 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             return
         self._tf = tf
         # Update LIVE dot/pulse and color
-        try:
+        with contextlib.suppress(Exception):
             if hasattr(self.pills, "set_live_dot_visible"):
                 self.pills.set_live_dot_visible(True)
             if hasattr(self.pills, "set_live_dot_pulsing"):
@@ -1295,28 +1295,25 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                     else THEME.get("pnl_neu_color", "#C9CDD0")
                 )
                 self.pills.set_active_color(color)
-        except Exception:
-            pass
 
     def refresh_pill_colors(self) -> None:
         """
         Force timeframe pills to refresh their colors from THEME.
         Called when trading mode switches (DEBUG/SIM/LIVE) to update pill colors.
         """
-        try:
-            if hasattr(self.pills, "set_active_color"):
-                # Clear cached color to force refresh
-                if hasattr(self.pills, "_last_active_hex"):
-                    delattr(self.pills, "_last_active_hex")
-                # Re-read color from THEME and apply
-                color = (
-                    ColorTheme.pnl_color_from_direction(self._pnl_up)
-                    if self._pnl_up is not None
-                    else THEME.get("pnl_neu_color", "#C9CDD0")
-                )
-                self.pills.set_active_color(color)
-        except Exception:
-            pass
+        with contextlib.suppress(Exception):
+            if not hasattr(self.pills, "set_active_color"):
+                return
+            # Clear cached color to force refresh
+            if hasattr(self.pills, "_last_active_hex"):
+                delattr(self.pills, "_last_active_hex")
+            # Re-read color from THEME and apply
+            color = (
+                ColorTheme.pnl_color_from_direction(self._pnl_up)
+                if self._pnl_up is not None
+                else THEME.get("pnl_neu_color", "#C9CDD0")
+            )
+            self.pills.set_active_color(color)
 
     # -------------------- Timeframe handling (end)
 

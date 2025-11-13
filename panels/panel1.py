@@ -802,11 +802,10 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
     def _ensure_live_pill_dot(self, initial: bool = False) -> None:
         """Ensure the LIVE dot exists and set a sane initial pulsing state."""
         with contextlib.suppress(Exception):
-            if hasattr(self, "pills") and self.pills:
-                if hasattr(self.pills, "set_live_dot_visible"):
-                    self.pills.set_live_dot_visible(True)
-                if hasattr(self.pills, "set_live_dot_pulsing"):
-                    self.pills.set_live_dot_pulsing(False if initial else (self._tf == "LIVE"))
+            if hasattr(self, "pills") and self.pills and hasattr(self.pills, "set_live_dot_visible"):
+                self.pills.set_live_dot_visible(True)
+            if hasattr(self, "pills") and self.pills and hasattr(self.pills, "set_live_dot_pulsing"):
+                self.pills.set_live_dot_pulsing(False if initial else (self._tf == "LIVE"))
 
     def set_timeframe(self, tf: str) -> None:
         """
