@@ -697,9 +697,8 @@ def set_trading_mode(panel, mode: str, account: Optional[str] = None) -> None:
 
     # 1. Freeze: Current state automatically preserved in scoped dict
 
-    # 2. Swap: Update active scope
-    panel.current_mode = mode
-    panel.current_account = account
+    # 2. Swap: Update active scope (single source of truth)
+    # current_mode and current_account are properties that derive from _active_scope
     panel._active_scope = new_scope
 
     # 3. Reload: Get equity curve for new scope

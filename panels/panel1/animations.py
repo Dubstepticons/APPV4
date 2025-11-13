@@ -82,6 +82,9 @@ def on_pulse_tick(panel) -> None:
                 panel._endpoint.setData([], [])
             for ripple in getattr(panel, "_ripple_items", []) or []:
                 ripple.setData([], [])
+            # Clear glow line to prevent ghost glow on non-LIVE/1D timeframes
+            if getattr(panel, "_glow_line", None):
+                panel._glow_line.setData([], [])
         except Exception:
             pass
         return
@@ -187,10 +190,11 @@ def update_live_pill_dot(panel, pulsing: bool) -> None:
         pulsing: True to enable pulsing animation, False to disable
     """
     try:
-        if hasattr(panel.pills, "set_live_dot_visible"):
-            panel.pills.set_live_dot_visible(True)
-        if hasattr(panel.pills, "set_live_dot_pulsing"):
-            panel.pills.set_live_dot_pulsing(bool(pulsing))
+        if hasattr(panel, "pills") and panel.pills:
+            if hasattr(panel.pills, "set_live_dot_visible"):
+                panel.pills.set_live_dot_visible(True)
+            if hasattr(panel.pills, "set_live_dot_pulsing"):
+                panel.pills.set_live_dot_pulsing(bool(pulsing))
     except Exception:
         pass
 

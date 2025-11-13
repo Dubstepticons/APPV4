@@ -33,15 +33,26 @@ except ImportError:
 
 def has_graph(panel) -> bool:
     """
-    Check if graph is available and initialized.
+    Check if graph is available and fully initialized.
+
+    Checks:
+    - pyqtgraph is available
+    - _plot exists
+    - _vb (viewbox) exists
+    - _line exists
 
     Args:
         panel: Panel1 instance
 
     Returns:
-        True if graph is available, False otherwise
+        True if graph is fully initialized, False otherwise
     """
-    return (pg is not None) and (getattr(panel, "_plot", None) is not None)
+    return (
+        pg is not None
+        and getattr(panel, "_plot", None) is not None
+        and getattr(panel, "_vb", None) is not None
+        and getattr(panel, "_line", None) is not None
+    )
 
 
 # ================================================================================

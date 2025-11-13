@@ -96,13 +96,9 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
         # Thread safety: QMutex for equity curve access (CRITICAL FIX for race conditions)
         self._equity_mutex = QtCore.QMutex()
 
-        # Current active scope
-        self.current_mode: str = "SIM"
-        self.current_account: str = ""
+        # Current active scope - SINGLE SOURCE OF TRUTH for mode/account state
+        # current_mode and current_account are properties that derive from this
         self._active_scope: tuple[str, str] = ("SIM", "")
-
-        # Display mode tracking (initialized to SIM, updated via _on_mode_changed)
-        self._current_display_mode: str = "SIM"
 
         # Legacy compatibility - points to active curve
         self._equity_points: list[tuple[float, float]] = []
@@ -192,6 +188,30 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
         # Schedule size check after UI is fully rendered
         from panels.panel1 import animations
         QtCore.QTimer.singleShot(500, lambda: animations.debug_sizes(self))
+
+    # ================================================================================
+    # Mode/Account State Properties (derived from _active_scope)
+    # ================================================================================
+
+    @property
+    def current_mode(self) -> str:
+        """Current trading mode (derived from _active_scope)."""
+        return self._active_scope[0]
+
+    @current_mode.setter
+    def current_mode(self, value: str) -> None:
+        """Set current mode (updates _active_scope)."""
+        self._active_scope = (value, self._active_scope[1])
+
+    @property
+    def current_account(self) -> str:
+        """Current account (derived from _active_scope)."""
+        return self._active_scope[1]
+
+    @current_account.setter
+    def current_account(self, value: str) -> None:
+        """Set current account (updates _active_scope)."""
+        self._active_scope = (self._active_scope[0], value)
 
     # ================================================================================
     # UI Construction
@@ -597,8 +617,9 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
         Args:
             new_mode: New trading mode
         """
-        # Update Panel1's display mode to match StateManager
-        self._current_display_mode = new_mode
+        # Update Panel1's active scope to match StateManager
+        # Keep existing account, only change mode
+        self.current_mode = new_mode  # Updates _active_scope via property
 
         # CRITICAL: Update balance display for the new mode
         try:
