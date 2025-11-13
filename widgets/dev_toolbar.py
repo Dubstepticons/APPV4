@@ -65,7 +65,6 @@ class DevToolbar(QtWidgets.QWidget):
         # Font size changes should be persisted to source themes (DEBUG/SIM/LIVE)
         # or stored separately and reapplied after theme switches
         # For now, font size adjustment is disabled to prevent data corruption
-        print("[DevToolbar] Font size adjustment disabled (would corrupt theme state)")
         pass
 
     def _font_down(self):
@@ -73,5 +72,4 @@ class DevToolbar(QtWidgets.QWidget):
         # Font size changes should be persisted to source themes (DEBUG/SIM/LIVE)
         # or stored separately and reapplied after theme switches
         # For now, font size adjustment is disabled to prevent data corruption
-        print("[DevToolbar] Font size adjustment disabled (would corrupt theme state)")
         pass

@@ -88,8 +88,8 @@ def setup_mode_hotkey(window):
 
             apply_trading_mode_theme(new_mode)
             info("ui", f"Theme applied: {new_mode}")
-        except Exception as e:
-            print(f"[MODE] Warning: Could not apply theme: {e}")
+        except Exception:
+            pass  # Silently ignore theme application errors
 
         # Refresh timeframe pill colors in Panel 2 and Panel 3
         try:

@@ -183,12 +183,10 @@ def validate_theme_system() -> None:
         for error in consistency_errors:
             log.error(f"  - {error}")
 
-    # Summary
+    # Summary - only log errors, not success
     total_errors = len(oklch_errors) + len(consistency_errors)
     if total_errors > 0:
         log.warning(f"Theme system has {total_errors} validation errors - review config/theme.py")
-    else:
-        log.info("Theme system validation passed - all OKLCH tokens and keys are valid")
 
 
 # ========================================================================
