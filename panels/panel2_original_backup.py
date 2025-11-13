@@ -97,12 +97,12 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         self.current_mode: str = "SIM"
         self.current_account: str = ""
 
+        # PHASE 6 REFACTOR: Position domain model replaces scattered position fields
+        # This consolidates 12+ position fields into a single domain object
+        from domain.position import Position
         self.symbol: str = "ES"  # Default symbol, updated via set_symbol()
-        self.entry_price: Optional[float] = None  # NEVER pre-populated from cache
-        self.entry_qty: int = 0  # NEVER pre-populated from cache
-        self.is_long: Optional[bool] = None  # NEVER pre-populated from cache
-        self.target_price: Optional[float] = None
-        self.stop_price: Optional[float] = None
+        self._position: Position = Position.flat(mode=self.current_mode, account=self.current_account)
+        self._position.symbol = self.symbol  # Set default symbol
 
         # Feed state (live, continuously updated from CSV)
         self.last_price: Optional[float] = None
@@ -112,17 +112,8 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         self.cum_delta: Optional[float] = None
         self.poc: Optional[float] = None
 
-        # Entry snapshots (captured once at position entry, static)
-        self.entry_vwap: Optional[float] = None
-        self.entry_delta: Optional[float] = None
-        self.entry_poc: Optional[float] = None
-
-        # Timer state (persisted)
-        self.entry_time_epoch: Optional[int] = None  # when trade began
+        # Heat timer state (separate from Position, UI-specific)
         self.heat_start_epoch: Optional[int] = None  # when drawdown began
-        # Per-trade extremes for MAE/MFE
-        self._trade_min_price: Optional[float] = None
-        self._trade_max_price: Optional[float] = None
 
         # Timeframe state (for pills & pulsing dot)
         self._tf: str = "LIVE"
@@ -131,6 +122,9 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         # Build UI and timers
         self._build()
         self._setup_timers()
+
+        # MIGRATION: Connect to SignalBus for event-driven updates
+        self._connect_signal_bus()
 
         # Load scoped state after UI is built
         try:
@@ -144,9 +138,119 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         # Apply current theme colors (in case theme was switched before this panel was created)
         self.refresh_theme()
 
+    def _connect_signal_bus(self) -> None:
+        """
+        Connect to SignalBus for event-driven updates.
+
+        MIGRATION: This replaces MessageRouter direct method calls.
+        Panels now subscribe to SignalBus Qt signals instead of being called directly.
+
+        Connected signals:
+        - positionUpdated → on_position_update()
+        - orderUpdateReceived → on_order_update()
+        - modeChanged → set_trading_mode()
+        """
+        try:
+            from core.signal_bus import get_signal_bus
+
+            signal_bus = get_signal_bus()
+
+            # Position updates from DTC
+            signal_bus.positionUpdated.connect(
+                self.on_position_update,
+                type=QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
+            )
+
+            # Order updates from DTC
+            signal_bus.orderUpdateReceived.connect(
+                self.on_order_update,
+                type=QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
+            )
+
+            # Mode changes
+            signal_bus.modeChanged.connect(
+                lambda mode: self.set_trading_mode(mode, None),
+                type=QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
+            )
+
+            log.info("[Panel2] Connected to SignalBus for DTC events")
+
+        except Exception as e:
+            log.error(f"[Panel2] Failed to connect to SignalBus: {e}")
+            import traceback
+            traceback.print_exc()
+
+    # -------------------- Compatibility properties (PHASE 6 REFACTOR) --------------------
+    # These properties proxy to the Position domain object for backward compatibility.
+    # Gradually migrate code to use _position directly, then remove these.
+
+    @property
+    def entry_price(self) -> Optional[float]:
+        """Entry price (proxies to _position.entry_price)."""
+        return self._position.entry_price if not self._position.is_flat else None
+
+    @property
+    def entry_qty(self) -> int:
+        """Entry quantity (proxies to _position.qty_abs)."""
+        return self._position.qty_abs
+
+    @property
+    def is_long(self) -> Optional[bool]:
+        """Position direction (proxies to _position.is_long)."""
+        return self._position.is_long
+
+    @property
+    def target_price(self) -> Optional[float]:
+        """Target price (proxies to _position.target_price)."""
+        return self._position.target_price
+
+    @property
+    def stop_price(self) -> Optional[float]:
+        """Stop price (proxies to _position.stop_price)."""
+        return self._position.stop_price
+
+    @property
+    def entry_vwap(self) -> Optional[float]:
+        """Entry VWAP snapshot (proxies to _position.entry_vwap)."""
+        return self._position.entry_vwap
+
+    @property
+    def entry_delta(self) -> Optional[float]:
+        """Entry cumulative delta snapshot (proxies to _position.entry_cum_delta)."""
+        return self._position.entry_cum_delta
+
+    @property
+    def entry_poc(self) -> Optional[float]:
+        """Entry POC snapshot (proxies to _position.entry_poc)."""
+        return self._position.entry_poc
+
+    @property
+    def entry_time_epoch(self) -> Optional[int]:
+        """Entry time as epoch (proxies to _position.entry_time)."""
+        if self._position.is_flat:
+            return None
+        return int(self._position.entry_time.timestamp())
+
+    @property
+    def _trade_min_price(self) -> Optional[float]:
+        """Trade minimum price for MAE (proxies to _position.trade_min_price)."""
+        return self._position.trade_min_price
+
+    @property
+    def _trade_max_price(self) -> Optional[float]:
+        """Trade maximum price for MFE (proxies to _position.trade_max_price)."""
+        return self._position.trade_max_price
+
     # -------------------- Trade persistence hooks (start)
     def notify_trade_closed(self, trade: dict) -> None:
         """External hook to persist a closed trade and notify listeners.
+
+        CRITICAL: Uses PositionRepository to atomically close position:
+        - Reads from OpenPosition table
+        - Writes to TradeRecord table
+        - Deletes from OpenPosition table
+        All in one database transaction.
+
         Expects keys: symbol, side, qty, entry_price, exit_price, realized_pnl,
         optional: entry_time, exit_time, commissions, r_multiple, mae, mfe, account.
         """
@@ -172,6 +276,94 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
 
         # Simple one-line trade close notification
         print(f"[TRADE CLOSE] {symbol} {qty} @ {entry} -> {exit_p} | P&L: {pnl_sign}${abs(pnl):,.2f} | Mode: {mode}")
+
+        # CRITICAL: Close position in database (single source of truth)
+        # This replaces the old TradeManager approach
+        ok = self._close_position_in_database(trade)
+
+        if not ok:
+            # Fallback to old TradeManager approach if database close fails
+            print("[TRADE CLOSE] Database close failed, falling back to TradeManager...")
+            ok = self._close_position_legacy(trade)
+
+        # Emit regardless; consumers may refresh their views
+        try:
+            payload = dict(trade)
+            payload["ok"] = ok
+            self.tradesChanged.emit(payload)
+        except Exception as e:
+            pass
+
+    def _close_position_in_database(self, trade: dict) -> bool:
+        """
+        Close position using PositionRepository (database as source of truth).
+
+        This is the new approach that atomically:
+        1. Reads from OpenPosition table
+        2. Writes to TradeRecord table
+        3. Deletes from OpenPosition table
+
+        Args:
+            trade: Trade dict with exit data
+
+        Returns:
+            True if close succeeded, False otherwise
+        """
+        try:
+            from data.position_repository import get_position_repository
+            from datetime import datetime, timezone
+
+            position_repo = get_position_repository()
+
+            # Extract exit data from trade dict
+            exit_price = trade.get("exit_price")
+            if exit_price is None:
+                log.error("[Panel2 DB] Cannot close position: exit_price missing")
+                return False
+
+            # Get exit time (default to now if not provided)
+            exit_time = trade.get("exit_time")
+            if exit_time is None:
+                exit_time = datetime.now(timezone.utc)
+            elif isinstance(exit_time, int):
+                # Convert epoch to datetime
+                exit_time = datetime.fromtimestamp(exit_time, tz=timezone.utc)
+
+            # Close position in database (atomic operation)
+            trade_id = position_repo.close_position(
+                mode=self.current_mode,
+                account=self.current_account,
+                exit_price=float(exit_price),
+                exit_time=exit_time,
+                realized_pnl=trade.get("realized_pnl"),
+                commissions=trade.get("commissions"),
+                exit_vwap=self.vwap,  # Current VWAP at exit
+                exit_cum_delta=self.cum_delta,  # Current cum delta at exit
+            )
+
+            if trade_id:
+                log.info(
+                    f"[Panel2 DB] Closed position in database: trade_id={trade_id} "
+                    f"{self.current_mode}/{self.current_account}"
+                )
+                return True
+            else:
+                log.error("[Panel2 DB] Failed to close position in database")
+                return False
+
+        except Exception as e:
+            log.error(f"[Panel2 DB] Error closing position in database: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def _close_position_legacy(self, trade: dict) -> bool:
+        """
+        Legacy approach using TradeManager (fallback only).
+
+        This is kept as a fallback in case database close fails.
+        Should rarely be used in normal operation.
+        """
         try:
             from services.trade_service import TradeManager
             from core.app_state import get_state_manager
@@ -180,6 +372,7 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             trade_manager = TradeManager(state_manager=state)
         except Exception as e:
             trade_manager = None
+
         ok = False
         try:
             if trade_manager:
@@ -215,15 +408,10 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         except Exception as e:
             from utils.logger import get_logger
             log = get_logger(__name__)
-            log.error(f"[panel2] Error recording closed trade: {e}", exc_info=True)
+            log.error(f"[panel2] Error recording closed trade (legacy): {e}", exc_info=True)
             ok = False
-        # Emit regardless; consumers may refresh their views
-        try:
-            payload = dict(trade)
-            payload["ok"] = ok
-            self.tradesChanged.emit(payload)
-        except Exception as e:
-            pass
+
+        return ok
 
     # -------------------- Trade persistence hooks (end)
 
@@ -306,43 +494,19 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             side = "long" if self.is_long else "short"
             entry_price = float(self.entry_price)
 
-            # Use centralized trading constants
-            sign = 1.0 if self.is_long else -1.0
-            realized_pnl = (exit_price - entry_price) * sign * qty * DOLLARS_PER_POINT
+            # PHASE 6: Use Position domain model for P&L calculations
+            realized_pnl = self._position.realized_pnl(exit_price)
             commissions = COMM_PER_CONTRACT * qty
 
-            # r-multiple if stop available
-            r_multiple = None
-            if self.stop_price is not None and float(self.stop_price) > 0:
-                risk_per_contract = abs(entry_price - float(self.stop_price)) * DOLLARS_PER_POINT
-                if risk_per_contract > 0:
-                    r_multiple = realized_pnl / (risk_per_contract * qty)
+            # r-multiple from Position model
+            r_multiple = self._position.r_multiple(exit_price)
 
-            # MAE/MFE in PnL units using tracked extremes
-            # LONG: MAE from min (adverse), MFE from max (favorable)
-            # SHORT: MAE from max (adverse), MFE from min (favorable)
-            mae = None
-            mfe = None
-            efficiency = None
-            try:
-                if self._trade_min_price is not None and self._trade_max_price is not None:
-                    if self.is_long:
-                        mae_pts = min(0.0, self._trade_min_price - entry_price)
-                        mfe_pts = max(0.0, self._trade_max_price - entry_price)
-                    else:  # SHORT
-                        mae_pts = min(0.0, entry_price - self._trade_max_price)
-                        mfe_pts = max(0.0, entry_price - self._trade_min_price)
-                    mae = mae_pts * DOLLARS_PER_POINT * qty
-                    mfe = mfe_pts * DOLLARS_PER_POINT * qty
+            # MAE/MFE from Position model (uses tracked trade extremes)
+            mae = self._position.mae()
+            mfe = self._position.mfe()
 
-                    # Calculate efficiency: (realized PnL / MFE) if MFE > 0
-                    if mfe > 0 and realized_pnl is not None:
-                        # Efficiency = realized profit / maximum potential profit
-                        # Expressed as decimal (0.0 to 1.0, where 1.0 = 100% efficient)
-                        # Can exceed 1.0 if trail added profit beyond max seen during trade
-                        efficiency = realized_pnl / mfe
-            except Exception:
-                pass
+            # Efficiency from Position model
+            efficiency = self._position.efficiency(exit_price)
 
             # entry/exit times
             from datetime import datetime
@@ -441,33 +605,16 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                 side = "long" if self.is_long else "short"
                 entry_price_val = float(self.entry_price)
 
-                # Calculate P&L
-                sign = 1.0 if self.is_long else -1.0
-                realized_pnl = (exit_price - entry_price_val) * sign * qty_val * DOLLARS_PER_POINT
+                # PHASE 6: Use Position domain model for P&L calculations
+                realized_pnl = self._position.realized_pnl(exit_price)
                 commissions = COMM_PER_CONTRACT * qty_val
 
-                # r-multiple if stop available
-                r_multiple = None
-                if self.stop_price is not None and float(self.stop_price) > 0:
-                    risk_per_contract = abs(entry_price_val - float(self.stop_price)) * DOLLARS_PER_POINT
-                    if risk_per_contract > 0:
-                        r_multiple = realized_pnl / (risk_per_contract * qty_val)
+                # r-multiple from Position model
+                r_multiple = self._position.r_multiple(exit_price)
 
-                # MAE/MFE
-                mae = None
-                mfe = None
-                try:
-                    if self._trade_min_price is not None and self._trade_max_price is not None:
-                        if self.is_long:
-                            mae_pts = min(0.0, self._trade_min_price - entry_price_val)
-                            mfe_pts = max(0.0, self._trade_max_price - entry_price_val)
-                        else:
-                            mae_pts = min(0.0, entry_price_val - self._trade_max_price)
-                            mfe_pts = max(0.0, entry_price_val - self._trade_min_price)
-                        mae = mae_pts * DOLLARS_PER_POINT * qty_val
-                        mfe = mfe_pts * DOLLARS_PER_POINT * qty_val
-                except Exception:
-                    pass
+                # MAE/MFE from Position model
+                mae = self._position.mae()
+                mfe = self._position.mfe()
 
                 # Get account for mode detection
                 account = payload.get("TradeAccount") or ""
@@ -694,6 +841,20 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                     self._trade_min_price = p
                 if self._trade_max_price is None or p > self._trade_max_price:
                     self._trade_max_price = p
+
+                # PHASE 6: Write trade extremes to database for MAE/MFE persistence
+                # This enables accurate MAE/MFE calculation even after crash/restart
+                try:
+                    from data.position_repository import get_position_repository
+                    position_repo = get_position_repository()
+                    position_repo.update_trade_extremes(
+                        mode=self.current_mode,
+                        account=self.current_account,
+                        current_price=p
+                    )
+                except Exception as e:
+                    # Non-critical: DB update failure shouldn't stop trading
+                    log.debug(f"[Panel2] Trade extremes DB update failed: {e}")
         except Exception:
             pass
 
@@ -816,6 +977,68 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         except Exception as e:
             log.error(f"[Panel2] Persist write failed: {e}")
 
+    def _load_position_from_database(self) -> bool:
+        """
+        Load open position from database for current mode/account.
+        Called after mode switch to restore position state.
+
+        PHASE 5: Database-backed mode switching.
+        Returns True if position was loaded, False otherwise.
+        """
+        try:
+            from data.position_repository import get_position_repository
+
+            position_repo = get_position_repository()
+            position_data = position_repo.get_open_position(
+                mode=self.current_mode,
+                account=self.current_account
+            )
+
+            if not position_data:
+                # No open position in this mode - clear position state
+                self.entry_qty = 0
+                self.entry_price = None
+                self.is_long = None
+                self.target_price = None
+                self.stop_price = None
+                log.debug(f"[Panel2 DB] No open position for {self.current_mode}/{self.current_account}")
+                return False
+
+            # Restore position to Panel2
+            qty_abs = abs(position_data["qty"])
+            is_long = position_data["qty"] > 0
+
+            self.entry_qty = qty_abs
+            self.entry_price = position_data["entry_price"]
+            self.is_long = is_long
+            self.target_price = position_data.get("target_price")
+            self.stop_price = position_data.get("stop_price")
+
+            # Restore entry snapshots
+            self.entry_vwap = position_data.get("entry_vwap")
+            self.entry_delta = position_data.get("entry_cum_delta")
+            self.entry_poc = position_data.get("entry_poc")
+
+            # Restore trade extremes
+            self._trade_min_price = position_data.get("trade_min_price")
+            self._trade_max_price = position_data.get("trade_max_price")
+
+            # Restore entry time
+            entry_time = position_data.get("entry_time")
+            if entry_time:
+                self.entry_time_epoch = int(entry_time.timestamp())
+
+            log.info(
+                f"[Panel2 DB] Restored position from database: "
+                f"{self.current_mode}/{self.current_account} "
+                f"{'LONG' if is_long else 'SHORT'} {qty_abs}@{self.entry_price}"
+            )
+            return True
+
+        except Exception as e:
+            log.error(f"[Panel2 DB] Error loading position from database: {e}")
+            return False
+
     def set_trading_mode(self, mode: str, account: Optional[str] = None) -> None:
         """
         Update trading mode for this panel.
@@ -823,8 +1046,10 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         CRITICAL: This implements the ModeChanged contract:
         1. Freeze current state (save to current scope)
         2. Swap to new (mode, account) scope
-        3. Reload session state from new scope
+        3. Reload session state from new scope (timers + position from DB)
         4. Single repaint
+
+        PHASE 5 COMPLETE: Now queries database for open position in new mode.
 
         Args:
             mode: Trading mode ("SIM", "LIVE", "DEBUG")
@@ -855,8 +1080,12 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         self.current_mode = mode
         self.current_account = account
 
-        # 3. Reload: Load state from new scope
+        # 3a. Reload: Load timer state from JSON (session-scoped)
         self._load_state()
+
+        # 3b. Reload: Load position state from database (PHASE 5)
+        # This ensures position is restored even if app was restarted
+        self._load_position_from_database()
 
         # 4. Single repaint: Refresh all cells
         self._refresh_all_cells()
@@ -887,6 +1116,10 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                 log.info(
                     f"[panel2] Position opened -- Entry VWAP: {self.entry_vwap}, Entry Delta: {self.entry_delta}, Entry POC: {self.entry_poc}"
                 )
+
+                # CRITICAL: Write position to database (single source of truth)
+                self._write_position_to_database()
+
         else:
             # No position - clear all position-specific data
             self.entry_price = None
@@ -923,6 +1156,97 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         display_symbol = extract_symbol_display(self.symbol)
         if hasattr(self, "symbol_banner"):
             self.symbol_banner.setText(display_symbol)
+
+    def _write_position_to_database(self) -> bool:
+        """
+        Write current position to database (single source of truth).
+
+        Called when position is opened or updated. Implements write-through pattern:
+        Panel2 state + Database state are synchronized immediately.
+
+        Returns:
+            True if write succeeded, False otherwise
+        """
+        if self.entry_qty <= 0 or self.entry_price is None:
+            return False
+
+        try:
+            from data.position_repository import get_position_repository
+            from datetime import datetime, timezone
+
+            position_repo = get_position_repository()
+
+            # Convert entry_time_epoch to datetime
+            entry_time = None
+            if self.entry_time_epoch:
+                entry_time = datetime.fromtimestamp(self.entry_time_epoch, tz=timezone.utc)
+            else:
+                entry_time = datetime.now(timezone.utc)
+
+            # Determine signed quantity (positive = long, negative = short)
+            signed_qty = self.entry_qty if self.is_long else -self.entry_qty
+
+            # Write to database
+            success = position_repo.save_open_position(
+                mode=self.current_mode,
+                account=self.current_account,
+                symbol=self.symbol,
+                qty=signed_qty,
+                entry_price=self.entry_price,
+                entry_time=entry_time,
+                entry_vwap=self.entry_vwap,
+                entry_cum_delta=self.entry_delta,
+                entry_poc=self.entry_poc,
+                target_price=self.target_price,
+                stop_price=self.stop_price,
+            )
+
+            if success:
+                log.info(
+                    f"[Panel2 DB] Wrote position to database: {self.current_mode}/{self.current_account} "
+                    f"{self.symbol} {signed_qty}@{self.entry_price}"
+                )
+            else:
+                log.error(f"[Panel2 DB] Failed to write position to database")
+
+            return success
+
+        except Exception as e:
+            log.error(f"[Panel2 DB] Error writing position to database: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def _update_trade_extremes_in_database(self) -> bool:
+        """
+        Update trade min/max prices in database for MAE/MFE tracking.
+
+        Called periodically (e.g., every 100ms) while position is open.
+        Updates only if current price is a new extreme.
+
+        Returns:
+            True if update succeeded, False otherwise
+        """
+        if self.entry_qty <= 0 or self.last_price is None:
+            return False
+
+        try:
+            from data.position_repository import get_position_repository
+
+            position_repo = get_position_repository()
+
+            # Update trade extremes in database
+            success = position_repo.update_trade_extremes(
+                mode=self.current_mode,
+                account=self.current_account,
+                current_price=self.last_price
+            )
+
+            return success
+
+        except Exception as e:
+            # Silently fail (this is called very frequently)
+            return False
 
     # -------------------- Position Interface (end)
 
@@ -1387,50 +1711,41 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
 
         # Calculate derived metrics if we have an active position
         if self.entry_qty and self.entry_price is not None and self.last_price is not None:
-            # P&L calculation
-            sign = 1 if self.is_long else -1
-            pnl_pts = (self.last_price - self.entry_price) * sign
-            gross_pnl = pnl_pts * DOLLARS_PER_POINT * self.entry_qty
+            # PHASE 6: Use Position domain model for P&L calculations
+            gross_pnl = self._position.unrealized_pnl(self.last_price)
             comm = COMM_PER_CONTRACT * self.entry_qty
             net_pnl = gross_pnl - comm
+
+            # Calculate pnl_pts for display (derived from gross)
+            sign = 1 if self.is_long else -1
+            pnl_pts = (self.last_price - self.entry_price) * sign
 
             data["pnl_points"] = pnl_pts
             data["gross_pnl"] = gross_pnl
             data["commissions"] = comm
             data["net_pnl"] = net_pnl
 
-            # MAE/MFE from TRADE extremes (not session extremes)
-            # LONG: MAE from min (adverse), MFE from max (favorable)
-            # SHORT: MAE from max (adverse), MFE from min (favorable)
-            # These track min/max SINCE position entry, not session-wide
-            if self._trade_min_price is not None and self._trade_max_price is not None:
-                if self.is_long:
-                    mae_pts = min(0.0, self._trade_min_price - self.entry_price)
-                    mfe_pts = max(0.0, self._trade_max_price - self.entry_price)
-                else:  # SHORT
-                    mae_pts = min(0.0, self.entry_price - self._trade_max_price)
-                    mfe_pts = max(0.0, self.entry_price - self._trade_min_price)
+            # MAE/MFE from Position domain model (uses tracked trade extremes)
+            mae_dollars = self._position.mae()
+            mfe_dollars = self._position.mfe()
+
+            if mae_dollars is not None and mfe_dollars is not None:
+                # Calculate points from dollars for backward compatibility
+                mae_pts = mae_dollars / (DOLLARS_PER_POINT * self.entry_qty) if self.entry_qty else 0.0
+                mfe_pts = mfe_dollars / (DOLLARS_PER_POINT * self.entry_qty) if self.entry_qty else 0.0
 
                 data["mae_points"] = mae_pts
                 data["mfe_points"] = mfe_pts
-                data["mae_dollars"] = mae_pts * DOLLARS_PER_POINT * self.entry_qty
-                data["mfe_dollars"] = mfe_pts * DOLLARS_PER_POINT * self.entry_qty
+                data["mae_dollars"] = mae_dollars
+                data["mfe_dollars"] = mfe_dollars
 
-                # Calculate efficiency: (realized PnL / MFE) if MFE > 0
-                if mfe_pts > 0 and "net_pnl" in data:
-                    # Efficiency = realized profit / maximum potential profit
-                    # Expressed as percentage (0.0 to 1.0, where 1.0 = 100% efficient)
-                    efficiency = min(1.0, max(0.0, data["net_pnl"] / (mfe_pts * DOLLARS_PER_POINT * self.entry_qty)))
-                    data["efficiency"] = efficiency
-                else:
-                    data["efficiency"] = None
+                # Efficiency from Position model (uses gross PnL consistently)
+                data["efficiency"] = self._position.efficiency(self.last_price)
+            else:
+                data["efficiency"] = None
 
-            # R-multiple
-            if self.stop_price is not None and float(self.stop_price) > 0:
-                risk_per_contract = abs(self.entry_price - float(self.stop_price)) * DOLLARS_PER_POINT
-                if risk_per_contract > 0:
-                    r_multiple = net_pnl / (risk_per_contract * self.entry_qty)
-                    data["r_multiple"] = r_multiple
+            # R-multiple from Position model
+            data["r_multiple"] = self._position.r_multiple(self.last_price)
 
             # Duration
             if self.entry_time_epoch:

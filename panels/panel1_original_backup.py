@@ -528,10 +528,12 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
         plot.setGeometry(self.graph_container.contentsRect())
 
     def resizeEvent(self, e: QtGui.QResizeEvent) -> None:
-        """Keep the plot synced with the container's inner rect."""
-        with contextlib.suppress(Exception):
+        """Keep the plot synced with the container’s inner rect."""
+        try:
             if getattr(self, "_plot", None) and self.graph_container:
                 self._plot.setGeometry(self.graph_container.contentsRect())
+        except Exception:
+            pass
         super().resizeEvent(e)
 
     # -------------------- Graph layout glue (end) --------------------------------
@@ -643,9 +645,11 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
                 self._ripple_items.append(ripple)
 
             # hover hook
-            with contextlib.suppress(Exception):
+            try:
                 self._plot.scene().sigMouseMoved.connect(self._on_mouse_move)
                 self._plot.viewport().installEventFilter(self)
+            except Exception:
+                pass
 
             # layout glue
             lay = self.graph_container.layout()
@@ -725,11 +729,13 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
             return
         # Limit endpoint pulse to LIVE and 1D timeframes
         if self._tf not in ("LIVE", "1D"):
-            with contextlib.suppress(Exception):
+            try:
                 if getattr(self, "_endpoint", None):
                     self._endpoint.setData([], [])
                 for ripple in getattr(self, "_ripple_items", []) or []:
                     ripple.setData([], [])
+            except Exception:
+                pass
             return
 
         import math
@@ -801,11 +807,14 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
     # -------------------- Timeframe helpers (start) --------------------------
     def _ensure_live_pill_dot(self, initial: bool = False) -> None:
         """Ensure the LIVE dot exists and set a sane initial pulsing state."""
-        with contextlib.suppress(Exception):
-            if hasattr(self, "pills") and self.pills and hasattr(self.pills, "set_live_dot_visible"):
-                self.pills.set_live_dot_visible(True)
-            if hasattr(self, "pills") and self.pills and hasattr(self.pills, "set_live_dot_pulsing"):
-                self.pills.set_live_dot_pulsing(False if initial else (self._tf == "LIVE"))
+        try:
+            if hasattr(self, "pills") and self.pills:
+                if hasattr(self.pills, "set_live_dot_visible"):
+                    self.pills.set_live_dot_visible(True)
+                if hasattr(self.pills, "set_live_dot_pulsing"):
+                    self.pills.set_live_dot_pulsing(False if initial else (self._tf == "LIVE"))
+        except Exception:
+            pass
 
     def set_timeframe(self, tf: str) -> None:
         """
@@ -1383,16 +1392,20 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
                 with contextlib.suppress(Exception):
                     self._plot.getPlotItem().enableAutoRange(x=True, y=True)
         else:
-            with contextlib.suppress(Exception):
+            try:
                 self._line.setData([], [])
                 if getattr(self, "_endpoint", None):
                     self._endpoint.setData([], [])
+            except Exception:
+                pass
 
         # Also enforce ripple visibility based on timeframe
-        with contextlib.suppress(Exception):
+        try:
             if self._tf not in ("LIVE", "1D"):
                 for ripple in getattr(self, "_ripple_items", []) or []:
                     ripple.setData([], [])
+        except Exception:
+            pass
 
     def _update_trails_and_glow(self) -> None:
         """Update trailing lines and glow effect with current data."""

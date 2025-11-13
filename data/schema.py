@@ -8,12 +8,15 @@ Clean DTC schema based on what Sierra Chart ACTUALLY sends:
 
 NO position data comes from Sierra - it only sends market data.
 All position tracking must be INFERRED from order executions.
+
+CRITICAL FIX: Added OpenPosition table for single source of truth.
+Database is now authoritative for position state - fixes crash recovery issues.
 """
 
 from datetime import datetime
 from typing import Optional
 
-from sqlmodel import Field, SQLModel, Index
+from sqlmodel import Field, SQLModel, Index, UniqueConstraint
 
 
 class TradeRecord(SQLModel, table=True):
@@ -106,6 +109,72 @@ class AccountBalance(SQLModel, table=True):
     mode: str = Field(default="LIVE", index=True)
 
     timestamp: datetime = Field(default_factory=datetime.utcnow, index=True)
+
+
+class OpenPosition(SQLModel, table=True):
+    """
+    Open position tracking - single source of truth for position state.
+
+    CRITICAL FIX: Establishes database as authoritative source for position state.
+    Fixes crash recovery, mode switching, and position inconsistency issues.
+
+    INVARIANT: Only 0 or 1 row per (mode, account) combination.
+    Composite unique constraint enforces this at database level.
+
+    Design:
+    - Write-through: Every position change → immediate DB write
+    - Read on startup: Recover position state from DB
+    - Read on mode switch: Load correct position for new mode
+    - Delete on close: Move to TradeRecord table when trade completes
+
+    Benefits:
+    - Crash safety: Position persisted, survives restarts
+    - Single source of truth: DB is authoritative, no conflicts
+    - Mode isolation: Each (mode, account) has separate position
+    - Audit trail: All position changes logged
+    """
+
+    __tablename__ = "openposition"
+
+    # Composite unique constraint: Only one open position per (mode, account)
+    # This enforces the invariant at database level
+    __table_args__ = (
+        UniqueConstraint('mode', 'account', name='uq_mode_account'),
+        Index('idx_open_position_mode', 'mode'),  # Fast lookups by mode
+    )
+
+    # Primary key
+    id: Optional[int] = Field(default=None, primary_key=True)
+
+    # Position identification (unique together)
+    mode: str = Field(index=True)  # "SIM", "LIVE", or "DEBUG"
+    account: str  # Account identifier (e.g., "Sim1", "120005")
+    symbol: str  # Symbol (e.g., "MES", "MNQ", "MGC")
+
+    # Position details
+    qty: int  # Signed quantity: positive = long, negative = short
+    side: str  # "LONG" or "SHORT" (redundant with qty sign, but explicit for clarity)
+    entry_price: float  # Average entry price
+    entry_time: datetime  # When position was opened (UTC)
+
+    # Bracket orders (optional, if target/stop set)
+    target_price: Optional[float] = None
+    stop_price: Optional[float] = None
+
+    # Entry snapshots (captured at entry, for trade record)
+    # These are static values from the moment position opened
+    entry_vwap: Optional[float] = None  # VWAP at entry
+    entry_cum_delta: Optional[float] = None  # Cumulative delta at entry
+    entry_poc: Optional[float] = None  # Point of control at entry
+
+    # Trade extremes (updated continuously while position open)
+    # Used to calculate MAE (Maximum Adverse Excursion) and MFE (Maximum Favorable Excursion)
+    trade_min_price: Optional[float] = None  # Lowest price reached during trade
+    trade_max_price: Optional[float] = None  # Highest price reached during trade
+
+    # Metadata
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow, index=True)
 
 
 # -------------------- CLEAN SCHEMA (end)
