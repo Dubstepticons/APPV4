@@ -9,8 +9,10 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
+from sqlmodel import SQLModel
+
 from data.db_engine import get_session
-from data.schema import Base, OpenPosition, TradeRecord
+from data.schema import OpenPosition, TradeRecord
 from data.position_repository import PositionRepository
 
 
@@ -21,12 +23,18 @@ def db_session():
 
     Uses in-memory SQLite for fast, isolated tests.
     Each test gets a fresh database.
+
+    Note: check_same_thread=False allows multi-threaded access for testing.
     """
-    # Create in-memory SQLite database
-    engine = create_engine("sqlite:///:memory:", echo=False)
+    # Create in-memory SQLite database with multi-threading support
+    engine = create_engine(
+        "sqlite:///:memory:",
+        echo=False,
+        connect_args={"check_same_thread": False}
+    )
 
     # Create all tables
-    Base.metadata.create_all(engine)
+    SQLModel.metadata.create_all(engine)
 
     # Create session
     Session = sessionmaker(bind=engine)
@@ -40,9 +48,64 @@ def db_session():
 
 
 @pytest.fixture
-def position_repo():
-    """Get position repository instance."""
-    return PositionRepository()
+def test_engine():
+    """
+    Create a test database engine using a temporary file.
+
+    File-based SQLite works better with multi-threading than in-memory.
+    """
+    import tempfile
+    import os
+
+    # Create temporary database file
+    fd, db_path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+
+    engine = create_engine(
+        f"sqlite:///{db_path}",
+        echo=False,
+        connect_args={"check_same_thread": False}
+    )
+    SQLModel.metadata.create_all(engine)
+
+    yield engine
+
+    # Cleanup
+    engine.dispose()
+    try:
+        os.unlink(db_path)
+    except Exception:
+        pass
+
+
+@pytest.fixture
+def position_repo(test_engine):
+    """
+    Get position repository instance configured for testing.
+
+    Patches the global engine and get_session to use the test database.
+    File-based SQLite allows proper multi-threaded access.
+    """
+    from unittest.mock import patch
+    from contextlib import contextmanager
+
+    @contextmanager
+    def test_get_session():
+        """Test version of get_session using the test engine."""
+        session = sessionmaker(bind=test_engine)()
+        try:
+            yield session
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()
+
+    # Patch both the engine and get_session
+    with patch('data.db_engine.engine', test_engine):
+        with patch('data.position_repository.get_session', test_get_session):
+            with patch('data.db_engine.get_session', test_get_session):
+                yield PositionRepository()
 
 
 @pytest.fixture

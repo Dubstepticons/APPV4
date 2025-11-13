@@ -20,7 +20,7 @@ from datetime import datetime, timezone, timedelta
 from unittest.mock import Mock, patch
 
 from data.schema import OpenPosition, TradeRecord
-from data.position_repository import get_position_repository
+from data.position_repository import PositionRepository, get_position_repository
 from services.position_recovery import get_recovery_service
 
 
@@ -46,18 +46,16 @@ class TestCrashRecovery:
         assert success, "Failed to save position"
 
         # Verify position in database
-        with patch('data.position_repository.get_session', return_value=db_session):
-            saved_pos = position_repo.get_open_position("SIM", "")
-            assert saved_pos is not None, "Position not found in database"
-            assert saved_pos["qty"] == 1
-            assert saved_pos["entry_price"] == 5800.0
+        saved_pos = position_repo.get_open_position("SIM", "")
+        assert saved_pos is not None, "Position not found in database"
+        assert saved_pos["qty"] == 1
+        assert saved_pos["entry_price"] == 5800.0
 
         # Step 2: Simulate crash (session closed, app restarted)
-        # In real scenario, db_session would be recreated
+        # In real scenario, database session would be recreated
 
         # Step 3: Recovery - load position from database
-        with patch('data.position_repository.get_session', return_value=db_session):
-            recovered_pos = position_repo.get_open_position("SIM", "")
+        recovered_pos = position_repo.get_open_position("SIM", "")
 
         # Step 4: Verify all fields restored
         assert recovered_pos is not None, "Position not recovered"
@@ -143,7 +141,11 @@ class TestCrashRecovery:
 
         # Step 3: Check if stale (>24h old)
         now = datetime.now(timezone.utc)
-        pos_age = now - positions[0]["updated_at"]
+        updated_at = positions[0]["updated_at"]
+        # Handle timezone-naive datetime from database
+        if updated_at.tzinfo is None:
+            updated_at = updated_at.replace(tzinfo=timezone.utc)
+        pos_age = now - updated_at
         is_stale = pos_age > timedelta(hours=24)
 
         assert is_stale, "Position should be flagged as stale"
@@ -286,20 +288,18 @@ class TestThreadSafety:
         errors = []
 
         # Create initial position
-        with patch('data.position_repository.get_session', return_value=db_session):
-            position_repo.save_open_position(
-                mode="SIM", account="", symbol="MES",
-                qty=1, entry_price=5800.0,
-                entry_time=datetime.now(timezone.utc)
-            )
+        position_repo.save_open_position(
+            mode="SIM", account="", symbol="MES",
+            qty=1, entry_price=5800.0,
+            entry_time=datetime.now(timezone.utc)
+        )
 
         # Worker function for threads
         def update_worker(thread_id):
             try:
-                with patch('data.position_repository.get_session', return_value=db_session):
-                    for i in range(10):
-                        price = 5800.0 + (thread_id * 10) + i
-                        position_repo.update_trade_extremes("SIM", "", price)
+                for i in range(10):
+                    price = 5800.0 + (thread_id * 10) + i
+                    position_repo.update_trade_extremes("SIM", "", price)
             except Exception as e:
                 errors.append((thread_id, e))
 
@@ -318,11 +318,10 @@ class TestThreadSafety:
         assert len(errors) == 0, f"Thread safety errors: {errors}"
 
         # Verify position still exists and has valid data
-        with patch('data.position_repository.get_session', return_value=db_session):
-            pos = position_repo.get_open_position("SIM", "")
-            assert pos is not None
-            assert pos["trade_min_price"] is not None
-            assert pos["trade_max_price"] is not None
+        pos = position_repo.get_open_position("SIM", "")
+        assert pos is not None
+        assert pos["trade_min_price"] is not None
+        assert pos["trade_max_price"] is not None
 
         print("✓ Test 3.1 PASSED: Concurrent updates successful (10 threads × 10 updates)")
 
@@ -338,21 +337,19 @@ class TestThreadSafety:
         results = []
 
         # Create position
-        with patch('data.position_repository.get_session', return_value=db_session):
-            position_repo.save_open_position(
-                mode="SIM", account="", symbol="MES",
-                qty=1, entry_price=5800.0,
-                entry_time=datetime.now(timezone.utc)
-            )
+        position_repo.save_open_position(
+            mode="SIM", account="", symbol="MES",
+            qty=1, entry_price=5800.0,
+            entry_time=datetime.now(timezone.utc)
+        )
 
         def close_worker():
-            with patch('data.position_repository.get_session', return_value=db_session):
-                result = position_repo.close_position(
-                    mode="SIM", account="",
-                    exit_price=5850.0,
-                    realized_pnl=250.0
-                )
-                results.append(result)
+            result = position_repo.close_position(
+                mode="SIM", account="",
+                exit_price=5850.0,
+                realized_pnl=250.0
+            )
+            results.append(result)
 
         # Launch 2 threads trying to close simultaneously
         t1 = threading.Thread(target=close_worker)
