@@ -26,23 +26,69 @@ def set_theme_mode(main_window, mode: str) -> None:
         mode: One of "DEBUG", "SIM", or "LIVE"
     """
     try:
+        from utils.logger import get_logger
+        log = get_logger(__name__)
+        log.info(f"[set_theme_mode] START - mode={mode}")
+    except:
+        pass
+
+    try:
         if mode not in ("DEBUG", "SIM", "LIVE"):
+            try:
+                from utils.logger import get_logger
+                log = get_logger(__name__)
+                log.warning(f"[set_theme_mode] Invalid mode: {mode}")
+            except:
+                pass
             return
 
         # Switch the THEME dictionary
         switch_theme(mode.lower())
 
         # Emit signal to trigger on_theme_changed
+        try:
+            from utils.logger import get_logger
+            log = get_logger(__name__)
+            log.info(f"[set_theme_mode] About to emit themeChanged signal with mode={mode}")
+        except:
+            pass
+
         main_window.themeChanged.emit(mode)
+
+        try:
+            from utils.logger import get_logger
+            log = get_logger(__name__)
+            log.info(f"[set_theme_mode] themeChanged signal emitted successfully")
+        except:
+            pass
 
         # Update central widget background
         central = main_window.centralWidget()
         if central:
+            bg_color = THEME.get('bg_primary', '#000000')
             central.setStyleSheet(
-                f"QWidget#CentralWidget {{ background: {THEME.get('bg_primary', '#000000')}; }}"
+                f"QWidget#CentralWidget {{ background: {bg_color}; }}"
             )
-    except Exception:
-        pass
+            try:
+                from utils.logger import get_logger
+                log = get_logger(__name__)
+                log.info(f"[set_theme_mode] Central widget background updated to {bg_color}")
+            except:
+                pass
+
+        try:
+            from utils.logger import get_logger
+            log = get_logger(__name__)
+            log.info(f"[set_theme_mode] END - theme mode set to {mode}")
+        except:
+            pass
+    except Exception as e:
+        try:
+            from utils.logger import get_logger
+            log = get_logger(__name__)
+            log.error(f"[set_theme_mode] Error: {e}", exc_info=True)
+        except:
+            print(f"[set_theme_mode] ERROR: {e}")
 
 
 def on_theme_changed(main_window, mode: str) -> None:
@@ -55,44 +101,72 @@ def on_theme_changed(main_window, mode: str) -> None:
         mode: One of "DEBUG", "SIM", or "LIVE"
     """
     try:
+        from utils.logger import get_logger
+        log = get_logger(__name__)
+
+        log.info(f"[ThemeManager.on_theme_changed] START - mode={mode}")
+
         if mode not in ("DEBUG", "SIM", "LIVE"):
+            log.warning(f"[ThemeManager] Invalid mode: {mode}")
             return
 
         main_window.current_theme_mode = mode
-
-        from utils.logger import get_logger
-        log = get_logger(__name__)
 
         # DEBUG: Log theme state
         log.info(f"[ThemeManager] Switching to mode: {mode}")
         log.info(f"[ThemeManager] THEME.bg_panel = {THEME.get('bg_panel', 'KEY_NOT_FOUND')}")
         log.info(f"[ThemeManager] THEME.cell_border = {THEME.get('cell_border', 'KEY_NOT_FOUND')}")
+        log.info(f"[ThemeManager] THEME.bg_primary = {THEME.get('bg_primary', 'KEY_NOT_FOUND')}")
+        log.info(f"[ThemeManager] THEME.ink = {THEME.get('ink', 'KEY_NOT_FOUND')}")
 
         # Refresh connection icon
+        log.debug(f"[ThemeManager] Refreshing connection icon...")
         icon = getattr(main_window.panel_balance, "conn_icon", None)
         if icon and hasattr(icon, "refresh_theme"):
             icon.refresh_theme()
+            log.debug(f"[ThemeManager] Connection icon refreshed")
+        else:
+            log.debug(f"[ThemeManager] Connection icon not found or no refresh_theme method")
 
         # Refresh Panel 1 (balance/investing)
+        log.debug(f"[ThemeManager] Refreshing Panel 1...")
         if hasattr(main_window.panel_balance, "_refresh_theme_colors"):
             main_window.panel_balance._refresh_theme_colors()
+            log.debug(f"[ThemeManager] Panel 1 _refresh_theme_colors() called")
+        else:
+            log.debug(f"[ThemeManager] Panel 1 has no _refresh_theme_colors method")
 
         # Refresh Panel 2 (live)
+        log.debug(f"[ThemeManager] Refreshing Panel 2...")
         if hasattr(main_window.panel_live, "refresh_theme"):
             log.info(f"[ThemeManager] Calling refresh_theme on Panel2")
             main_window.panel_live.refresh_theme()
+            log.info(f"[ThemeManager] Panel 2 refresh_theme() completed")
+        else:
+            log.error(f"[ThemeManager] Panel 2 has no refresh_theme method!")
 
         # Refresh Panel 3 (stats)
+        log.debug(f"[ThemeManager] Refreshing Panel 3...")
         if hasattr(main_window.panel_stats, "refresh_theme"):
             log.info(f"[ThemeManager] Calling refresh_theme on Panel3")
             main_window.panel_stats.refresh_theme()
+            log.info(f"[ThemeManager] Panel 3 refresh_theme() completed")
+        else:
+            log.error(f"[ThemeManager] Panel 3 has no refresh_theme method!")
 
         # Update central widget background
+        log.debug(f"[ThemeManager] Updating central widget background...")
         central = main_window.centralWidget()
         if central:
+            bg_color = THEME.get('bg_primary', '#000000')
             central.setStyleSheet(
-                f"QWidget#CentralWidget {{ background: {THEME.get('bg_primary', '#000000')}; }}"
+                f"QWidget#CentralWidget {{ background: {bg_color}; }}"
             )
+            log.debug(f"[ThemeManager] Central widget background set to {bg_color}")
+        else:
+            log.warning(f"[ThemeManager] Central widget not found")
+
+        log.info(f"[ThemeManager.on_theme_changed] END - mode={mode}")
     except Exception as e:
         from utils.logger import get_logger
         log = get_logger(__name__)

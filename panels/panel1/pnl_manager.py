@@ -708,6 +708,18 @@ def set_trading_mode(panel, mode: str, account: Optional[str] = None) -> None:
     # Switch theme first to ensure THEME has correct colors for this mode
     switch_theme(mode.lower())
 
+    # CRITICAL FIX: Emit themeChanged signal so UI panels refresh their colors
+    try:
+        # Get main window and emit the theme changed signal
+        main_window = panel.window()  # Get the parent window
+        if main_window and hasattr(main_window, 'themeChanged'):
+            log.info(f"[Panel1] Emitting themeChanged signal for mode: {mode}")
+            main_window.themeChanged.emit(mode)
+        else:
+            log.warning(f"[Panel1] Could not find main_window or themeChanged signal")
+    except Exception as e:
+        log.error(f"[Panel1] Error emitting themeChanged signal: {e}")
+
     # Update badge text
     panel.mode_badge.setText(f"{mode}")
 

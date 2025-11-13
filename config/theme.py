@@ -590,11 +590,66 @@ def switch_theme(theme_name: str) -> None:
     """
     global THEME
 
+    try:
+        from utils.logger import get_logger
+        log = get_logger(__name__)
+        log.info(f"[switch_theme] START - theme_name={theme_name}")
+    except:
+        pass
+
     theme_name = theme_name.lower().strip()
     new_theme = _THEME_MAP.get(theme_name, DEBUG_THEME)
 
+    try:
+        from utils.logger import get_logger
+        log = get_logger(__name__)
+
+        # CRITICAL: Check which theme object we actually got
+        if new_theme is DEBUG_THEME:
+            log.info(f"[switch_theme] THEME LOOKUP: {theme_name} -> DEBUG_THEME")
+        elif new_theme is LIVE_THEME:
+            log.info(f"[switch_theme] THEME LOOKUP: {theme_name} -> LIVE_THEME")
+        elif new_theme is SIM_THEME:
+            log.info(f"[switch_theme] THEME LOOKUP: {theme_name} -> SIM_THEME")
+        else:
+            log.warning(f"[switch_theme] THEME LOOKUP: {theme_name} -> UNKNOWN THEME OBJECT!")
+
+        log.info(f"[switch_theme] Found theme: {theme_name} -> {len(new_theme)} keys")
+        log.info(f"[switch_theme] NEW bg_panel = {new_theme.get('bg_panel', 'NOT_SET')}")
+        log.info(f"[switch_theme] NEW cell_border = {new_theme.get('cell_border', 'NOT_SET')}")
+    except Exception as e:
+        try:
+            from utils.logger import get_logger
+            log = get_logger(__name__)
+            log.error(f"[switch_theme] Error logging theme lookup: {e}")
+        except:
+            pass
+
+    log_before = f"BEFORE clear: THEME.bg_panel={THEME.get('bg_panel', 'NOT_SET')}"
+    try:
+        from utils.logger import get_logger
+        log = get_logger(__name__)
+        log.info(f"[switch_theme] {log_before}")
+    except:
+        pass
+
     THEME.clear()
     THEME.update(new_theme)
+
+    try:
+        from utils.logger import get_logger
+        log = get_logger(__name__)
+        log.info(f"[switch_theme] AFTER update: THEME dict now has {len(THEME)} keys")
+        log.info(f"[switch_theme] AFTER update: THEME.bg_panel = {THEME.get('bg_panel', 'NOT_SET')}")
+        log.info(f"[switch_theme] AFTER update: THEME.cell_border = {THEME.get('cell_border', 'NOT_SET')}")
+        log.info(f"[switch_theme] END - theme switched to {theme_name}")
+    except Exception as e:
+        try:
+            from utils.logger import get_logger
+            log = get_logger(__name__)
+            log.error(f"[switch_theme] Error logging after update: {e}")
+        except:
+            pass
 
 
 def apply_trading_mode_theme(mode: str) -> None:
