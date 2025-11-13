@@ -494,43 +494,19 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             side = "long" if self.is_long else "short"
             entry_price = float(self.entry_price)
 
-            # Use centralized trading constants
-            sign = 1.0 if self.is_long else -1.0
-            realized_pnl = (exit_price - entry_price) * sign * qty * DOLLARS_PER_POINT
+            # PHASE 6: Use Position domain model for P&L calculations
+            realized_pnl = self._position.realized_pnl(exit_price)
             commissions = COMM_PER_CONTRACT * qty
 
-            # r-multiple if stop available
-            r_multiple = None
-            if self.stop_price is not None and float(self.stop_price) > 0:
-                risk_per_contract = abs(entry_price - float(self.stop_price)) * DOLLARS_PER_POINT
-                if risk_per_contract > 0:
-                    r_multiple = realized_pnl / (risk_per_contract * qty)
+            # r-multiple from Position model
+            r_multiple = self._position.r_multiple(exit_price)
 
-            # MAE/MFE in PnL units using tracked extremes
-            # LONG: MAE from min (adverse), MFE from max (favorable)
-            # SHORT: MAE from max (adverse), MFE from min (favorable)
-            mae = None
-            mfe = None
-            efficiency = None
-            try:
-                if self._trade_min_price is not None and self._trade_max_price is not None:
-                    if self.is_long:
-                        mae_pts = min(0.0, self._trade_min_price - entry_price)
-                        mfe_pts = max(0.0, self._trade_max_price - entry_price)
-                    else:  # SHORT
-                        mae_pts = min(0.0, entry_price - self._trade_max_price)
-                        mfe_pts = max(0.0, entry_price - self._trade_min_price)
-                    mae = mae_pts * DOLLARS_PER_POINT * qty
-                    mfe = mfe_pts * DOLLARS_PER_POINT * qty
+            # MAE/MFE from Position model (uses tracked trade extremes)
+            mae = self._position.mae()
+            mfe = self._position.mfe()
 
-                    # Calculate efficiency: (realized PnL / MFE) if MFE > 0
-                    if mfe > 0 and realized_pnl is not None:
-                        # Efficiency = realized profit / maximum potential profit
-                        # Expressed as decimal (0.0 to 1.0, where 1.0 = 100% efficient)
-                        # Can exceed 1.0 if trail added profit beyond max seen during trade
-                        efficiency = realized_pnl / mfe
-            except Exception:
-                pass
+            # Efficiency from Position model
+            efficiency = self._position.efficiency(exit_price)
 
             # entry/exit times
             from datetime import datetime
@@ -629,33 +605,16 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                 side = "long" if self.is_long else "short"
                 entry_price_val = float(self.entry_price)
 
-                # Calculate P&L
-                sign = 1.0 if self.is_long else -1.0
-                realized_pnl = (exit_price - entry_price_val) * sign * qty_val * DOLLARS_PER_POINT
+                # PHASE 6: Use Position domain model for P&L calculations
+                realized_pnl = self._position.realized_pnl(exit_price)
                 commissions = COMM_PER_CONTRACT * qty_val
 
-                # r-multiple if stop available
-                r_multiple = None
-                if self.stop_price is not None and float(self.stop_price) > 0:
-                    risk_per_contract = abs(entry_price_val - float(self.stop_price)) * DOLLARS_PER_POINT
-                    if risk_per_contract > 0:
-                        r_multiple = realized_pnl / (risk_per_contract * qty_val)
+                # r-multiple from Position model
+                r_multiple = self._position.r_multiple(exit_price)
 
-                # MAE/MFE
-                mae = None
-                mfe = None
-                try:
-                    if self._trade_min_price is not None and self._trade_max_price is not None:
-                        if self.is_long:
-                            mae_pts = min(0.0, self._trade_min_price - entry_price_val)
-                            mfe_pts = max(0.0, self._trade_max_price - entry_price_val)
-                        else:
-                            mae_pts = min(0.0, entry_price_val - self._trade_max_price)
-                            mfe_pts = max(0.0, entry_price_val - self._trade_min_price)
-                        mae = mae_pts * DOLLARS_PER_POINT * qty_val
-                        mfe = mfe_pts * DOLLARS_PER_POINT * qty_val
-                except Exception:
-                    pass
+                # MAE/MFE from Position model
+                mae = self._position.mae()
+                mfe = self._position.mfe()
 
                 # Get account for mode detection
                 account = payload.get("TradeAccount") or ""
@@ -1752,50 +1711,41 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
 
         # Calculate derived metrics if we have an active position
         if self.entry_qty and self.entry_price is not None and self.last_price is not None:
-            # P&L calculation
-            sign = 1 if self.is_long else -1
-            pnl_pts = (self.last_price - self.entry_price) * sign
-            gross_pnl = pnl_pts * DOLLARS_PER_POINT * self.entry_qty
+            # PHASE 6: Use Position domain model for P&L calculations
+            gross_pnl = self._position.unrealized_pnl(self.last_price)
             comm = COMM_PER_CONTRACT * self.entry_qty
             net_pnl = gross_pnl - comm
+
+            # Calculate pnl_pts for display (derived from gross)
+            sign = 1 if self.is_long else -1
+            pnl_pts = (self.last_price - self.entry_price) * sign
 
             data["pnl_points"] = pnl_pts
             data["gross_pnl"] = gross_pnl
             data["commissions"] = comm
             data["net_pnl"] = net_pnl
 
-            # MAE/MFE from TRADE extremes (not session extremes)
-            # LONG: MAE from min (adverse), MFE from max (favorable)
-            # SHORT: MAE from max (adverse), MFE from min (favorable)
-            # These track min/max SINCE position entry, not session-wide
-            if self._trade_min_price is not None and self._trade_max_price is not None:
-                if self.is_long:
-                    mae_pts = min(0.0, self._trade_min_price - self.entry_price)
-                    mfe_pts = max(0.0, self._trade_max_price - self.entry_price)
-                else:  # SHORT
-                    mae_pts = min(0.0, self.entry_price - self._trade_max_price)
-                    mfe_pts = max(0.0, self.entry_price - self._trade_min_price)
+            # MAE/MFE from Position domain model (uses tracked trade extremes)
+            mae_dollars = self._position.mae()
+            mfe_dollars = self._position.mfe()
+
+            if mae_dollars is not None and mfe_dollars is not None:
+                # Calculate points from dollars for backward compatibility
+                mae_pts = mae_dollars / (DOLLARS_PER_POINT * self.entry_qty) if self.entry_qty else 0.0
+                mfe_pts = mfe_dollars / (DOLLARS_PER_POINT * self.entry_qty) if self.entry_qty else 0.0
 
                 data["mae_points"] = mae_pts
                 data["mfe_points"] = mfe_pts
-                data["mae_dollars"] = mae_pts * DOLLARS_PER_POINT * self.entry_qty
-                data["mfe_dollars"] = mfe_pts * DOLLARS_PER_POINT * self.entry_qty
+                data["mae_dollars"] = mae_dollars
+                data["mfe_dollars"] = mfe_dollars
 
-                # Calculate efficiency: (realized PnL / MFE) if MFE > 0
-                if mfe_pts > 0 and "net_pnl" in data:
-                    # Efficiency = realized profit / maximum potential profit
-                    # Expressed as percentage (0.0 to 1.0, where 1.0 = 100% efficient)
-                    efficiency = min(1.0, max(0.0, data["net_pnl"] / (mfe_pts * DOLLARS_PER_POINT * self.entry_qty)))
-                    data["efficiency"] = efficiency
-                else:
-                    data["efficiency"] = None
+                # Efficiency from Position model (uses gross PnL consistently)
+                data["efficiency"] = self._position.efficiency(self.last_price)
+            else:
+                data["efficiency"] = None
 
-            # R-multiple
-            if self.stop_price is not None and float(self.stop_price) > 0:
-                risk_per_contract = abs(self.entry_price - float(self.stop_price)) * DOLLARS_PER_POINT
-                if risk_per_contract > 0:
-                    r_multiple = net_pnl / (risk_per_contract * self.entry_qty)
-                    data["r_multiple"] = r_multiple
+            # R-multiple from Position model
+            data["r_multiple"] = self._position.r_multiple(self.last_price)
 
             # Duration
             if self.entry_time_epoch:
