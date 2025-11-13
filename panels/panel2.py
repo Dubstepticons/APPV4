@@ -97,12 +97,12 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         self.current_mode: str = "SIM"
         self.current_account: str = ""
 
+        # PHASE 6 REFACTOR: Position domain model replaces scattered position fields
+        # This consolidates 12+ position fields into a single domain object
+        from domain.position import Position
         self.symbol: str = "ES"  # Default symbol, updated via set_symbol()
-        self.entry_price: Optional[float] = None  # NEVER pre-populated from cache
-        self.entry_qty: int = 0  # NEVER pre-populated from cache
-        self.is_long: Optional[bool] = None  # NEVER pre-populated from cache
-        self.target_price: Optional[float] = None
-        self.stop_price: Optional[float] = None
+        self._position: Position = Position.flat(mode=self.current_mode, account=self.current_account)
+        self._position.symbol = self.symbol  # Set default symbol
 
         # Feed state (live, continuously updated from CSV)
         self.last_price: Optional[float] = None
@@ -112,17 +112,8 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         self.cum_delta: Optional[float] = None
         self.poc: Optional[float] = None
 
-        # Entry snapshots (captured once at position entry, static)
-        self.entry_vwap: Optional[float] = None
-        self.entry_delta: Optional[float] = None
-        self.entry_poc: Optional[float] = None
-
-        # Timer state (persisted)
-        self.entry_time_epoch: Optional[int] = None  # when trade began
+        # Heat timer state (separate from Position, UI-specific)
         self.heat_start_epoch: Optional[int] = None  # when drawdown began
-        # Per-trade extremes for MAE/MFE
-        self._trade_min_price: Optional[float] = None
-        self._trade_max_price: Optional[float] = None
 
         # Timeframe state (for pills & pulsing dot)
         self._tf: str = "LIVE"
@@ -188,6 +179,67 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             log.error(f"[Panel2] Failed to connect to SignalBus: {e}")
             import traceback
             traceback.print_exc()
+
+    # -------------------- Compatibility properties (PHASE 6 REFACTOR) --------------------
+    # These properties proxy to the Position domain object for backward compatibility.
+    # Gradually migrate code to use _position directly, then remove these.
+
+    @property
+    def entry_price(self) -> Optional[float]:
+        """Entry price (proxies to _position.entry_price)."""
+        return self._position.entry_price if not self._position.is_flat else None
+
+    @property
+    def entry_qty(self) -> int:
+        """Entry quantity (proxies to _position.qty_abs)."""
+        return self._position.qty_abs
+
+    @property
+    def is_long(self) -> Optional[bool]:
+        """Position direction (proxies to _position.is_long)."""
+        return self._position.is_long
+
+    @property
+    def target_price(self) -> Optional[float]:
+        """Target price (proxies to _position.target_price)."""
+        return self._position.target_price
+
+    @property
+    def stop_price(self) -> Optional[float]:
+        """Stop price (proxies to _position.stop_price)."""
+        return self._position.stop_price
+
+    @property
+    def entry_vwap(self) -> Optional[float]:
+        """Entry VWAP snapshot (proxies to _position.entry_vwap)."""
+        return self._position.entry_vwap
+
+    @property
+    def entry_delta(self) -> Optional[float]:
+        """Entry cumulative delta snapshot (proxies to _position.entry_cum_delta)."""
+        return self._position.entry_cum_delta
+
+    @property
+    def entry_poc(self) -> Optional[float]:
+        """Entry POC snapshot (proxies to _position.entry_poc)."""
+        return self._position.entry_poc
+
+    @property
+    def entry_time_epoch(self) -> Optional[int]:
+        """Entry time as epoch (proxies to _position.entry_time)."""
+        if self._position.is_flat:
+            return None
+        return int(self._position.entry_time.timestamp())
+
+    @property
+    def _trade_min_price(self) -> Optional[float]:
+        """Trade minimum price for MAE (proxies to _position.trade_min_price)."""
+        return self._position.trade_min_price
+
+    @property
+    def _trade_max_price(self) -> Optional[float]:
+        """Trade maximum price for MFE (proxies to _position.trade_max_price)."""
+        return self._position.trade_max_price
 
     # -------------------- Trade persistence hooks (start)
     def notify_trade_closed(self, trade: dict) -> None:
