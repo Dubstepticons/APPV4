@@ -1,16 +1,19 @@
 """
 Live Panel Module
 
-Main Panel2 class for live trading metrics display.
-Extracted from panels/panel2.py for modularity.
+READ-ONLY UI LAYER for Panel2 live trading metrics display.
 
-Architecture:
-- Panel2: Main QWidget class
-- Delegation to helper modules:
-  * helpers: Utility functions
-  * state_manager: State persistence
-  * trade_handlers: Trade notifications
-  * metrics_updater: Cell calculations
+Architecture Contract:
+- NO state storage (all state in state_manager)
+- NO mutations (read-only access to state via state_manager.get_state())
+- NO calculations (delegates to metrics_updater)
+- ONLY UI updates and timer management
+
+Panel2 Architecture:
+- state_manager: Single source of truth for ALL state
+- metrics_updater: Pure calculation module (no mutations)
+- trade_handlers: DTC message normalization only
+- live_panel: Read-only UI layer (this file)
 
 Features:
 - 3x5 grid layout with 15 MetricCell widgets
@@ -39,6 +42,7 @@ from widgets.metric_cell import MetricCell
 
 # Import helper modules
 from panels.panel2 import state_manager, trade_handlers, metrics_updater
+from panels.panel2.state_manager import StateManager
 
 log = get_logger(__name__)
 
@@ -47,10 +51,6 @@ CSV_FEED_PATH = r"C:\Users\cgrah\Desktop\APPSIERRA\data\snapshot.csv"
 
 CSV_REFRESH_MS = 500
 TIMER_TICK_MS = 1000
-
-HEAT_WARN_SEC = 3 * 60  # 3:00 m
-HEAT_ALERT_FLASH_SEC = 4 * 60 + 30  # 4:30 m (start flashing)
-HEAT_ALERT_SOLID_SEC = 5 * 60  # 5:00 m (red + flash remain)
 # -------------------- Constants & Config (end)
 
 
@@ -59,6 +59,8 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
     """
     Panel 2 -- Live trading metrics, 3x5 grid layout. Live CSV feed (500 ms),
     Duration/Heat timers with persistence, state-change logging.
+
+    Architecture: READ-ONLY UI - all state in StateManager.
     """
 
     tradesChanged = QtCore.pyqtSignal(object)
@@ -66,36 +68,9 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
     def __init__(self, parent=None):
         super().__init__(parent)
 
-        # CRITICAL: (mode, account) scoping
-        self.current_mode: str = "SIM"
-        self.current_account: str = ""
-
-        self.symbol: str = "ES"  # Default symbol, updated via set_symbol()
-        self.entry_price: Optional[float] = None  # NEVER pre-populated from cache
-        self.entry_qty: int = 0  # NEVER pre-populated from cache
-        self.is_long: Optional[bool] = None  # NEVER pre-populated from cache
-        self.target_price: Optional[float] = None
-        self.stop_price: Optional[float] = None
-
-        # Feed state (live, continuously updated from CSV)
-        self.last_price: Optional[float] = None
-        self.session_high: Optional[float] = None
-        self.session_low: Optional[float] = None
-        self.vwap: Optional[float] = None
-        self.cum_delta: Optional[float] = None
-        self.poc: Optional[float] = None
-
-        # Entry snapshots (captured once at position entry, static)
-        self.entry_vwap: Optional[float] = None
-        self.entry_delta: Optional[float] = None
-        self.entry_poc: Optional[float] = None
-
-        # Timer state (persisted)
-        self.entry_time_epoch: Optional[int] = None  # when trade began
-        self.heat_start_epoch: Optional[int] = None  # when drawdown began
-        # Per-trade extremes for MAE/MFE
-        self._trade_min_price: Optional[float] = None
-        self._trade_max_price: Optional[float] = None
+        # CRITICAL: StateManager is the SINGLE SOURCE OF TRUTH
+        # Panel stores NO state - all data lives in state_manager
+        self._state_manager = StateManager()
 
         # Timeframe state (for pills & pulsing dot)
         self._tf: str = "LIVE"
@@ -107,12 +82,13 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
 
         # Load scoped state after UI is built
         try:
-            state_manager.load_state(self)
+            self._state_manager.load_state()
         except Exception as e:
             log.warning(f"[Panel2] Failed to load initial state: {e}")
 
         # First paint
-        metrics_updater.refresh_all_cells(self, initial=True)
+        state = self._state_manager.get_state()
+        metrics_updater.refresh_all_cells(self, state, initial=True)
 
         # Apply current theme colors (in case theme was switched before this panel was created)
         self.refresh_theme()
@@ -140,15 +116,21 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         """
         trade_handlers.on_order_update(self, payload)
 
+        # Refresh UI after handler updates state
+        state = self._state_manager.get_state()
+        metrics_updater.refresh_all_cells(self, state)
+
     def on_position_update(self, payload: dict) -> None:
         """
-        Handle normalized PositionUpdate from DTC and mirror into local state.
+        Handle normalized PositionUpdate from DTC and mirror into state_manager.
         Delegates to trade_handlers module.
 
         Args:
             payload: Normalized position update dict from MessageRouter (lowercase keys)
         """
         trade_handlers.on_position_update(self, payload)
+
+        # UI refresh already handled by trade_handlers
 
     # -------------------- Trade persistence hooks (end)
 
@@ -317,34 +299,60 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
           * Price cell shows entry price from DTC (e.g., "2 @ 5800.25")
           * Live price from CSV is NOT displayed but used for calculations
         """
-        prev = (self.last_price, self.session_high, self.session_low, self.vwap, self.cum_delta)
         updated = self._read_snapshot_csv()
         if not updated:
             return
 
+        # Get state from state_manager (read-only)
+        state = self._state_manager.get_state()
+
         # Track per-trade min/max while in position for MAE/MFE
+        # CRITICAL: Update state_manager, not panel fields
         try:
-            if self.entry_qty and self.last_price is not None:
-                p = float(self.last_price)
-                if self._trade_min_price is None or p < self._trade_min_price:
-                    self._trade_min_price = p
-                if self._trade_max_price is None or p > self._trade_max_price:
-                    self._trade_max_price = p
+            if state.entry_qty and state.last_price is not None:
+                p = float(state.last_price)
+                if state.trade_min_price is None or p < state.trade_min_price:
+                    state.trade_min_price = p
+                if state.trade_max_price is None or p > state.trade_max_price:
+                    state.trade_max_price = p
         except Exception:
             pass
 
         # UI update
-        metrics_updater.refresh_all_cells(self)
+        metrics_updater.refresh_all_cells(self, state)
 
         # Proximity alerts
-        metrics_updater.update_proximity_alerts(self)
+        metrics_updater.update_proximity_alerts(self, state)
 
         # Update the non-cell banner
-        metrics_updater.update_live_banner(self)
+        metrics_updater.update_live_banner(self, state)
 
     def _on_clock_tick(self):
-        # Just update time/heat text and color thresholds every second
-        metrics_updater.update_time_and_heat_cells(self)
+        """
+        Timer tick for duration/heat updates.
+
+        CRITICAL: Handle heat timer start/stop signals from metrics_updater.
+        """
+        # Get state from state_manager
+        state = self._state_manager.get_state()
+
+        # Update time/heat display (this sets _heat_should_start/_heat_should_stop signals)
+        metrics_updater.update_time_and_heat_cells(self, state)
+
+        # Handle heat timer signals (bridge until we refactor timer to state-manager)
+        if hasattr(self, '_heat_should_start') and self._heat_should_start:
+            # Start heat timer
+            state.heat_start_epoch = int(time.time())
+            self._heat_should_start = False
+            log.info("[panel2] Heat timer STARTED")
+
+        if hasattr(self, '_heat_should_stop') and self._heat_should_stop:
+            # Stop heat timer
+            if state.heat_start_epoch is not None:
+                elapsed = int(time.time() - state.heat_start_epoch)
+                log.info(f"[panel2] Heat timer PAUSED (was underwater for {elapsed}s)")
+            state.heat_start_epoch = None
+            self._heat_should_stop = False
 
     def _read_snapshot_csv(self) -> bool:
         """
@@ -352,8 +360,13 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
           - Expects header row: last,high,low,vwap,cum_delta,poc
           - Uses FIRST data row after the header (row 2)
           - Robust to BOM and column re-ordering
+
+        CRITICAL: Updates state_manager, NOT panel fields.
         """
         try:
+            # Get state from state_manager
+            state = self._state_manager.get_state()
+
             with open(CSV_FEED_PATH, newline="", encoding="utf-8-sig") as f:
                 reader = csv.DictReader(f)
                 row = next(reader, None)  # first data row after header
@@ -369,28 +382,13 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                     except (ValueError, TypeError):
                         return 0.0
 
-                # DEBUG: Log raw CSV row data
-                log.debug(f"[panel2] CSV row keys: {list(row.keys())}")
-                log.debug(f"[panel2] CSV row data: {row}")
-
-                self.last_price = fnum("last")
-                self.session_high = fnum("high")
-                self.session_low = fnum("low")
-                self.vwap = fnum("vwap")
-                self.cum_delta = fnum("cum_delta")
-                self.poc = fnum("poc")
-
-                # DEBUG: Log parsed values
-                log.debug(f"[panel2] Parsed CSV - last={self.last_price}, vwap={self.vwap}, cum_delta={self.cum_delta}, poc={self.poc}")
-
-                # PERIODIC: Log CSV values every 10 seconds to track changes
-                import time as time_mod
-                now = time_mod.time()
-                if not hasattr(self, '_last_csv_log_time'):
-                    self._last_csv_log_time = 0
-                if now - self._last_csv_log_time >= 10:
-                    self._last_csv_log_time = now
-                    log.info(f"[panel2] CSV Feed - cum_delta={self.cum_delta}, poc={self.poc}, vwap={self.vwap}, last={self.last_price}")
+                # Update state_manager, NOT panel fields
+                state.last_price = fnum("last")
+                state.session_high = fnum("high")
+                state.session_low = fnum("low")
+                state.vwap = fnum("vwap")
+                state.cum_delta = fnum("cum_delta")
+                state.poc = fnum("poc")
 
                 return True
 
@@ -411,71 +409,49 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
 
     # -------------------- Position Interface (start)
     def set_position(self, qty: int, entry_price: float, is_long: Optional[bool]):
-        self.entry_qty = max(0, int(qty))
+        """
+        DEPRECATED: Use state_manager directly.
+        Kept for backward compatibility with tests.
+        """
+        # Get state from state_manager
+        state = self._state_manager.get_state()
+
+        state.entry_qty = max(0, int(qty))
 
         # Start duration timer if entering a position
-        if self.entry_qty > 0 and entry_price is not None:
-            self.entry_price = float(entry_price)
-            self.is_long = is_long
-            if not self.entry_time_epoch:
-                self.entry_time_epoch = int(time.time())
+        if state.entry_qty > 0 and entry_price is not None:
+            state.entry_price = float(entry_price)
+            state.is_long = is_long
+            if not state.entry_time_epoch:
+                state.entry_time_epoch = int(time.time())
                 # Capture VWAP, Delta, and POC snapshots at entry (static values)
-                self.entry_vwap = self.vwap
-                self.entry_delta = self.cum_delta
-                self.entry_poc = self.poc
+                state.entry_vwap = state.vwap
+                state.entry_delta = state.cum_delta
+                state.entry_poc = state.poc
                 # Initialize trade extremes to entry price (prevents premature MAE/MFE)
-                self._trade_min_price = self.entry_price
-                self._trade_max_price = self.entry_price
+                state.trade_min_price = state.entry_price
+                state.trade_max_price = state.entry_price
 
-                # DEBUG: Comprehensive logging for entry snapshots
-                log.info(f"[panel2] ========== Position Opened - Entry Snapshots ==========")
-                log.info(f"  CSV Feed Path: {CSV_FEED_PATH}")
-                log.info(f"  Entry Price: {self.entry_price}")
-                log.info(f"  Entry Qty: {self.entry_qty} ({'LONG' if self.is_long else 'SHORT'})")
-                log.info(f"  ---")
-                log.info(f"  Live VWAP from CSV: {self.vwap}")
-                log.info(f"  Captured Entry VWAP: {self.entry_vwap}")
-                log.info(f"  ---")
-                log.info(f"  Live cum_delta from CSV: {self.cum_delta} <-- CHECK THIS VALUE")
-                log.info(f"  Captured Entry Delta: {self.entry_delta} <-- THIS IS WHAT DISPLAYS")
-                log.info(f"  ---")
-                log.info(f"  Live POC from CSV: {self.poc}")
-                log.info(f"  Captured Entry POC: {self.entry_poc}")
-                log.info(f"  ---")
-                log.info(f"  Last Price: {self.last_price}")
-                log.info(f"[panel2] ==========================================================")
-
-                # CRITICAL: Warn if any snapshot is None
-                if self.entry_vwap is None:
-                    log.warning("[panel2] WARNING: entry_vwap is None - VWAP cell will not display!")
-                if self.entry_delta is None:
-                    log.warning("[panel2] WARNING: entry_delta is None - Delta cell will not display!")
-                if self.entry_poc is None:
-                    log.warning("[panel2] WARNING: entry_poc is None - POC cell will not display!")
+                log.info(f"[panel2] Position opened via set_position(): vwap={state.entry_vwap}, delta={state.entry_delta}, poc={state.entry_poc}")
         else:
-            # No position - clear all position-specific data
-            self.entry_price = None
-            self.is_long = None
-            self.target_price = None
-            self.stop_price = None
-            self.entry_vwap = None
-            self.entry_delta = None
-            self.entry_poc = None
-            self.entry_time_epoch = None
-            self.heat_start_epoch = None
-            # Clear trade extremes (MAE/MFE tracking)
-            self._trade_min_price = None
-            self._trade_max_price = None
+            # No position - reset state via state_manager
+            self._state_manager.reset_position()
             log.info("[panel2] Position closed -- all position data cleared")
-        state_manager.save_state(self)
-        metrics_updater.refresh_all_cells(self)
-        metrics_updater.update_live_banner(self)
+
+        self._state_manager.save_state()
+        metrics_updater.refresh_all_cells(self, state)
+        metrics_updater.update_live_banner(self, state)
 
     def set_targets(self, target_price: Optional[float], stop_price: Optional[float]):
-        self.target_price = float(target_price) if target_price is not None else None
-        self.stop_price = float(stop_price) if stop_price is not None else None
-        metrics_updater.refresh_all_cells(self)
-        metrics_updater.update_live_banner(self)
+        """
+        DEPRECATED: Use state_manager directly.
+        Kept for backward compatibility with tests.
+        """
+        state = self._state_manager.get_state()
+        state.target_price = float(target_price) if target_price is not None else None
+        state.stop_price = float(stop_price) if stop_price is not None else None
+        metrics_updater.refresh_all_cells(self, state)
+        metrics_updater.update_live_banner(self, state)
 
     def set_symbol(self, symbol: str):
         """
@@ -483,9 +459,10 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         Extracts 3-letter display symbol from full DTC symbol.
         Example: 'F.US.MESZ25' -> 'MES'
         """
-        self.symbol = symbol.strip().upper() if symbol else "ES"
+        state = self._state_manager.get_state()
+        state.symbol = symbol.strip().upper() if symbol else "ES"
         # Extract display symbol (3 letters after "US.")
-        display_sym = extract_symbol_display(self.symbol)
+        display_sym = extract_symbol_display(state.symbol)
         if hasattr(self, "symbol_banner"):
             self.symbol_banner.setText(display_sym)
 
@@ -550,7 +527,8 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
     def refresh(self) -> None:
         """Public refresh method to align with tests and other panels."""
         try:
-            metrics_updater.refresh_all_cells(self)
+            state = self._state_manager.get_state()
+            metrics_updater.refresh_all_cells(self, state)
         except Exception:
             pass
 
@@ -559,33 +537,37 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         Expose current trade metrics for Panel 3 to grab directly.
         Returns all live trading data including P&L, MAE, MFE, R-multiple, etc.
         Panel 3 uses this for real-time statistical analysis before storage.
+
+        CRITICAL: Read from state_manager, not panel fields.
         """
+        state = self._state_manager.get_state()
+
         data = {
-            "symbol": self.symbol,
-            "entry_qty": self.entry_qty,
-            "entry_price": self.entry_price,
-            "is_long": self.is_long,
-            "target_price": self.target_price,
-            "stop_price": self.stop_price,
-            "last_price": self.last_price,
-            "session_high": self.session_high,
-            "session_low": self.session_low,
-            "vwap": self.vwap,
-            "cum_delta": self.cum_delta,
-            "entry_time_epoch": self.entry_time_epoch,
-            "heat_start_epoch": self.heat_start_epoch,
-            "trade_min_price": self._trade_min_price,
-            "trade_max_price": self._trade_max_price,
+            "symbol": state.symbol,
+            "entry_qty": state.entry_qty,
+            "entry_price": state.entry_price,
+            "is_long": state.is_long,
+            "target_price": state.target_price,
+            "stop_price": state.stop_price,
+            "last_price": state.last_price,
+            "session_high": state.session_high,
+            "session_low": state.session_low,
+            "vwap": state.vwap,
+            "cum_delta": state.cum_delta,
+            "entry_time_epoch": state.entry_time_epoch,
+            "heat_start_epoch": state.heat_start_epoch,
+            "trade_min_price": state.trade_min_price,
+            "trade_max_price": state.trade_max_price,
         }
 
         # Calculate derived metrics if we have an active position
-        if self.entry_qty and self.entry_price is not None and self.last_price is not None:
+        if state.entry_qty and state.entry_price is not None and state.last_price is not None:
             # P&L calculation using symbol-aware constants
-            spec = match_spec(self.symbol)
-            sign = 1 if self.is_long else -1
-            pnl_pts = (self.last_price - self.entry_price) * sign
-            gross_pnl = pnl_pts * spec["pt_value"] * self.entry_qty
-            comm = spec["rt_fee"] * self.entry_qty
+            spec = match_spec(state.symbol)
+            sign = 1 if state.is_long else -1
+            pnl_pts = (state.last_price - state.entry_price) * sign
+            gross_pnl = pnl_pts * spec["pt_value"] * state.entry_qty
+            comm = spec["rt_fee"] * state.entry_qty
             net_pnl = gross_pnl - comm
 
             data["pnl_points"] = pnl_pts
@@ -594,47 +576,42 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             data["net_pnl"] = net_pnl
 
             # MAE/MFE from TRADE extremes (not session extremes)
-            # LONG: MAE from min (adverse), MFE from max (favorable)
-            # SHORT: MAE from max (adverse), MFE from min (favorable)
-            # These track min/max SINCE position entry, not session-wide
-            if self._trade_min_price is not None and self._trade_max_price is not None:
+            if state.trade_min_price is not None and state.trade_max_price is not None:
                 # Use centralized TradeMath calculation
                 mae_pts, mfe_pts = TradeMath.calculate_mae_mfe(
-                    entry_price=self.entry_price,
-                    trade_min_price=self._trade_min_price,
-                    trade_max_price=self._trade_max_price,
-                    is_long=self.is_long,
+                    entry_price=state.entry_price,
+                    trade_min_price=state.trade_min_price,
+                    trade_max_price=state.trade_max_price,
+                    is_long=state.is_long,
                 )
 
                 if mae_pts is not None and mfe_pts is not None:
                     data["mae_points"] = mae_pts
                     data["mfe_points"] = mfe_pts
-                    data["mae_dollars"] = mae_pts * spec["pt_value"] * self.entry_qty
-                    data["mfe_dollars"] = mfe_pts * spec["pt_value"] * self.entry_qty
+                    data["mae_dollars"] = mae_pts * spec["pt_value"] * state.entry_qty
+                    data["mfe_dollars"] = mfe_pts * spec["pt_value"] * state.entry_qty
 
                 # Calculate efficiency: (realized PnL / MFE) if MFE > 0
                 if mfe_pts > 0 and "net_pnl" in data:
-                    # Efficiency = realized profit / maximum potential profit
-                    # Expressed as percentage (0.0 to 1.0, where 1.0 = 100% efficient)
-                    efficiency = min(1.0, max(0.0, data["net_pnl"] / (mfe_pts * spec["pt_value"] * self.entry_qty)))
+                    efficiency = min(1.0, max(0.0, data["net_pnl"] / (mfe_pts * spec["pt_value"] * state.entry_qty)))
                     data["efficiency"] = efficiency
                 else:
                     data["efficiency"] = None
 
             # R-multiple
-            if self.stop_price is not None and float(self.stop_price) > 0:
-                risk_per_contract = abs(self.entry_price - float(self.stop_price)) * spec["pt_value"]
+            if state.stop_price is not None and float(state.stop_price) > 0:
+                risk_per_contract = abs(state.entry_price - float(state.stop_price)) * spec["pt_value"]
                 if risk_per_contract > 0:
-                    r_multiple = net_pnl / (risk_per_contract * self.entry_qty)
+                    r_multiple = net_pnl / (risk_per_contract * state.entry_qty)
                     data["r_multiple"] = r_multiple
 
             # Duration
-            if self.entry_time_epoch:
-                data["duration_seconds"] = int(time.time() - self.entry_time_epoch)
+            if state.entry_time_epoch:
+                data["duration_seconds"] = int(time.time() - state.entry_time_epoch)
 
             # Heat duration
-            if self.heat_start_epoch:
-                data["heat_seconds"] = int(time.time() - self.heat_start_epoch)
+            if state.heat_start_epoch:
+                data["heat_seconds"] = int(time.time() - state.heat_start_epoch)
 
         return data
 
@@ -642,33 +619,40 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         """
         Expose current CSV feed data for Panel 3 analysis.
         Returns live market data: price, high, low, vwap, delta.
+
+        CRITICAL: Read from state_manager, not panel fields.
         """
+        state = self._state_manager.get_state()
         return {
-            "last_price": self.last_price,
-            "session_high": self.session_high,
-            "session_low": self.session_low,
-            "vwap": self.vwap,
-            "cum_delta": self.cum_delta,
+            "last_price": state.last_price,
+            "session_high": state.session_high,
+            "session_low": state.session_low,
+            "vwap": state.vwap,
+            "cum_delta": state.cum_delta,
         }
 
     def get_trade_state(self) -> dict:
         """
         Expose position state for Panel 3 queries.
         Returns basic position information: qty, entry, direction, targets.
+
+        CRITICAL: Read from state_manager, not panel fields.
         """
+        state = self._state_manager.get_state()
         return {
-            "symbol": self.symbol,
-            "qty": self.entry_qty,
-            "entry_price": self.entry_price,
-            "is_long": self.is_long,
-            "target_price": self.target_price,
-            "stop_price": self.stop_price,
-            "has_position": bool(self.entry_qty and self.entry_qty > 0),
+            "symbol": state.symbol,
+            "qty": state.entry_qty,
+            "entry_price": state.entry_price,
+            "is_long": state.is_long,
+            "target_price": state.target_price,
+            "stop_price": state.stop_price,
+            "has_position": state.has_position(),
         }
 
     def has_active_position(self) -> bool:
         """Quick check if there's an active trade for Panel 3 to analyze."""
-        return bool(self.entry_qty and self.entry_qty > 0 and self.entry_price is not None)
+        state = self._state_manager.get_state()
+        return state.has_position()
 
     def seed_demo_position(
         self,
@@ -724,5 +708,101 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
 
     # Ensure timers persisted on close
     def closeEvent(self, ev: QtGui.QCloseEvent) -> None:
-        state_manager.save_state(self)
+        self._state_manager.save_state()
         super().closeEvent(ev)
+
+
+    # -------------------- Properties for backward compatibility (start) ----------
+    # These provide read-only access to state for tests and external code
+    # DO NOT use these internally - use state_manager.get_state() instead
+
+    @property
+    def current_mode(self) -> str:
+        """Current trading mode (read from state_manager)."""
+        return self._state_manager.get_active_scope()[0]
+
+    @current_mode.setter
+    def current_mode(self, value: str) -> None:
+        """Set current mode (updates state_manager)."""
+        _, account = self._state_manager.get_active_scope()
+        self._state_manager.set_active_scope(value, account)
+
+    @property
+    def current_account(self) -> str:
+        """Current account (read from state_manager)."""
+        return self._state_manager.get_active_scope()[1]
+
+    @current_account.setter
+    def current_account(self, value: str) -> None:
+        """Set current account (updates state_manager)."""
+        mode, _ = self._state_manager.get_active_scope()
+        self._state_manager.set_active_scope(mode, value)
+
+    # Direct state field access for backward compatibility
+    # All of these are READ-ONLY properties that read from state_manager
+
+    @property
+    def symbol(self) -> str:
+        return self._state_manager.get_state().symbol
+
+    @property
+    def entry_price(self) -> Optional[float]:
+        return self._state_manager.get_state().entry_price
+
+    @property
+    def entry_qty(self) -> int:
+        return self._state_manager.get_state().entry_qty
+
+    @property
+    def is_long(self) -> Optional[bool]:
+        return self._state_manager.get_state().is_long
+
+    @property
+    def target_price(self) -> Optional[float]:
+        return self._state_manager.get_state().target_price
+
+    @property
+    def stop_price(self) -> Optional[float]:
+        return self._state_manager.get_state().stop_price
+
+    @property
+    def last_price(self) -> Optional[float]:
+        return self._state_manager.get_state().last_price
+
+    @property
+    def session_high(self) -> Optional[float]:
+        return self._state_manager.get_state().session_high
+
+    @property
+    def session_low(self) -> Optional[float]:
+        return self._state_manager.get_state().session_low
+
+    @property
+    def vwap(self) -> Optional[float]:
+        return self._state_manager.get_state().vwap
+
+    @property
+    def cum_delta(self) -> Optional[float]:
+        return self._state_manager.get_state().cum_delta
+
+    @property
+    def entry_vwap(self) -> Optional[float]:
+        return self._state_manager.get_state().entry_vwap
+
+    @property
+    def entry_delta(self) -> Optional[float]:
+        return self._state_manager.get_state().entry_delta
+
+    @property
+    def entry_poc(self) -> Optional[float]:
+        return self._state_manager.get_state().entry_poc
+
+    @property
+    def entry_time_epoch(self) -> Optional[int]:
+        return self._state_manager.get_state().entry_time_epoch
+
+    @property
+    def heat_start_epoch(self) -> Optional[int]:
+        return self._state_manager.get_state().heat_start_epoch
+
+    # -------------------- Properties for backward compatibility (end) ------------
