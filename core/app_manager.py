@@ -1,10 +1,24 @@
+"""
+core/app_manager.py
+
+MainWindow orchestration for APPV4 trading application.
+
+Responsibilities:
+- Initialize and manage the vertical panel stack (Panel1, Panel2, Panel3)
+- Orchestrate DTC connection and authentication
+- Route theme changes to all panels
+- Manage trading mode (SIM/LIVE) state
+- Connect SignalBus events to panel updates
+
+Architecture:
+- Uses SignalBus for all cross-component messaging (replaces MessageRouter)
+- Panels are decoupled and communicate via Qt signals
+- Thread-safe DTC event handling via QueuedConnection
+"""
+
 from __future__ import annotations
 
 import contextlib
-
-# File: core/app_manager.py
-# Block: full-module (Part 1/1)
-# Purpose: MainWindow orchestration, vertical panel stack, theme routing, DTC init & guarded logon
 import os
 
 from PyQt6 import QtCore, QtWidgets

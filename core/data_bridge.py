@@ -1,12 +1,32 @@
+"""
+core/data_bridge.py
+
+DTC Protocol Client for Qt-based trading application.
+
+Responsibilities:
+- Manage TCP connection to DTC Protocol server
+- Handle DTC JSON message framing (null-terminated)
+- Event normalization and routing via SignalBus
+- Heartbeat monitoring and watchdog
+- Auto-reconnect with exponential backoff
+- Handshake and authentication sequencing
+
+Protocol:
+- DTC Protocol JSON encoding (null-terminated messages)
+- Heartbeat exchange for connection health
+- Trade account, position, and order updates
+- Account balance and equity monitoring
+
+Thread Safety:
+- Runs DTC socket operations in background thread
+- Emits Qt signals for thread-safe UI updates
+- Uses QueuedConnection for cross-thread signal delivery
+"""
+
 from __future__ import annotations
 
 import contextlib
 import time
-
-# File: core/data_bridge.py
-# DTC JSON bridge (Qt): null-terminated framing, event normalization,
-# heartbeat, watchdog, auto-reconnect, and handshake-ready signaling.
-# -------------------- Imports (start)
 from typing import Any, Dict, Optional
 
 from blinker import Signal
