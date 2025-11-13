@@ -887,6 +887,10 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                 log.info(
                     f"[panel2] Position opened -- Entry VWAP: {self.entry_vwap}, Entry Delta: {self.entry_delta}, Entry POC: {self.entry_poc}"
                 )
+
+                # CRITICAL: Write position to database (single source of truth)
+                self._write_position_to_database()
+
         else:
             # No position - clear all position-specific data
             self.entry_price = None
@@ -923,6 +927,97 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         display_symbol = extract_symbol_display(self.symbol)
         if hasattr(self, "symbol_banner"):
             self.symbol_banner.setText(display_symbol)
+
+    def _write_position_to_database(self) -> bool:
+        """
+        Write current position to database (single source of truth).
+
+        Called when position is opened or updated. Implements write-through pattern:
+        Panel2 state + Database state are synchronized immediately.
+
+        Returns:
+            True if write succeeded, False otherwise
+        """
+        if self.entry_qty <= 0 or self.entry_price is None:
+            return False
+
+        try:
+            from data.position_repository import get_position_repository
+            from datetime import datetime, timezone
+
+            position_repo = get_position_repository()
+
+            # Convert entry_time_epoch to datetime
+            entry_time = None
+            if self.entry_time_epoch:
+                entry_time = datetime.fromtimestamp(self.entry_time_epoch, tz=timezone.utc)
+            else:
+                entry_time = datetime.now(timezone.utc)
+
+            # Determine signed quantity (positive = long, negative = short)
+            signed_qty = self.entry_qty if self.is_long else -self.entry_qty
+
+            # Write to database
+            success = position_repo.save_open_position(
+                mode=self.current_mode,
+                account=self.current_account,
+                symbol=self.symbol,
+                qty=signed_qty,
+                entry_price=self.entry_price,
+                entry_time=entry_time,
+                entry_vwap=self.entry_vwap,
+                entry_cum_delta=self.entry_delta,
+                entry_poc=self.entry_poc,
+                target_price=self.target_price,
+                stop_price=self.stop_price,
+            )
+
+            if success:
+                log.info(
+                    f"[Panel2 DB] Wrote position to database: {self.current_mode}/{self.current_account} "
+                    f"{self.symbol} {signed_qty}@{self.entry_price}"
+                )
+            else:
+                log.error(f"[Panel2 DB] Failed to write position to database")
+
+            return success
+
+        except Exception as e:
+            log.error(f"[Panel2 DB] Error writing position to database: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def _update_trade_extremes_in_database(self) -> bool:
+        """
+        Update trade min/max prices in database for MAE/MFE tracking.
+
+        Called periodically (e.g., every 100ms) while position is open.
+        Updates only if current price is a new extreme.
+
+        Returns:
+            True if update succeeded, False otherwise
+        """
+        if self.entry_qty <= 0 or self.last_price is None:
+            return False
+
+        try:
+            from data.position_repository import get_position_repository
+
+            position_repo = get_position_repository()
+
+            # Update trade extremes in database
+            success = position_repo.update_trade_extremes(
+                mode=self.current_mode,
+                account=self.current_account,
+                current_price=self.last_price
+            )
+
+            return success
+
+        except Exception as e:
+            # Silently fail (this is called very frequently)
+            return False
 
     # -------------------- Position Interface (end)
 
