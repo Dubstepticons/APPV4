@@ -132,6 +132,9 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         self._build()
         self._setup_timers()
 
+        # MIGRATION: Connect to SignalBus for event-driven updates
+        self._connect_signal_bus()
+
         # Load scoped state after UI is built
         try:
             self._load_state()
@@ -143,6 +146,48 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
 
         # Apply current theme colors (in case theme was switched before this panel was created)
         self.refresh_theme()
+
+    def _connect_signal_bus(self) -> None:
+        """
+        Connect to SignalBus for event-driven updates.
+
+        MIGRATION: This replaces MessageRouter direct method calls.
+        Panels now subscribe to SignalBus Qt signals instead of being called directly.
+
+        Connected signals:
+        - positionUpdated → on_position_update()
+        - orderUpdateReceived → on_order_update()
+        - modeChanged → set_trading_mode()
+        """
+        try:
+            from core.signal_bus import get_signal_bus
+
+            signal_bus = get_signal_bus()
+
+            # Position updates from DTC
+            signal_bus.positionUpdated.connect(
+                self.on_position_update,
+                type=QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
+            )
+
+            # Order updates from DTC
+            signal_bus.orderUpdateReceived.connect(
+                self.on_order_update,
+                type=QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
+            )
+
+            # Mode changes
+            signal_bus.modeChanged.connect(
+                lambda mode: self.set_trading_mode(mode, None),
+                type=QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
+            )
+
+            log.info("[Panel2] Connected to SignalBus for DTC events")
+
+        except Exception as e:
+            log.error(f"[Panel2] Failed to connect to SignalBus: {e}")
+            import traceback
+            traceback.print_exc()
 
     # -------------------- Trade persistence hooks (start)
     def notify_trade_closed(self, trade: dict) -> None:

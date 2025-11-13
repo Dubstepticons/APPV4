@@ -227,6 +227,9 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
         # Wire balance signal from StateManager
         self._wire_balance_signal()
 
+        # MIGRATION: Connect to SignalBus for event-driven updates
+        self._connect_signal_bus()
+
         # Initialize PnL display to $0.00 (0.00%) in neutral color instead of dashes
         # This happens after wiring so signals are ready
         self.set_pnl_for_timeframe(pnl_value=0.0, pnl_pct=0.0, up=None)
@@ -237,6 +240,78 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
 
         # Schedule size check after UI is fully rendered
         QtCore.QTimer.singleShot(500, self._debug_sizes)
+
+    def _connect_signal_bus(self) -> None:
+        """
+        Connect to SignalBus for event-driven updates.
+
+        MIGRATION: This replaces MessageRouter direct method calls.
+        Panels now subscribe to SignalBus Qt signals instead of being called directly.
+
+        Connected signals:
+        - balanceUpdated → updates StateManager and triggers UI update
+        - modeChanged → set_trading_mode()
+        """
+        try:
+            from core.signal_bus import get_signal_bus
+
+            signal_bus = get_signal_bus()
+
+            # Balance updates from DTC (LIVE mode only)
+            def _on_balance_updated(balance: float, account: str):
+                """
+                Handle balance update from DTC.
+
+                CRITICAL: Only processes LIVE mode balances.
+                SIM mode uses PnL-calculated balance, not DTC broker balance.
+                """
+                try:
+                    from utils.trade_mode import detect_mode_from_account
+                    from core.app_state import get_state_manager
+
+                    mode = detect_mode_from_account(account) if account else "SIM"
+
+                    # Skip SIM mode balance updates from DTC
+                    if mode == "SIM":
+                        log.debug(
+                            "[Panel1] Skipping DTC balance for SIM mode",
+                            dtc_balance=balance
+                        )
+                        return
+
+                    # Update StateManager (LIVE mode only)
+                    state = get_state_manager()
+                    if state:
+                        state.set_balance_for_mode(mode, balance)
+                        log.debug(f"[Panel1] Updated {mode} balance: ${balance:,.2f}")
+
+                        # Update UI if this is the active mode
+                        if mode == state.current_mode:
+                            self.set_account_balance(balance)
+                            self.update_equity_series_from_balance(balance, mode=mode)
+
+                except Exception as e:
+                    log.error(f"[Panel1] Error handling balance update: {e}")
+                    import traceback
+                    traceback.print_exc()
+
+            signal_bus.balanceUpdated.connect(
+                _on_balance_updated,
+                type=QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
+            )
+
+            # Mode changes
+            signal_bus.modeChanged.connect(
+                lambda mode: self.set_trading_mode(mode, None),
+                type=QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
+            )
+
+            log.info("[Panel1] Connected to SignalBus for DTC events")
+
+        except Exception as e:
+            log.error(f"[Panel1] Failed to connect to SignalBus: {e}")
+            import traceback
+            traceback.print_exc()
 
     # -------------------- UI BUILD (start) -----------------------------------
     def _build_ui(self) -> None:
