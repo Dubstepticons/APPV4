@@ -117,7 +117,7 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         # First paint
         self._refresh_all_cells(initial=True)
 
-        log.info("panel2.initialized", mode=self.current_mode, symbol=self.symbol)
+        log.info(f"Panel2 initialized: mode={self.current_mode}, symbol={self.symbol}")
 
     def _build(self):
         """
@@ -160,7 +160,7 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         self.clock_timer.timeout.connect(self.chart_integration.on_clock_tick)
         self.clock_timer.start(TIMER_TICK_MS)
 
-        log.info("panel2.timers_started", csv_ms=CSV_REFRESH_MS, clock_ms=TIMER_TICK_MS)
+        log.info(f"Panel2 timers started: csv_ms={CSV_REFRESH_MS}, clock_ms={TIMER_TICK_MS}")
 
     def _connect_signal_bus(self):
         """

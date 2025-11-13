@@ -56,7 +56,7 @@ class ChartIntegration:
         self.cum_delta: Optional[float] = None
         self.poc: Optional[float] = None
 
-        log.info("chart_integration.initialized", csv_path=csv_path)
+        log.info(f"Chart integration initialized with CSV path: {csv_path}")
 
     def on_csv_tick(self):
         """
@@ -107,7 +107,7 @@ class ChartIntegration:
                 return True
 
         except Exception as e:
-            log.error("chart_integration.read_error", error=str(e))
+            log.error(f"Chart integration read error: {e}")
             return False
 
     def update_heat_state_transitions(self, prev_price: Optional[float], new_price: Optional[float]):
@@ -142,7 +142,7 @@ class ChartIntegration:
         if crossed and self.panel.position_display.heat_start_epoch is None:
             import time
             self.panel.position_display.heat_start_epoch = int(time.time())
-            log.info("chart_integration.heat_started", entry_price=entry_price, new_price=new_price)
+            log.info(f"Heat started: entry_price={entry_price}, new_price={new_price}")
 
     def update_proximity_alerts(self):
         """
