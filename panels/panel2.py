@@ -785,6 +785,20 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                     self._trade_min_price = p
                 if self._trade_max_price is None or p > self._trade_max_price:
                     self._trade_max_price = p
+
+                # PHASE 6: Write trade extremes to database for MAE/MFE persistence
+                # This enables accurate MAE/MFE calculation even after crash/restart
+                try:
+                    from data.position_repository import get_position_repository
+                    position_repo = get_position_repository()
+                    position_repo.update_trade_extremes(
+                        mode=self.current_mode,
+                        account=self.current_account,
+                        current_price=p
+                    )
+                except Exception as e:
+                    # Non-critical: DB update failure shouldn't stop trading
+                    log.debug(f"[Panel2] Trade extremes DB update failed: {e}")
         except Exception:
             pass
 
