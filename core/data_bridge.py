@@ -169,7 +169,7 @@ def _dtc_to_app_event(dtc: dict) -> Optional[AppMessage]:
         return AppMessage(type="ORDER_UPDATE", payload=_normalize_order(dtc))
 
     # DEBUG: Log unhandled message types (helps identify missing handlers)
-    try:
+    with contextlib.suppress(Exception):
         from config.settings import DEBUG_DTC
 
         # Patch 2: Suppress Type 501 (market data) noise from debug logs
@@ -177,8 +177,6 @@ def _dtc_to_app_event(dtc: dict) -> Optional[AppMessage]:
             import sys
 
             print(f"[UNHANDLED-DTC-TYPE] Type {msg_type} ({name}) - no handler", file=sys.stderr, flush=True)
-    except Exception:
-        pass
 
     return None
 
@@ -406,7 +404,7 @@ class DTCClientJSON(QtCore.QObject):
 
         # Preferred path: detect explicit LogonResponse(success)
         def _check_logon(msg: dict) -> None:
-            try:
+            with contextlib.suppress(Exception):
                 t = msg.get("Type") or msg.get("type") or msg.get("MessageType")
                 result = msg.get("Result") or msg.get("result") or msg.get("Status")
                 is_logon_resp = (t == LOGON_RESPONSE) or (isinstance(t, str) and t.lower() == "logonresponse")
@@ -428,9 +426,6 @@ class DTCClientJSON(QtCore.QObject):
                     with contextlib.suppress(Exception):
                         # Kick off initial data requests
                         self._request_initial_data()
-            except Exception:
-                # Non-fatal (UI glue)
-                pass
 
         # Wire to our own raw message signal
         with contextlib.suppress(Exception):
@@ -627,11 +622,9 @@ class DTCClientJSON(QtCore.QObject):
             print(f"[DTC] Type: {msg_type} ({msg_name})")
 
         # Emit raw message for listeners (e.g., handshake detector / app_manager fallback)
-        try:
+        with contextlib.suppress(Exception):
             self.message.emit(dtc)
             self.messageReceived.emit(dtc)
-        except Exception:
-            pass
 
         # Normalize & dispatch app-level event
         app_msg = _dtc_to_app_event(dtc)
@@ -693,7 +686,7 @@ class DTCClientJSON(QtCore.QObject):
         """Best-effort detection of Binary DTC frames and log a clear hint once."""
         if self._binary_mode_suspected:
             return
-        try:
+        with contextlib.suppress(Exception):
             if not raw or len(raw) < 4:
                 return
             # DTC binary: [uint16 size][uint16 type] little-endian
@@ -712,9 +705,6 @@ class DTCClientJSON(QtCore.QObject):
                         "DTC server appears to be in BINARY mode. Enable JSON/Compact: "
                         "Global Settings > Data/Trade Service Settings > DTC Protocol Server."
                     )
-        except Exception:
-            # Non-fatal; keep normal flow
-            pass
 
     # -------------------- Dispatch to app (start)
     def _emit_app(self, app_msg: AppMessage) -> None:

@@ -64,10 +64,8 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if os.getenv("DEBUG_DTC", "0") == "1":
             print("DEBUG: MainWindow.__init__ COMPLETE")
-        try:
+        with contextlib.suppress(Exception):
             log.info("[startup] MainWindow initialized")
-        except Exception:
-            pass
 
     def _setup_window(self) -> None:
         """Configure window properties."""
@@ -172,7 +170,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Suppress timeframe handling during startup init
         self._startup_done: bool = False
         # Apply base theme BEFORE building widgets to avoid initial flicker
-        try:
+        with contextlib.suppress(Exception):
             from config.theme import switch_theme
 
             switch_theme(self.current_theme_mode.lower())
@@ -184,8 +182,6 @@ class MainWindow(QtWidgets.QMainWindow):
                         int(THEME.get("ui_font_size", 14)),
                     )
                 )
-        except Exception:
-            pass
 
     def _build_ui(self) -> None:
         """Build UI panels and initialize DTC connection."""
@@ -246,12 +242,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self._setup_cross_panel_linkage(outer)
         # Reassert intended theme after panel construction, in case any panel
         # applied its own global theme during __init__.
-        try:
+        with contextlib.suppress(Exception):
             self.on_theme_changed(self.current_theme_mode)
             if os.getenv("DEBUG_DTC", "0") == "1":
                 log.debug(f"[Theme] Reapplied {self.current_theme_mode.upper()} after panel init")
-        except Exception:
-            pass
 
         # Initialize Panel1's session start balance and equity curve
         # This ensures PnL calculates from the session start, not from the first balance update
@@ -320,18 +314,16 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Stats panel timeframe -> central handler
         if hasattr(self.panel_stats, "timeframeChanged"):
-            try:
+            with contextlib.suppress(Exception):
                 self.panel_stats.timeframeChanged.connect(
                     self._on_stats_tf_changed,
                     type=QtCore.Qt.ConnectionType.UniqueConnection,
                 )
                 if os.getenv("DEBUG_DTC", "0") == "1":
                     log.debug("[Startup] Wired Panel3 timeframe -> _on_stats_tf_changed")
-            except Exception:
-                pass
 
         # Panel2 pills timeframe -> central handler
-        try:
+        with contextlib.suppress(Exception):
             pills = getattr(self.panel_live, "pills", None)
             if pills is not None and hasattr(pills, "timeframeChanged"):
                 pills.timeframeChanged.connect(
@@ -340,8 +332,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 )
                 if os.getenv("DEBUG_DTC", "0") == "1":
                     log.debug("[Startup] Wired Panel2 pills timeframe -> _on_live_pills_tf_changed")
-        except Exception:
-            pass
 
         # Refresh Panel 3 stats when Panel 2 reports a closed trade
         # Also trigger Panel 3 to grab data from Panel 2 for analysis
@@ -398,7 +388,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _setup_theme_toolbar(self) -> None:
         """Setup theme switcher toolbar (ENV-gated)."""
-        try:
+        with contextlib.suppress(Exception):
             show_toolbar = str(os.getenv("APPSIERRA_SHOW_THEME_TOOLBAR", "0")).strip().lower() in (
                 "1",
                 "true",
@@ -423,15 +413,11 @@ class MainWindow(QtWidgets.QMainWindow):
                 tb.addAction(act_live)
 
                 # Optional: Optimize Archives action (manual trigger for SQLite VACUUM)
-                try:
+                with contextlib.suppress(Exception):
                     act_opt = QtWidgets.QAction("Optimize Archives", self)
                     act_opt.triggered.connect(self._optimize_archives_ui)
                     tb.addSeparator()
                     tb.addAction(act_opt)
-                except Exception:
-                    pass
-        except Exception:
-            pass
 
     def _setup_mode_selector(self) -> None:
         """Setup mode selector hotkey (Ctrl+Shift+M)."""
@@ -488,15 +474,13 @@ class MainWindow(QtWidgets.QMainWindow):
             log.info(f"[Hotkey] SIM balance reset to ${new_balance:,.2f}")
 
             # Show user feedback
-            try:
+            with contextlib.suppress(Exception):
                 from PyQt6.QtWidgets import QMessageBox
                 QMessageBox.information(
                     self,
                     "SIM Balance Reset",
                     f"SIM balance has been reset to ${new_balance:,.2f}"
                 )
-            except Exception:
-                pass
 
         except Exception as e:
             log.error(f"[Hotkey] Error resetting SIM balance: {e}", exc_info=True)

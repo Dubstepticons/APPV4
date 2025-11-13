@@ -192,7 +192,7 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
         Force timeframe pills to refresh their colors from THEME.
         Called when trading mode switches (DEBUG/SIM/LIVE) to update pill colors.
         """
-        try:
+        with contextlib.suppress(Exception):
             if hasattr(self.tf_pills, "set_active_color"):
                 # Clear cached color to force refresh
                 if hasattr(self.tf_pills, "_last_active_hex"):
@@ -202,8 +202,6 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
                 from config.theme import ColorTheme
 
                 self.tf_pills.set_active_color(THEME.get("pnl_neu_color", "#9CA3AF"))
-        except Exception:
-            pass
 
     # -------------------- Public API -----------------------------------------
     def update_metrics(self, data: dict[str, Any]) -> None:
@@ -269,13 +267,11 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
             combined = {**trade_data, **feed_data, **state_data}
             return combined
         except Exception as e:
-            try:
+            with contextlib.suppress(Exception):
                 from utils.logger import get_logger
 
                 log = get_logger(__name__)
                 log.warning(f"[panel3] Failed to grab data from Panel 2: {e}")
-            except Exception:
-                pass
             return None
 
     def register_order_event(self, payload: dict) -> None:
@@ -286,7 +282,7 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
         Args:
             payload: Normalized order update dict from message_router
         """
-        try:
+        with contextlib.suppress(Exception):
             # Just log for now - Panel 3 updates via _load_metrics_for_timeframe
             from utils.logger import get_logger
 
@@ -294,8 +290,6 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
             order_status = payload.get("OrderStatus")
             if order_status in (3, 7):  # Filled status
                 log.debug("[panel3] Order filled detected - will refresh metrics on next timeframe check")
-        except Exception:
-            pass
 
     def analyze_and_store_trade_snapshot(self) -> None:
         """
@@ -422,19 +416,15 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
                 self.sharpe_bar.set_value(0.0)
 
             # Set pills to neutral color
-            try:
+            with contextlib.suppress(Exception):
                 if hasattr(self.tf_pills, "set_active_color"):
                     self.tf_pills.set_active_color(THEME.get("pnl_neu_color", "#9CA3AF"))
-            except Exception:
-                pass
 
         except Exception as e:
-            try:
+            with contextlib.suppress(Exception):
                 from utils.logger import get_logger
                 log = get_logger(__name__)
                 log.error(f"[panel3] Error displaying empty metrics: {e}")
-            except Exception:
-                pass
 
     def on_trade_closed(self, trade_payload: dict) -> None:
         """Called when Panel 2 reports a closed trade.
@@ -455,9 +445,7 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
 
             log.debug(f"[panel3] Metrics refreshed on trade close")
         except Exception as e:
-            try:
+            with contextlib.suppress(Exception):
                 from utils.logger import get_logger
                 log = get_logger(__name__)
                 log.error(f"[panel3] Error handling trade close: {e}")
-            except Exception:
-                pass

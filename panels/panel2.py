@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 import csv
 from datetime import UTC, datetime, timezone
 import json
@@ -717,7 +718,7 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         outer.addLayout(pills_row)
 
         # Initialize live dot state/color
-        try:
+        with contextlib.suppress(Exception):
             if hasattr(self.pills, "set_live_dot_visible"):
                 self.pills.set_live_dot_visible(True)
             if hasattr(self.pills, "set_live_dot_pulsing"):
@@ -729,8 +730,6 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                     else THEME.get("pnl_neu_color", "#C9CDD0")
                 )
                 self.pills.set_active_color(color)
-        except Exception:
-            pass
 
         # ---- Live Position header (horizontal layout: title, symbol, and price on same row)
         hdr = QtWidgets.QHBoxLayout()
@@ -863,7 +862,7 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         # Heat transitions (drawdown tracking)
         self._update_heat_state_transitions(prev[0], self.last_price)
         # Track per-trade min/max while in position for MAE/MFE
-        try:
+        with contextlib.suppress(Exception):
             if self.entry_qty and self.last_price is not None:
                 p = float(self.last_price)
                 if self._trade_min_price is None or p < self._trade_min_price:
@@ -884,8 +883,6 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                 except Exception as e:
                     # Non-critical: DB update failure shouldn't stop trading
                     log.debug(f"[Panel2] Trade extremes DB update failed: {e}")
-        except Exception:
-            pass
 
         # UI update
         self._refresh_all_cells()
