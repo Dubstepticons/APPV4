@@ -61,11 +61,15 @@ class SignalBus(QtCore.QObject):
     #: Position update from DTC (dict with position fields)
     positionUpdated = QtCore.pyqtSignal(dict)
 
-    #: Position closed - emits trade record dict
+    #: Position closed - emits trade record dict (OUTCOME event from service)
     positionClosed = QtCore.pyqtSignal(dict)
 
     #: Position extremes updated (for MAE/MFE tracking)
     positionExtremesUpdated = QtCore.pyqtSignal(str, str, float)  # mode, account, price
+
+    # ARCHITECTURE (Step 7): Trade lifecycle intents from UI
+    #: User requested to close position (INTENT signal from Panel2)
+    tradeCloseRequested = QtCore.pyqtSignal(dict)  # trade dict with exit context
 
     # ========================================================================
     # ORDER EVENTS

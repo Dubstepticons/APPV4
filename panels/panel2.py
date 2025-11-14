@@ -148,9 +148,10 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         Panels now subscribe to SignalBus Qt signals instead of being called directly.
 
         Connected signals:
-        - positionUpdated  on_position_update()
-        - orderUpdateReceived  on_order_update()
-        - modeChanged  set_trading_mode()
+        - positionUpdated → on_position_update()
+        - orderUpdateReceived → on_order_update()
+        - modeChanged → set_trading_mode()
+        - positionClosed → _on_position_closed() [Step 7]
         """
         try:
             from core.signal_bus import get_signal_bus
@@ -167,6 +168,12 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             signal_bus.orderUpdateReceived.connect(
                 self.on_order_update,
                 QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
+            )
+
+            # ARCHITECTURE (Step 7): Position closed from TradeCloseService
+            signal_bus.positionClosed.connect(
+                self._on_position_closed,
+                QtCore.Qt.ConnectionType.QueuedConnection
             )
 
             # Mode changes
@@ -332,33 +339,29 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
 
     # -------------------- Trade persistence hooks (start)
     def notify_trade_closed(self, trade: dict) -> None:
-        """External hook to persist a closed trade and notify listeners.
+        """External hook to request trade closure via event-driven architecture.
 
-        CRITICAL: Uses PositionRepository to atomically close position:
-        - Reads from OpenPosition table
-        - Writes to TradeRecord table
-        - Deletes from OpenPosition table
-        All in one database transaction.
+        ARCHITECTURE FIX (Step 7): Event-driven trade closure
+        ========================================================================
+        This method now emits SignalBus.tradeCloseRequested instead of calling
+        the repository directly. The flow is:
+
+        1. Panel2.notify_trade_closed(trade) → emits tradeCloseRequested
+        2. TradeCloseService handles event → calls PositionRepository
+        3. Service emits positionClosed → Panel2 updates UI
+
+        Benefits:
+          - Panel2 decoupled from data layer
+          - Service layer owns business rules
+          - Testable without UI
+          - Consistent with event-driven architecture
+        ========================================================================
 
         Expects keys: symbol, side, qty, entry_price, exit_price, realized_pnl,
         optional: entry_time, exit_time, commissions, r_multiple, mae, mfe, account.
         """
-        log.info("[Panel2 DEBUG] ========== notify_trade_closed CALLED ==========")
-        log.info(f"[Panel2 DEBUG] Trade data: {trade}")
-
-        # Get current balance BEFORE processing
-        try:
-            from core.app_state import get_state_manager
-            state = get_state_manager()
-            account = trade.get("account", "")
-            # CONSOLIDATION FIX: Use canonical mode detection (single source of truth)
-            mode = detect_mode_from_account(account)
-            balance_before = state.get_balance_for_mode(mode) if state else None
-            log.info(f"[Panel2 DEBUG] Mode: {mode}, Account: {account}, Balance: {balance_before}")
-        except Exception as e:
-            balance_before = None
-            mode = "UNKNOWN"
-            log.error(f"[Panel2 DEBUG] Error getting state: {e}")
+        log.info("[Panel2] ========== notify_trade_closed CALLED ==========")
+        log.info(f"[Panel2] Trade data: {trade}")
 
         # Log trade close summary
         symbol = trade.get("symbol", "UNKNOWN")
@@ -367,40 +370,84 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         entry = trade.get("entry_price", "?")
         exit_p = trade.get("exit_price", "?")
         qty = trade.get("qty", "?")
+        account = trade.get("account", "")
 
-        log.info(f"[Panel2 DEBUG] Trade summary: {symbol} {qty} @ {entry} -> {exit_p}, P&L: {pnl_sign}{pnl}")
+        log.info(f"[Panel2] Trade summary: {symbol} {qty} @ {entry} -> {exit_p}, P&L: {pnl_sign}{pnl}, Account: {account}")
 
-        # CRITICAL: Close position in database (single source of truth)
-        # This replaces the old TradeManager approach
-        log.info("[Panel2 DEBUG] Calling _close_position_in_database...")
-        ok = self._close_position_in_database(trade)
-        log.info(f"[Panel2 DEBUG] Database close result: {ok}")
-
-        if not ok:
-            # Fallback to old TradeManager approach if database close fails
-            ok = self._close_position_legacy(trade)
-
-        # Emit regardless; consumers may refresh their views
+        # ARCHITECTURE FIX (Step 7): Emit intent signal instead of calling repository
         try:
-            payload = dict(trade)
-            payload["ok"] = ok
-            log.info(f"[Panel2 DEBUG] Emitting tradesChanged signal with payload: {payload}")
-            self.tradesChanged.emit(payload)
-
-            # PHASE 4: Also emit to SignalBus for Panel3 analytics (replaces direct call)
-            log.info("[Panel2 DEBUG] Getting SignalBus instance...")
             from core.signal_bus import get_signal_bus
             signal_bus = get_signal_bus()
-            log.info(f"[Panel2 DEBUG] SignalBus instance: {signal_bus}")
-            log.info("[Panel2 DEBUG] Emitting tradeClosedForAnalytics signal to SignalBus...")
-            signal_bus.tradeClosedForAnalytics.emit(payload)
-            log.info("[Panel2 DEBUG] ========== Signal emission COMPLETE ==========")
+
+            log.info("[Panel2] Emitting tradeCloseRequested signal to TradeCloseService...")
+            signal_bus.tradeCloseRequested.emit(trade)
+            log.info("[Panel2] ========== Trade close request SENT ==========")
+
+            # Note: Panel2 will receive positionClosed signal from TradeCloseService
+            # to update UI (via _on_position_closed handler connected in __init__)
+
         except Exception as e:
-            log.error(f"[panel2.notify_trade_closed] Error emitting signal: {e}")
+            log.error(f"[Panel2] Error emitting trade close request: {e}")
             import traceback
             traceback.print_exc()
-            pass
 
+    def _on_position_closed(self, closed_position: dict) -> None:
+        """
+        Handle positionClosed signal from TradeCloseService.
+
+        ARCHITECTURE (Step 7): Event-driven UI update
+        ========================================================================
+        This is the completion of the event-driven trade closure flow:
+        1. Panel2 emitted tradeCloseRequested
+        2. TradeCloseService processed closure (DB + StateManager)
+        3. Service emits positionClosed → THIS HANDLER
+
+        Responsibilities:
+          - Clear position display in Panel2 UI
+          - Emit legacy tradesChanged for backward compatibility
+          - Log trade closure completion
+        ========================================================================
+
+        Args:
+            closed_position: Trade record dict from service with DB data
+        """
+        try:
+            log.info("[Panel2] ========== positionClosed RECEIVED from Service ==========")
+            log.info(f"[Panel2] Closed position: {closed_position}")
+
+            # Clear position display
+            self._clear_position_ui()
+
+            # Emit legacy signal for backward compatibility with any remaining subscribers
+            try:
+                payload = dict(closed_position)
+                payload["ok"] = True  # Service only emits on success
+                self.tradesChanged.emit(payload)
+                log.info(f"[Panel2] Emitted legacy tradesChanged signal")
+            except Exception as e:
+                log.error(f"[Panel2] Error emitting legacy signal: {e}")
+
+            log.info("[Panel2] ========== Position closed UI update COMPLETE ==========")
+
+        except Exception as e:
+            log.error(f"[Panel2] Error handling positionClosed: {e}", exc_info=True)
+
+    def _clear_position_ui(self) -> None:
+        """Clear position display in Panel2 UI."""
+        try:
+            # Reset position object
+            if self._position:
+                self._position = None
+
+            # Clear position labels/widgets
+            # (Panel2 UI widgets will handle this via their own update logic)
+            log.debug("[Panel2] Position UI cleared")
+
+        except Exception as e:
+            log.error(f"[Panel2] Error clearing position UI: {e}")
+
+    # DEPRECATED (Step 7): This method is no longer used in event-driven architecture
+    # Kept for reference but will be removed in future cleanup
     def _close_position_in_database(self, trade: dict) -> bool:
         """
         Close position using PositionRepository (database as source of truth).

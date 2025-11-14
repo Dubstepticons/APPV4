@@ -69,6 +69,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Initialize state and UI
         self._setup_window()
         self._setup_state_manager()
+        self._setup_trade_services()  # ARCHITECTURE (Step 7): Initialize trade lifecycle services
         self._setup_theme()
         self._build_ui()
         self._recover_open_positions()  # CRITICAL: Restore positions from database after crash/restart
@@ -121,6 +122,37 @@ class MainWindow(QtWidgets.QMainWindow):
             import traceback
             traceback.print_exc()
             self._state = None
+
+    def _setup_trade_services(self) -> None:
+        """
+        Initialize trade lifecycle services.
+
+        ARCHITECTURE (Step 7): Service layer setup
+        ========================================================================
+        This initializes the event-driven trade lifecycle services:
+          - TradeCloseService: Handles trade closure requests from UI
+
+        Services are wired to SignalBus and StateManager to orchestrate:
+          UI → Intent Signal → Service → Repository + State → Outcome Signal → UI
+        ========================================================================
+        """
+        try:
+            from services.trade_close_service import get_trade_close_service
+            from core.signal_bus import get_signal_bus
+
+            # Get singleton instances
+            trade_close_service = get_trade_close_service()
+            signal_bus = get_signal_bus()
+
+            # Initialize service with dependencies
+            if self._state:
+                trade_close_service.initialize(self._state, signal_bus)
+                log.info("[Startup] TradeCloseService initialized")
+            else:
+                log.warning("[Startup] Cannot initialize TradeCloseService - StateManager not available")
+
+        except Exception as e:
+            log.error(f"[Startup] Failed to initialize trade services: {e}", exc_info=True)
 
     def _recover_open_positions(self) -> None:
         """
