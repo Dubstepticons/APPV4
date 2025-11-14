@@ -3,13 +3,30 @@ data/position_repository.py
 
 Repository pattern for position persistence - single source of truth.
 
+ARCHITECTURE PRINCIPLE (Step 4): PositionRepository is the ONLY writer
+================================================================================
+This repository is the EXCLUSIVE gateway for all OpenPosition and TradeRecord
+database writes. No other component is allowed to write to these tables.
+
+ALLOWED:
+  - PositionRepository methods (this file)
+  - Migration scripts (data/db_engine.py)
+
+FORBIDDEN:
+  - Panel2 direct DB writes (removed in Step 7)
+  - StateManager DB writes (StateManager is cache only)
+  - Any other component writing to OpenPosition or TradeRecord
+
+Enforcement: Code review and architecture documentation
+================================================================================
+
 This module provides a clean abstraction for position database operations,
 implementing the Repository pattern to decouple business logic from SQL.
 
 Key Operations:
 - save_open_position(): Upsert open position (write-through)
 - get_open_position(): Read current open position for mode/account
-- close_position(): Move from OpenPosition  TradeRecord
+- close_position(): Move from OpenPosition → TradeRecord
 - update_trade_extremes(): Update MAE/MFE tracking
 - recover_all_open_positions(): Startup recovery
 

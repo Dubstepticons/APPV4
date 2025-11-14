@@ -405,6 +405,23 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         """
         Close position using PositionRepository (database as source of truth).
 
+        ARCHITECTURE VIOLATION (Step 4): Panel calls repository directly
+        ========================================================================
+        This method violates the architecture principle that panels should NOT
+        call repositories or perform persistence operations directly.
+
+        CURRENT STATE:
+          - Panel2 directly calls PositionRepository.close_position()
+          - This creates tight coupling between UI and data layer
+
+        TARGET STATE (Step 7):
+          - Panel2 emits SignalBus.tradeCloseRequested(trade)
+          - TradeCloseService handles the event and calls repository
+          - Panel2 listens to SignalBus.positionClosed for UI updates
+
+        This violation will be fixed in Step 7: Rebuild Trade Lifecycle
+        ========================================================================
+
         This is the new approach that atomically:
         1. Reads from OpenPosition table
         2. Writes to TradeRecord table
