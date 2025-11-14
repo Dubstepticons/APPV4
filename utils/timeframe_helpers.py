@@ -18,7 +18,7 @@ def timeframe_start(tf: str, now: Optional[datetime] = None) -> datetime:
     Previously duplicated in services/stats_service.py and services/trade_service.py.
 
     Args:
-        tf: Timeframe string ("1D", "1W", "1M", "3M", "YTD")
+        tf: Timeframe string ("LIVE", "1D", "1W", "1M", "3M", "YTD")
         now: Reference datetime (defaults to current UTC time)
 
     Returns:
@@ -35,6 +35,9 @@ def timeframe_start(tf: str, now: Optional[datetime] = None) -> datetime:
     now = now or datetime.utcnow()
     t = tf.upper()
 
+    if t == "LIVE":
+        # Short-horizon "live" view (last 1 hour)
+        return now - timedelta(hours=1)
     if t == "1D":
         return now - timedelta(days=1)
     if t == "1W":

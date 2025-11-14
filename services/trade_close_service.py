@@ -78,10 +78,8 @@ class TradeCloseService(QtCore.QObject):
         """
         try:
             log.info(
-                "[TradeCloseService] Trade close requested",
-                symbol=trade.get("symbol"),
-                account=trade.get("account"),
-                exit_price=trade.get("exit_price")
+                f"[TradeCloseService] Trade close requested: "
+                f"symbol={trade.get('symbol')}, account={trade.get('account')}, exit_price={trade.get('exit_price')}"
             )
 
             # Validate required fields
@@ -103,27 +101,35 @@ class TradeCloseService(QtCore.QObject):
                 self._emit_error("Trade close failed: StateManager not available")
                 return
 
-            # Use StateManager's current mode as authoritative
-            # (Panel2 should be in sync, but StateManager is the coordination point)
+            # Use StateManager's mode/account when available; otherwise fall back to trade data.
+            # This avoids overwriting a valid trade account (e.g., "Sim1") with None.
             mode = self.state_manager.current_mode
             canonical_account = self.state_manager.current_account
 
-            # Cross-check account from trade dict with StateManager
-            if account != canonical_account:
-                log.warning(
-                    "[TradeCloseService] Account mismatch",
-                    trade_account=account,
-                    state_account=canonical_account,
-                    using_state_account=True
-                )
-                # Use StateManager's account as authoritative
-                account = canonical_account
+            # If StateManager has no account yet, trust the trade's account
+            if canonical_account is None:
+                from utils.trade_mode import detect_mode_from_account
+
+                # Derive mode from account if StateManager is still at default
+                derived_mode = detect_mode_from_account(account)
+                if mode != derived_mode:
+                    log.warning(
+                        "[TradeCloseService] Mode/account derived from trade: "
+                        f"state_mode={mode}, derived_mode={derived_mode}, account={account}"
+                    )
+                    mode = derived_mode
+            else:
+                # Cross-check account from trade dict with StateManager when both are set
+                if account != canonical_account:
+                    log.warning(
+                        "[TradeCloseService] Account mismatch: "
+                        f"trade_account={account}, state_account={canonical_account}, using_state_account=True"
+                    )
+                    # Use StateManager's account as authoritative
+                    account = canonical_account
 
             log.debug(
-                "[TradeCloseService] Closing position",
-                mode=mode,
-                account=account,
-                symbol=trade.get("symbol")
+                f"[TradeCloseService] Closing position: mode={mode}, account={account}, symbol={trade.get('symbol')}"
             )
 
             # Close position in database (via repository - only writer to DB)
@@ -140,10 +146,8 @@ class TradeCloseService(QtCore.QObject):
                 new_balance = current_balance + realized_pnl
 
                 log.info(
-                    f"[TradeCloseService] Updating {mode} balance",
-                    old_balance=current_balance,
-                    pnl=realized_pnl,
-                    new_balance=new_balance
+                    f"[TradeCloseService] Updating {mode} balance: "
+                    f"old_balance={current_balance}, pnl={realized_pnl}, new_balance={new_balance}"
                 )
 
                 self.state_manager.set_balance_for_mode(mode, new_balance)
@@ -156,10 +160,7 @@ class TradeCloseService(QtCore.QObject):
             self._emit_trade_for_analytics(closed_position)
 
             log.info(
-                "[TradeCloseService] Trade closed successfully",
-                mode=mode,
-                account=account,
-                pnl=realized_pnl
+                f"[TradeCloseService] Trade closed successfully: mode={mode}, account={account}, pnl={realized_pnl}"
             )
 
         except Exception as e:
@@ -196,31 +197,49 @@ class TradeCloseService(QtCore.QObject):
             entry_cum_delta = trade.get("entry_cum_delta")
             exit_vwap = trade.get("exit_vwap")
             exit_cum_delta = trade.get("exit_cum_delta")
+            # For SIM mode, the historical schema uses empty-string account as the key.
+            # Map SIM accounts like "Sim1" to "" for repository calls, but keep the
+            # original account on the closed_position payload for UI/analytics.
+            repo_account = account
+            if mode == "SIM" and account and account.lower().startswith("sim"):
+                repo_account = ""
 
             # Close position in DB (atomic operation)
-            closed_position = position_repo.close_position(
+            trade_id = position_repo.close_position(
                 mode=mode,
-                account=account,
+                account=repo_account,
                 exit_price=exit_price,
                 exit_time=exit_time,
-                mae=mae,
-                mfe=mfe,
-                efficiency=efficiency,
+                realized_pnl=trade.get("realized_pnl"),
                 commissions=commissions,
-                r_multiple=r_multiple,
-                entry_vwap=entry_vwap,
-                entry_cum_delta=entry_cum_delta,
                 exit_vwap=exit_vwap,
-                exit_cum_delta=exit_cum_delta
+                exit_cum_delta=exit_cum_delta,
             )
 
-            if closed_position:
-                log.info(
-                    "[TradeCloseService] Position closed in DB",
-                    mode=mode,
-                    account=account,
-                    pnl=closed_position.get("realized_pnl")
+            if not trade_id:
+                log.error(
+                    f"[TradeCloseService] PositionRepository.close_position returned no trade_id "
+                    f"for mode={mode}, account={account}"
                 )
+                return None
+
+            # Build closed position payload for UI and analytics signals.
+            # Use the original trade dict as a base, but ensure canonical mode/account
+            # and include the trade_id returned from the repository.
+            closed_position: dict[str, Any] = dict(trade)
+            closed_position["trade_id"] = trade_id
+            closed_position["mode"] = mode
+            closed_position["account"] = account
+
+            # Ensure realized_pnl is present for balance updates; fall back to 0.0
+            if closed_position.get("realized_pnl") is None:
+                closed_position["realized_pnl"] = 0.0
+
+            log.info(
+                f"[TradeCloseService] Position closed in DB: "
+                f"mode={mode}, account={account}, trade_id={trade_id}, "
+                f"pnl={closed_position.get('realized_pnl')}"
+            )
 
             return closed_position
 

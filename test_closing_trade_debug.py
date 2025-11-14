@@ -36,6 +36,35 @@ def main():
     # Create QApplication
     app = QtWidgets.QApplication(sys.argv)
 
+    # ========== CRITICAL: Initialize Service Layer ==========
+    log.info("\n" + "=" * 80)
+    log.info("INITIALIZING SERVICE LAYER (StateManager + SignalBus + TradeCloseService)")
+    log.info("=" * 80)
+
+    # Import service layer components
+    from core.state_manager import StateManager
+    from core.signal_bus import get_signal_bus
+    from services.trade_close_service import get_trade_close_service
+
+    # Create StateManager
+    log.info("[TEST] Creating StateManager...")
+    state_manager = StateManager()
+    state_manager.set_mode("SIM")  # Set to SIM mode for this test
+    state_manager.current_account = "Sim1"
+    log.info(f"[TEST] StateManager created: mode={state_manager.current_mode}, account={state_manager.current_account}")
+
+    # Get SignalBus singleton
+    log.info("[TEST] Getting SignalBus singleton...")
+    signal_bus = get_signal_bus()
+    log.info("[TEST] SignalBus obtained")
+
+    # Get TradeCloseService singleton and initialize it
+    log.info("[TEST] Initializing TradeCloseService...")
+    trade_close_service = get_trade_close_service()
+    trade_close_service.initialize(state_manager, signal_bus)
+    log.info("[TEST] TradeCloseService initialized and wired to SignalBus")
+    log.info("[TEST] ✅ Service layer ready: Panel2 → SignalBus → TradeCloseService → SignalBus → Panel3")
+
     # Import panels
     from panels.panel2 import Panel2
     from panels.panel3 import Panel3
@@ -153,11 +182,17 @@ def main():
 
     # Final summary
     log.info("\n" + "=" * 80)
-    log.info("TEST SUMMARY")
+    log.info("TEST SUMMARY - Signal Flow Verification")
     log.info("=" * 80)
-    log.info("1. Check the logs above for '[Panel2 DEBUG]' messages to trace signal emission")
-    log.info("2. Check the logs above for '[Panel3 DEBUG]' messages to trace signal reception")
-    log.info("3. If Panel3 DEBUG messages are missing, the signal is NOT being received")
+    log.info("Expected signal flow:")
+    log.info("  Panel2 → tradeCloseRequested → TradeCloseService → tradeClosedForAnalytics → Panel3")
+    log.info("")
+    log.info("Check logs above for:")
+    log.info("  1. '[Panel2]' - Should show 'Emitting tradeCloseRequested signal'")
+    log.info("  2. '[TradeCloseService]' - Should show 'Trade close requested' and 'Trade closed successfully'")
+    log.info("  3. '[Panel3 DEBUG]' or '[Panel3]' - Should show 'on_trade_closed' called")
+    log.info("")
+    log.info("If any step is missing, the signal chain is broken at that point.")
     log.info("=" * 80)
 
     # Don't start event loop - just exit

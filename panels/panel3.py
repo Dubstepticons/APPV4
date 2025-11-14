@@ -351,10 +351,11 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
                 pass
 
     # -------------------- Data & Metrics (local to Panel 3) -----------------
-    def _load_metrics_for_timeframe(self, tf: str) -> None:
+    def _load_metrics_for_timeframe(self, tf: str, mode_override: Optional[str] = None) -> None:
         """Query closed trades within timeframe and update metric cells and Sharpe bar.
         Prefers TradeRecord.exit_time; falls back to timestamp if absent.
-        Filters by active trading mode (SIM/LIVE).
+        Filters by trading mode (SIM/LIVE). Uses mode_override when provided,
+        otherwise falls back to the active UI mode from StateManager.
         """
         log.info(f"[Panel3 DEBUG] ========== _load_metrics_for_timeframe CALLED ==========")
         log.info(f"[Panel3 DEBUG] Timeframe: {tf}")
@@ -365,18 +366,21 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
             log.error(f"[Panel3 DEBUG] Failed to import stats_service: {e}")
             return
 
-        # Get active mode from state manager
-        mode = None
-        try:
-            from core.app_state import get_state_manager
-            state = get_state_manager()
-            # ALWAYS use current_mode (UI mode) not position_mode (open trade mode)
-            # Panel 3 should show stats for the mode the UI is displaying
-            mode = state.current_mode if state else "SIM"
-            log.info(f"[Panel3 DEBUG] Current mode from state manager: {mode}")
-        except Exception as e:
-            mode = "SIM"  # Default fallback
-            log.error(f"[Panel3 DEBUG] Error getting mode, defaulting to SIM: {e}")
+        # Determine mode to query
+        if mode_override:
+            mode = mode_override
+            log.info(f"[Panel3 DEBUG] Mode override from payload: {mode}")
+        else:
+            mode = None
+            try:
+                from core.app_state import get_state_manager
+                state = get_state_manager()
+                # Use current_mode (UI mode) when no explicit mode is provided
+                mode = state.current_mode if state else "SIM"
+                log.info(f"[Panel3 DEBUG] Current mode from state manager: {mode}")
+            except Exception as e:
+                mode = "SIM"  # Default fallback
+                log.error(f"[Panel3 DEBUG] Error getting mode, defaulting to SIM: {e}")
 
         log.info(f"[Panel3 DEBUG] Computing stats for timeframe={tf}, mode={mode}...")
         payload = compute_trading_stats_for_timeframe(tf, mode=mode)
@@ -461,9 +465,10 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
             log.info(f"[Panel3 DEBUG] Trade payload: {trade_payload}")
             log.info(f"[Panel3 DEBUG] Current timeframe: {self._tf}")
 
-            # Refresh the metrics for current timeframe
+            # Refresh the metrics for current timeframe, using trade mode when available
             log.info("[Panel3 DEBUG] Calling _load_metrics_for_timeframe...")
-            self._load_metrics_for_timeframe(self._tf)
+            trade_mode = trade_payload.get("mode")
+            self._load_metrics_for_timeframe(self._tf, mode_override=trade_mode)
             log.info("[Panel3 DEBUG] _load_metrics_for_timeframe completed")
 
             # Grab live data from Panel 2 if available

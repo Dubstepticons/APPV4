@@ -51,17 +51,27 @@ def invalidate_stats_cache() -> None:
         _stats_cache.clear()
 
 
+from utils.logger import get_logger
+
+
+log = get_logger(__name__)
+
+
 def compute_trading_stats_for_timeframe(tf: str, mode: str | None = None) -> dict[str, Any]:
     """Compute Panel 3 stats for the given timeframe using DB trades.
 
     Args:
-        tf: Timeframe ("1D", "1W", "1M", "3M", "YTD")
+        tf: Timeframe ("LIVE", "1D", "1W", "1M", "3M", "YTD")
         mode: Filter by mode ("SIM", "LIVE", or None for all)
 
     Returns a dict keyed by PANEL3_METRICS friendly labels.
     Uses TradeRecord.exit_time when present; falls back to timestamp.
     """
-    print(f"  timeframe={tf}, mode={mode}")
+    # Lightweight debug hook; can be filtered by log level
+    try:
+        log.debug("stats.compute.start", timeframe=tf, mode=mode)
+    except Exception:
+        pass
 
     # Local imports to avoid hard dependency at import time
     try:
@@ -96,7 +106,14 @@ def compute_trading_stats_for_timeframe(tf: str, mode: str | None = None) -> dic
             cached_time, cached_result = _stats_cache[cache_key]
             if now - cached_time < _CACHE_TTL_SECONDS:
                 # Cache hit - return cached result (make a copy to avoid external mutation)
-                print(f"[STATS CACHE HIT] {cache_key} (age: {now - cached_time:.2f}s)")
+                try:
+                    log.debug(
+                        "stats.cache.hit",
+                        key=str(cache_key),
+                        age=now - cached_time,
+                    )
+                except Exception:
+                    pass
                 return dict(cached_result)
             else:
                 # Cache expired - remove stale entry
@@ -123,13 +140,9 @@ def compute_trading_stats_for_timeframe(tf: str, mode: str | None = None) -> dic
 
         rows = query.order_by(time_field.asc()).all()
 
-        if not rows:
-            pass
-
         for idx, r in enumerate(rows, 1):
             if r.realized_pnl is not None:
                 pnls.append(float(r.realized_pnl))
-                print(f"  -> Added to PnL list: {r.realized_pnl}")
             if getattr(r, "commissions", None) is not None:
                 commissions_sum += float(r.commissions)
             if getattr(r, "r_multiple", None) is not None:
@@ -141,9 +154,6 @@ def compute_trading_stats_for_timeframe(tf: str, mode: str | None = None) -> dic
                 mae_list.append(float(r.mae))
             if getattr(r, "mfe", None) is not None:
                 mfe_list.append(float(r.mfe))
-
-    print(f"  Total PnL values collected: {len(pnls)}")
-    print(f"  PnL list: {pnls}")
 
     total = len(pnls)
     wins = [p for p in pnls if p > 0]
@@ -199,15 +209,6 @@ def compute_trading_stats_for_timeframe(tf: str, mode: str | None = None) -> dic
     mae_avg = (sum(mae_list) / len(mae_list)) if mae_list else None
     mfe_avg = (sum(mfe_list) / len(mfe_list)) if mfe_list else None
 
-    print(f"  Total PnL: {total_pnl}")
-    print(f"  Wins: {len(wins)} trades = ${sum_w:,.2f}")
-    print(f"  Losses: {len(losses)} trades = ${sum_l:,.2f}")
-    print(f"  Hit Rate: {hit_rate:.1f}%")
-    print(f"  Max Drawdown: {max_dd:.2f}")
-    print(f"  Max Run-Up: {max_ru:.2f}")
-    print(f"  Expectancy: {expectancy:.2f}")
-    print(f"  Profit Factor: {pf if pf else 'N/A'}")
-
     result_dict = {
         "Total PnL": f"{total_pnl:.2f}",
         "Max Drawdown": f"{-max_dd:.2f}",
@@ -231,14 +232,68 @@ def compute_trading_stats_for_timeframe(tf: str, mode: str | None = None) -> dic
         "Sharpe Ratio": f"{sharpe:.2f}",
     }
 
-    print(f"  Total PnL (formatted): {result_dict.get('Total PnL')}")
-    print(f"  Trade Count: {result_dict.get('Trades')}")
-    print(f"\n{'='*80}\n")
-
     # CRITICAL FIX: Store result in cache with current timestamp
     # VULN-003 FIX: Thread-safe cache write
     with _stats_cache_lock:
         _stats_cache[cache_key] = (time.time(), result_dict)
-    print(f"[STATS CACHE STORE] {cache_key}")
+    try:
+        log.debug("stats.cache.store", key=str(cache_key), trades=result_dict.get("Trades"))
+    except Exception:
+        pass
 
     return result_dict
+
+
+def get_equity_curve_for_scope(mode: str, account: str | None = None) -> list[tuple[float, float]]:
+    """
+    Build an equity curve (timestamp, balance) series for a given trading scope.
+
+    The curve is constructed as a cumulative sum of realized P&L for closed trades
+    in the specified mode. Account is currently informational only – the equity
+    curve is mode-scoped, matching the existing Panel1 behavior.
+
+    Args:
+        mode: Trading mode ("SIM", "LIVE", "DEBUG")
+        account: Account identifier (optional, reserved for future filtering)
+
+    Returns:
+        List of (timestamp_utc, balance) points.
+    """
+    try:
+        from datetime import timezone
+
+        from data.db_engine import get_session
+        from data.schema import TradeRecord
+    except Exception:
+        return []
+
+    # Starting balance mirrors existing Panel1 behavior
+    starting_balance = 10000.0 if mode == "SIM" else 0.0
+    equity_points: list[tuple[float, float]] = []
+
+    try:
+        with get_session() as s:  # type: ignore
+            query = (
+                s.query(TradeRecord)
+                .filter(TradeRecord.mode == mode)
+                .filter(TradeRecord.is_closed == True)  # noqa: E712
+                .filter(TradeRecord.realized_pnl.isnot(None))
+                .filter(TradeRecord.exit_time.isnot(None))
+                .order_by(TradeRecord.exit_time.asc())
+            )
+
+            trades = query.all()
+            if not trades:
+                return []
+
+            cumulative_balance = starting_balance
+            for trade in trades:
+                if trade.realized_pnl is not None and trade.exit_time is not None:
+                    cumulative_balance += float(trade.realized_pnl)
+                    ts = trade.exit_time.replace(tzinfo=timezone.utc).timestamp()
+                    equity_points.append((ts, cumulative_balance))
+
+    except Exception:
+        return []
+
+    return equity_points

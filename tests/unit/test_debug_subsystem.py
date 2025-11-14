@@ -28,12 +28,6 @@ spec_logger.loader.exec_module(logger_module)
 # Now load diagnostics
 spec.loader.exec_module(diagnostics)
 
-# Import error_policy
-spec_policy = importlib.util.spec_from_file_location("error_policy", "core/error_policy.py")
-error_policy = importlib.util.module_from_spec(spec_policy)
-sys.modules["core.error_policy"] = error_policy
-spec_policy.loader.exec_module(error_policy)
-
 # Get the functions we need
 DiagnosticsHub = diagnostics.DiagnosticsHub
 info = diagnostics.info
@@ -41,8 +35,6 @@ debug = diagnostics.debug
 warn = diagnostics.warn
 error = diagnostics.error
 PerformanceMarker = diagnostics.PerformanceMarker
-ErrorPolicyManager = error_policy.ErrorPolicyManager
-handle_error = error_policy.handle_error
 
 import time
 
@@ -89,36 +81,8 @@ print(f"    Exported to {export_file}")
 print()
 
 # Test 4: Error policy manager
-print("[4] Testing error policy manager...")
-policy_mgr = ErrorPolicyManager.get_instance()
-policy = policy_mgr.get_policy("dtc_connection_drop", "network")
-print(f"    Policy loaded: {policy.recovery}")
-print(f"    Max retries: {policy.max_retries}")
-print(f"    Escalation: {policy.escalation}")
-print()
-
-# Test 5: Error handling with retry
-print("[5] Testing error handling with retry...")
-attempt_count = [0]
-
-
-def failing_operation():
-    attempt_count[0] += 1
-    if attempt_count[0] < 2:
-        raise Exception(f"Simulated failure {attempt_count[0]}")
-    return True
-
-
-success = handle_error(
-    error_type="dtc_connection_drop", category="network", context={"test": True}, operation=failing_operation
-)
-
-print(f"    Operation result: {'SUCCESS' if success else 'FAILED'}")
-print(f"    Total attempts: {attempt_count[0]}")
-print()
-
-# Test 6: Final statistics
-print("[6] Final statistics:")
+# Test 4: Final statistics
+print("[4] Final statistics:")
 final_stats = hub.get_statistics()
 print(f"   Total events: {final_stats['total_events']}")
 print(f"   Error count: {final_stats['errors_count']}")

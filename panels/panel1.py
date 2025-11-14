@@ -846,57 +846,27 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
         """Calculate and display PnL for the current timeframe based on ACTUAL TRADES within the timeframe."""
 
         try:
-            from datetime import datetime, timedelta, timezone
-            from data.db_engine import get_session
-            from data.schema import TradeRecord
-            from sqlalchemy import func
+            # Use centralized stats service for timeframe PnL
+            from services.stats_service import compute_trading_stats_for_timeframe
 
-            UTC = timezone.utc
-            now = datetime.now(UTC)
             mode = self._current_display_mode
 
-            # Define timeframe ranges
-            timeframe_ranges = {
-                "LIVE": (now - timedelta(hours=1), now),  # Last 1 hour
-                "1D": (datetime(now.year, now.month, now.day, 0, 0, 0, tzinfo=UTC), now),  # Since midnight
-                "1W": (now - timedelta(weeks=1), now),  # Last 7 days
-                "1M": (now - timedelta(days=30), now),  # Last 30 days
-                "3M": (now - timedelta(days=90), now),  # Last 90 days
-                "YTD": (datetime(now.year, 1, 1, tzinfo=UTC), now),  # Jan 1 to now
-            }
+            # Stats service accepts "LIVE", "1D", "1W", "1M", "3M", "YTD"
+            tf = self._tf if self._tf in ("LIVE", "1D", "1W", "1M", "3M", "YTD") else "LIVE"
 
-            if self._tf not in timeframe_ranges:
-                start_time, end_time = timeframe_ranges["LIVE"]
-            else:
-                start_time, end_time = timeframe_ranges[self._tf]
+            payload = compute_trading_stats_for_timeframe(tf, mode=mode)
 
+            # Extract numeric total PnL from helper key
+            total_pnl = float(payload.get("_total_pnl_value", 0.0))
 
-            # Query trades for this timeframe
-            with get_session() as session:
-                trades = session.query(TradeRecord).filter(
-                    TradeRecord.mode == mode,
-                    TradeRecord.exit_time >= start_time,
-                    TradeRecord.exit_time <= end_time,
-                    TradeRecord.realized_pnl is not None,  # Only trades with valid PnL
-                    TradeRecord.is_closed == True
-                ).all()
+            baseline = 10000.0  # Standard SIM starting balance
+            pnl_pct = (total_pnl / baseline) * 100.0 if baseline else 0.0
 
-            if trades:
-                # Calculate total PnL for timeframe (filter out None values)
-                total_pnl = sum(t.realized_pnl for t in trades if t.realized_pnl is not None)
-                baseline = 10000.0  # Standard SIM starting balance
-                pnl_pct = (total_pnl / baseline) * 100.0
-
-
-                pnl_up = total_pnl > 0 if abs(total_pnl) > 0.01 else None
-            else:
-                total_pnl = 0.0
-                pnl_pct = 0.0
-                pnl_up = None
+            pnl_up = total_pnl > 0 if abs(total_pnl) > 0.01 else None
 
             # Update display
             self.set_pnl_for_timeframe(pnl_value=total_pnl, pnl_pct=pnl_pct, up=pnl_up)
-            log.debug(f"[panel1] PnL for {self._tf}: ${total_pnl:+.2f} ({pnl_pct:+.2f}%)")
+            log.debug(f"[panel1] PnL for {tf}: ${total_pnl:+.2f} ({pnl_pct:+.2f}%)")
 
         except Exception as e:
             import traceback
@@ -969,46 +939,19 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
         """
 
         try:
-            from datetime import timezone
-            from data.db_engine import get_session
-            from data.schema import TradeRecord
+            # Delegate to stats service helper for equity curve construction
+            from services.stats_service import get_equity_curve_for_scope
 
-            # Get starting balance (default 10k for SIM, 0 for LIVE)
-            starting_balance = 10000.0 if mode == "SIM" else 0.0
-
-            # Query all trades for this mode, ordered by exit time
-            with get_session() as s:
-                query = (
-                    s.query(TradeRecord)
-                    .filter(TradeRecord.mode == mode)
-                    .filter(TradeRecord.is_closed == True)
-                    .filter(TradeRecord.realized_pnl.isnot(None))
-                    .filter(TradeRecord.exit_time.isnot(None))
-                    .order_by(TradeRecord.exit_time.asc())
-                )
-
-                trades = query.all()
-
-                if not trades:
-                    # No trades yet, return empty curve
-                    return []
-
-                # Build equity curve: cumulative sum of P&L
-                equity_points = []
-                cumulative_balance = starting_balance
-
-                for trade in trades:
-                    if trade.realized_pnl is not None and trade.exit_time is not None:
-                        cumulative_balance += trade.realized_pnl
-                        timestamp = trade.exit_time.replace(tzinfo=timezone.utc).timestamp()
-                        equity_points.append((timestamp, cumulative_balance))
-
-                return equity_points
+            return get_equity_curve_for_scope(mode, account)
 
         except Exception as e:
-            log.error(f"[Panel1] Error loading equity curve from database: {e}", exc_info=True)
-            import traceback
-            traceback.print_exc()
+            log.error(f"[Panel1] Error loading equity curve from stats service: {e}", exc_info=True)
+            try:
+                import traceback
+
+                traceback.print_exc()
+            except Exception:
+                pass
             return []
 
     def _get_equity_curve(self, mode: str, account: str) -> list[tuple[float, float]]:

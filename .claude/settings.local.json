@@ -5,7 +5,10 @@
       "Bash(python run_theme_test.py:*)",
       "Bash(python:*)",
       "Bash(set PYTHONIOENCODING=utf-8:*)",
-      "Bash(more:*)"
+      "Bash(more:*)",
+      "Bash(pytest:*)",
+      "Bash(timeout 30 python:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

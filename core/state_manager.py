@@ -77,54 +77,6 @@ class StateManager(QtCore.QObject):
         # Config (injected)
         self.live_account_id: str = "120005"  # Will be set from config
 
-    def load_sim_balance_from_trades(self) -> float:
-        """
-        Load the SIM balance from the database by summing all realized P&L trades.
-        This is called on app startup to restore the balance if the app was restarted.
-        Thread-safe.
-        """
-        try:
-            from data.db_engine import get_session
-            from data.schema import TradeRecord
-            from sqlalchemy import func
-
-            print(f"[DEBUG state_manager.load_sim_balance_from_trades] Loading SIM balance from database...")
-
-            with get_session() as session:
-                # Query all closed trades in SIM mode and sum their realized P&L
-                result = session.query(func.sum(TradeRecord.realized_pnl)).filter(
-                    TradeRecord.mode == "SIM",
-                    TradeRecord.realized_pnl != None,
-                    TradeRecord.is_closed == True
-                ).scalar()
-
-                # Also count how many trades we have
-                trade_count = session.query(TradeRecord).filter(
-                    TradeRecord.mode == "SIM",
-                    TradeRecord.is_closed == True
-                ).count()
-
-                total_pnl = float(result) if result else 0.0
-
-                with self._lock:
-                    self.sim_balance = 10000.0 + total_pnl
-                    new_balance = self.sim_balance
-
-                print(f"\n[DATABASE LOAD] SIM Balance Restored from Trades")
-                print(f"  Trades in Database: {trade_count}")
-                print(f"  Base Balance: $10,000.00")
-                print(f"  Total P&L: {total_pnl:+,.2f}")
-                print(f"  Current Balance: ${new_balance:,.2f}\n")
-                print(f"[DEBUG state_manager.load_sim_balance_from_trades] Total PnL from trades: {total_pnl:+,.2f}, SIM balance: ${new_balance:,.2f}")
-
-                return new_balance
-        except Exception as e:
-            print(f"[DEBUG state_manager.load_sim_balance_from_trades] Error loading balance: {e}")
-            # Fall back to default 10k
-            with self._lock:
-                self.sim_balance = 10000.0
-                return self.sim_balance
-
     # ---- Core API (Thread-Safe) ----
     def set(self, key: str, value: Any) -> None:
         """Assign a value to the state. Thread-safe."""

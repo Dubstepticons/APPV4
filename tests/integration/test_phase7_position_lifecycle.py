@@ -28,6 +28,7 @@ from services.position_recovery import get_recovery_service
 # TEST SUITE 1: CRASH RECOVERY (3 tests)
 # ==============================================================================
 
+@pytest.mark.core_regression
 class TestCrashRecovery:
     """Test position recovery after application crash."""
 
@@ -273,6 +274,7 @@ class TestModeSwitching:
 # TEST SUITE 3: THREAD SAFETY (2 tests)
 # ==============================================================================
 
+@pytest.mark.core_regression
 class TestThreadSafety:
     """Test concurrent access and thread safety."""
 

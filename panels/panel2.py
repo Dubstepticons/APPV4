@@ -446,144 +446,6 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         except Exception as e:
             log.error(f"[Panel2] Error clearing position UI: {e}")
 
-    # DEPRECATED (Step 7): This method is no longer used in event-driven architecture
-    # Kept for reference but will be removed in future cleanup
-    def _close_position_in_database(self, trade: dict) -> bool:
-        """
-        Close position using PositionRepository (database as source of truth).
-
-        ARCHITECTURE VIOLATION (Step 4): Panel calls repository directly
-        ========================================================================
-        This method violates the architecture principle that panels should NOT
-        call repositories or perform persistence operations directly.
-
-        CURRENT STATE:
-          - Panel2 directly calls PositionRepository.close_position()
-          - This creates tight coupling between UI and data layer
-
-        TARGET STATE (Step 7):
-          - Panel2 emits SignalBus.tradeCloseRequested(trade)
-          - TradeCloseService handles the event and calls repository
-          - Panel2 listens to SignalBus.positionClosed for UI updates
-
-        This violation will be fixed in Step 7: Rebuild Trade Lifecycle
-        ========================================================================
-
-        This is the new approach that atomically:
-        1. Reads from OpenPosition table
-        2. Writes to TradeRecord table
-        3. Deletes from OpenPosition table
-
-        Args:
-            trade: Trade dict with exit data
-
-        Returns:
-            True if close succeeded, False otherwise
-        """
-        try:
-            from data.position_repository import get_position_repository
-            from datetime import datetime, timezone
-
-            position_repo = get_position_repository()
-
-            # Extract exit data from trade dict
-            exit_price = trade.get("exit_price")
-            if exit_price is None:
-                log.error("[Panel2 DB] Cannot close position: exit_price missing")
-                return False
-
-            # Get exit time (default to now if not provided)
-            exit_time = trade.get("exit_time")
-            if exit_time is None:
-                exit_time = datetime.now(timezone.utc)
-            elif isinstance(exit_time, int):
-                # Convert epoch to datetime
-                exit_time = datetime.fromtimestamp(exit_time, tz=timezone.utc)
-
-            # Close position in database (atomic operation)
-            trade_id = position_repo.close_position(
-                mode=self.current_mode,
-                account=self.current_account,
-                exit_price=float(exit_price),
-                exit_time=exit_time,
-                realized_pnl=trade.get("realized_pnl"),
-                commissions=trade.get("commissions"),
-                exit_vwap=self.vwap,  # Current VWAP at exit
-                exit_cum_delta=self.cum_delta,  # Current cum delta at exit
-            )
-
-            if trade_id:
-                log.info(
-                    f"[Panel2 DB] Closed position in database: trade_id={trade_id} "
-                    f"{self.current_mode}/{self.current_account}"
-                )
-                return True
-            else:
-                log.error("[Panel2 DB] Failed to close position in database")
-                return False
-
-        except Exception as e:
-            log.error(f"[Panel2 DB] Error closing position in database: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
-
-    def _close_position_legacy(self, trade: dict) -> bool:
-        """
-        Legacy approach using TradeManager (fallback only).
-
-        This is kept as a fallback in case database close fails.
-        Should rarely be used in normal operation.
-        """
-        try:
-            from services.trade_service import TradeManager
-            from core.app_state import get_state_manager
-
-            state = get_state_manager()
-            trade_manager = TradeManager(state_manager=state)
-        except Exception as e:
-            trade_manager = None
-
-        ok = False
-        try:
-            if trade_manager:
-                # Extract account from trade dict for mode detection
-                account = trade.get("account", "")
-
-                # Create pos_info dict from trade data
-                pos_info = {
-                    "qty": trade.get("qty", 0),
-                    "entry_price": trade.get("entry_price", 0),
-                    "entry_time": trade.get("entry_time"),
-                    "account": account,
-                }
-
-                # Call record_closed_trade with proper signature
-                try:
-                    ok = trade_manager.record_closed_trade(
-                        symbol=trade.get("symbol", ""),
-                        pos_info=pos_info,
-                        exit_price=trade.get("exit_price"),
-                        realized_pnl=trade.get("realized_pnl"),
-                        commissions=trade.get("commissions"),
-                        r_multiple=trade.get("r_multiple"),
-                        mae=trade.get("mae"),
-                        mfe=trade.get("mfe"),
-                        efficiency=trade.get("efficiency"),
-                        # Account will be auto-detected in record_closed_trade
-                    )
-                except Exception as method_error:
-                    import traceback
-                    traceback.print_exc()
-                    ok = False
-        except Exception as e:
-            from utils.logger import get_logger
-            log = get_logger(__name__)
-            log.error(f"[panel2] Error recording closed trade (legacy): {e}", exc_info=True)
-            ok = False
-
-        return ok
-
     # -------------------- Trade persistence hooks (end)
 
     # -------------------- DTC Order handling (start)
@@ -1029,16 +891,17 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                 # PHASE 6: Write trade extremes to database for MAE/MFE persistence
                 # This enables accurate MAE/MFE calculation even after crash/restart
                 try:
-                    from data.position_repository import get_position_repository
-                    position_repo = get_position_repository()
-                    position_repo.update_trade_extremes(
+                    from services.position_service import get_position_service
+
+                    position_service = get_position_service()
+                    position_service.update_trade_extremes(
                         mode=self.current_mode,
                         account=self.current_account,
-                        current_price=p
+                        current_price=p,
                     )
                 except Exception as e:
                     # Non-critical: DB update failure shouldn't stop trading
-                    log.debug(f"[Panel2] Trade extremes DB update failed: {e}")
+                    log.debug(f"[Panel2] Trade extremes DB update failed via PositionService: {e}")
 
         # UI update
         self._refresh_all_cells()
@@ -1361,29 +1224,20 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             return False
 
         try:
-            from data.position_repository import get_position_repository
-            from datetime import datetime, timezone
+            from services.position_service import get_position_service
 
-            position_repo = get_position_repository()
-
-            # Convert entry_time_epoch to datetime
-            entry_time = None
-            if self.entry_time_epoch:
-                entry_time = datetime.fromtimestamp(self.entry_time_epoch, tz=timezone.utc)
-            else:
-                entry_time = datetime.now(timezone.utc)
+            position_service = get_position_service()
 
             # Determine signed quantity (positive = long, negative = short)
             signed_qty = self.entry_qty if self.is_long else -self.entry_qty
 
-            # Write to database
-            success = position_repo.save_open_position(
+            success = position_service.save_open_position(
                 mode=self.current_mode,
                 account=self.current_account,
                 symbol=self.symbol,
                 qty=signed_qty,
                 entry_price=self.entry_price,
-                entry_time=entry_time,
+                entry_time_epoch=self.entry_time_epoch,
                 entry_vwap=self.entry_vwap,
                 entry_cum_delta=self.entry_delta,
                 entry_poc=self.entry_poc,
@@ -1393,18 +1247,19 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
 
             if success:
                 log.info(
-                    f"[Panel2 DB] Wrote position to database: {self.current_mode}/{self.current_account} "
+                    f"[Panel2 DB] Wrote position via PositionService: {self.current_mode}/{self.current_account} "
                     f"{self.symbol} {signed_qty}@{self.entry_price}"
                 )
-            else:
-                log.error(f"[Panel2 DB] Failed to write position to database")
-
             return success
 
         except Exception as e:
-            log.error(f"[Panel2 DB] Error writing position to database: {e}")
-            import traceback
-            traceback.print_exc()
+            log.error(f"[Panel2] Error writing position via PositionService: {e}")
+            try:
+                import traceback
+
+                traceback.print_exc()
+            except Exception:
+                pass
             return False
 
     def _update_trade_extremes_in_database(self) -> bool:
@@ -1421,20 +1276,15 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             return False
 
         try:
-            from data.position_repository import get_position_repository
+            from services.position_service import get_position_service
 
-            position_repo = get_position_repository()
-
-            # Update trade extremes in database
-            success = position_repo.update_trade_extremes(
+            position_service = get_position_service()
+            return position_service.update_trade_extremes(
                 mode=self.current_mode,
                 account=self.current_account,
-                current_price=self.last_price
+                current_price=float(self.last_price),
             )
-
-            return success
-
-        except Exception as e:
+        except Exception:
             # Silently fail (this is called very frequently)
             return False
 

@@ -22,6 +22,7 @@ import pytest
 # ============================================================================
 
 
+@pytest.mark.core_regression
 class TestPanel2OrderUpdates:
     """Test Panel2 order update handling"""
 
@@ -121,6 +122,7 @@ class TestPanel2OrderUpdates:
 # ============================================================================
 
 
+@pytest.mark.core_regression
 class TestPanel2PositionUpdates:
     """Test Panel2 position update handling"""
 

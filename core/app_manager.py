@@ -96,6 +96,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             from core.state_manager import StateManager
             from core.app_state import set_state_manager
+            from services.balance_service import load_sim_balance_from_trades
 
             self._state = StateManager()
 
@@ -111,12 +112,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 QtCore.Qt.ConnectionType.QueuedConnection
             )
 
-            # Load SIM balance from database (sum of all trades' realized P&L)
-            loaded_balance = self._state.load_sim_balance_from_trades()
-            print(f"\n[INITIAL BALANCE] SIM Account Loaded")
-            print(f"  Starting Balance: $10,000.00")
-            print(f"  Loaded Balance: ${self._state.sim_balance:,.2f}")
-            print(f"  Total P&L from Trades: ${self._state.sim_balance - 10000.0:+,.2f}\n")
+            # ARCHITECTURE FIX (Balance Service):
+            # Load SIM balance from database via services layer (not from StateManager)
+            loaded_balance = load_sim_balance_from_trades(self._state)
         except Exception as e:
             error_msg = str(e).replace('\u2705', '[OK]').replace('\u2717', '[FAIL]').replace('[OK]', '[OK]').replace('[X]', '[FAIL]')
             import traceback

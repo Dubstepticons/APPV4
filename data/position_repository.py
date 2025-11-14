@@ -36,6 +36,7 @@ SQLAlchemy handles connection pooling and thread safety.
 
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
+import threading
 
 from sqlalchemy.exc import IntegrityError
 
@@ -267,6 +268,11 @@ class PositionRepository:
             log.error(f"[PositionRepo] Error updating trade extremes: {e}")
             return False
 
+    # Class-level lock to serialize close operations for a given process.
+    # This prevents race conditions where two threads try to close the same
+    # (mode, account) position at the same time.
+    _close_lock = threading.Lock()
+
     def close_position(
         self,
         mode: str,
@@ -301,82 +307,85 @@ class PositionRepository:
         Returns:
             TradeRecord ID if successful, None if error or position not found
 
-        Thread-Safe: Yes (transactional)
+        Thread-Safe: Yes (transactional + process-level lock)
         """
         try:
             if exit_time is None:
                 exit_time = datetime.now(timezone.utc)
 
-            with get_session() as session:
-                # 1. Read open position
-                open_pos = session.query(OpenPosition).filter_by(
-                    mode=mode,
-                    account=account
-                ).first()
+            # Serialize close operations to prevent race conditions where two
+            # threads both see the same OpenPosition before it is deleted.
+            with self._close_lock:
+                with get_session() as session:
+                    # 1. Read open position
+                    open_pos = session.query(OpenPosition).filter_by(
+                        mode=mode,
+                        account=account
+                    ).first()
 
-                if not open_pos:
-                    log.warning(f"[PositionRepo] No open position to close: {mode}/{account}")
-                    return None
+                    if not open_pos:
+                        log.warning(f"[PositionRepo] No open position to close: {mode}/{account}")
+                        return None
 
-                # 2. Calculate P&L if not provided
-                if realized_pnl is None:
-                    # P&L = (exit - entry) * qty * dollars_per_point
-                    # For futures, dollars_per_point depends on contract (e.g., MES = $5)
-                    from services.trade_constants import DOLLARS_PER_POINT
-                    price_diff = exit_price - open_pos.entry_price
-                    realized_pnl = price_diff * abs(open_pos.qty) * DOLLARS_PER_POINT
-                    # Adjust sign for short positions
-                    if open_pos.qty < 0:
-                        realized_pnl = -realized_pnl
+                    # 2. Calculate P&L if not provided
+                    if realized_pnl is None:
+                        # P&L = (exit - entry) * qty * dollars_per_point
+                        # For futures, dollars_per_point depends on contract (e.g., MES = $5)
+                        from services.trade_constants import DOLLARS_PER_POINT
+                        price_diff = exit_price - open_pos.entry_price
+                        realized_pnl = price_diff * abs(open_pos.qty) * DOLLARS_PER_POINT
+                        # Adjust sign for short positions
+                        if open_pos.qty < 0:
+                            realized_pnl = -realized_pnl
 
-                # 3. Calculate MAE/MFE from trade extremes
-                mae, mfe, efficiency, r_multiple = self._calculate_trade_metrics(
-                    open_pos=open_pos,
-                    exit_price=exit_price,
-                    realized_pnl=realized_pnl,
-                )
+                    # 3. Calculate MAE/MFE from trade extremes
+                    mae, mfe, efficiency, r_multiple = self._calculate_trade_metrics(
+                        open_pos=open_pos,
+                        exit_price=exit_price,
+                        realized_pnl=realized_pnl,
+                    )
 
-                # 4. Create TradeRecord
-                trade = TradeRecord(
-                    symbol=open_pos.symbol,
-                    side=open_pos.side,
-                    qty=abs(open_pos.qty),
-                    mode=open_pos.mode,
-                    account=open_pos.account,
-                    # Entry data
-                    entry_time=open_pos.entry_time,
-                    entry_price=open_pos.entry_price,
-                    entry_vwap=open_pos.entry_vwap,
-                    entry_cum_delta=open_pos.entry_cum_delta,
-                    # Exit data
-                    exit_time=exit_time,
-                    exit_price=exit_price,
-                    exit_vwap=exit_vwap,
-                    exit_cum_delta=exit_cum_delta,
-                    # P&L and metrics
-                    realized_pnl=realized_pnl,
-                    commissions=commissions,
-                    mae=mae,
-                    mfe=mfe,
-                    efficiency=efficiency,
-                    r_multiple=r_multiple,
-                    is_closed=True,
-                    created_at=datetime.now(timezone.utc),
-                )
-                session.add(trade)
+                    # 4. Create TradeRecord
+                    trade = TradeRecord(
+                        symbol=open_pos.symbol,
+                        side=open_pos.side,
+                        qty=abs(open_pos.qty),
+                        mode=open_pos.mode,
+                        account=open_pos.account,
+                        # Entry data
+                        entry_time=open_pos.entry_time,
+                        entry_price=open_pos.entry_price,
+                        entry_vwap=open_pos.entry_vwap,
+                        entry_cum_delta=open_pos.entry_cum_delta,
+                        # Exit data
+                        exit_time=exit_time,
+                        exit_price=exit_price,
+                        exit_vwap=exit_vwap,
+                        exit_cum_delta=exit_cum_delta,
+                        # P&L and metrics
+                        realized_pnl=realized_pnl,
+                        commissions=commissions,
+                        mae=mae,
+                        mfe=mfe,
+                        efficiency=efficiency,
+                        r_multiple=r_multiple,
+                        is_closed=True,
+                        created_at=datetime.now(timezone.utc),
+                    )
+                    session.add(trade)
 
-                # 5. Delete open position
-                session.delete(open_pos)
+                    # 5. Delete open position
+                    session.delete(open_pos)
 
-                # 6. Commit transaction (atomic)
-                session.commit()
+                    # 6. Commit transaction (atomic)
+                    session.commit()
 
-                log.info(
-                    f"[PositionRepo] Closed position: {mode}/{account} {open_pos.symbol} "
-                    f"{open_pos.qty}@{open_pos.entry_price}{exit_price} P&L={realized_pnl:+.2f}"
-                )
+                    log.info(
+                        f"[PositionRepo] Closed position: {mode}/{account} {open_pos.symbol} "
+                        f"{open_pos.qty}@{open_pos.entry_price}{exit_price} P&L={realized_pnl:+.2f}"
+                    )
 
-                return trade.id
+                    return trade.id
 
         except Exception as e:
             log.error(f"[PositionRepo] Error closing position: {e}")
