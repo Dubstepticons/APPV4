@@ -77,24 +77,14 @@ class SignalBus(QtCore.QObject):
     #: Order status update from DTC
     orderUpdateReceived = QtCore.pyqtSignal(dict)
 
-    #: Order rejected by broker
-    orderRejected = QtCore.pyqtSignal(str)  # rejection reason
-
     #: Order submission requested
     orderSubmitRequested = QtCore.pyqtSignal(dict)  # order params
 
-    # ========================================================================
-    # MARKET DATA EVENTS
-    # ========================================================================
-
-    #: Market trade tick from DTC
-    marketTradeReceived = QtCore.pyqtSignal(dict)
-
-    #: Market bid/ask update from DTC
-    marketBidAskReceived = QtCore.pyqtSignal(dict)
-
-    #: Price updated (symbol, price) - derived event
-    priceUpdated = QtCore.pyqtSignal(str, float)
+    # ARCHITECTURE FIX (Step 3): Removed unused signals
+    # - orderRejected (never emitted or subscribed)
+    # - marketTradeReceived (never emitted or subscribed)
+    # - marketBidAskReceived (never emitted or subscribed)
+    # - priceUpdated (never emitted or subscribed)
 
     # ========================================================================
     # SESSION EVENTS
@@ -277,55 +267,6 @@ def reset_signal_bus() -> None:
 # ========================================================================
 
 
-def wrap_blinker_signal(blinker_signal, qt_signal: QtCore.pyqtSignal):
-    """
-    Wrap a Blinker signal to emit a Qt signal.
-
-    Temporary migration helper to bridge Blinker  Qt signals.
-
-    Args:
-        blinker_signal: Blinker signal to wrap
-        qt_signal: Qt signal to emit
-
-    Example:
-        >>> from blinker import signal as blinker_signal
-        >>> balance_signal = blinker_signal('balance_updated')
-        >>> signal_bus = get_signal_bus()
-        >>> wrap_blinker_signal(balance_signal, signal_bus.balanceUpdated)
-    """
-
-    def bridge_handler(sender, **kwargs):
-        """Bridge Blinker signal to Qt signal."""
-        try:
-            # Extract data from Blinker kwargs
-            data = kwargs.get("data", kwargs)
-
-            # Emit Qt signal with appropriate arguments
-            if isinstance(data, dict):
-                qt_signal.emit(data)
-            elif isinstance(data, (list, tuple)):
-                qt_signal.emit(*data)
-            else:
-                qt_signal.emit(data)
-
-            log.debug(
-                "signal_bus.blinker_bridge",
-                msg="Bridged Blinker  Qt signal",
-                blinker_signal=str(blinker_signal),
-                qt_signal=qt_signal.signal,
-            )
-        except Exception as e:
-            log.error(
-                "signal_bus.blinker_bridge_failed",
-                msg="Failed to bridge Blinker signal",
-                error=str(e),
-                exc_info=True,
-            )
-
-    blinker_signal.connect(bridge_handler)
-    log.info(
-        "signal_bus.blinker_wrapped",
-        msg="Blinker signal wrapped to Qt signal",
-        blinker_signal=str(blinker_signal),
-        qt_signal=qt_signal.signal,
-    )
+# ARCHITECTURE FIX (Step 3): wrap_blinker_signal function REMOVED
+# Blinker is no longer used in runtime dispatch (see data_bridge.py)
+# All event routing now uses SignalBus (Qt signals) only

@@ -320,40 +320,12 @@ class StateManager(QtCore.QObject):
     # -------------------- mode logging (end)
 
     # -------------------- Trading data persistence (start)
-    def update_balance(self, balance: Optional[float]) -> None:
-        """Record current account balance. Thread-safe."""
-        if balance is not None:
-            with contextlib.suppress(TypeError, ValueError):
-                with self._lock:
-                    self._state["balance"] = float(balance)  # Ignore invalid balance values
-
-    def update_position(self, symbol: Optional[str], qty: int, avg_price: Optional[float]) -> None:
-        """Record or remove a position. Thread-safe."""
-        if not symbol:
-            return
-
-        with self._lock:
-            positions = self._state.get("positions", {})
-            if qty == 0:
-                # Close position (remove from dict)
-                positions.pop(symbol, None)
-            else:
-                # Update or create position
-                positions[symbol] = {
-                    "qty": int(qty),
-                    "avg_price": float(avg_price) if avg_price else None,
-                }
-            self._state["positions"] = positions
-
-    def record_order(self, payload: dict) -> None:
-        """Record an order event for statistics and replay. Thread-safe."""
-        if not isinstance(payload, dict):
-            return
-
-        with self._lock:
-            orders = self._state.get("orders", [])
-            orders.append(payload)
-            self._state["orders"] = orders
+    # ARCHITECTURE FIX (Step 3): Obsolete generic tracker methods REMOVED
+    # These methods were never used in production code (only in tests/diagnostic tools)
+    # - update_balance() - superseded by set_balance_for_mode() and balance properties
+    # - update_position() - superseded by open_position()/close_position() methods
+    # - record_order() - never used in production, only in diagnostic tools
+    # If tests need these, they should use the specific domain methods instead
 
     # -------------------- Trading data persistence (end)
 
