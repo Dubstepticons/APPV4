@@ -192,11 +192,6 @@ def _dtc_to_app_event(dtc: dict) -> Optional[AppMessage]:
     with contextlib.suppress(Exception):
         from config.settings import DEBUG_DTC
 
-        # Patch 2: Suppress Type 501 (market data) noise from debug logs
-        if DEBUG_DTC and msg_type not in (501,):
-            import sys
-
-
     return None
 
 
@@ -620,19 +615,6 @@ class DTCClientJSON(QtCore.QObject):
             if qty == 0 and (avg is None or avg == 0.0):
                 should_skip_debug = True
 
-        # Always log message types if DEBUG_DTC is enabled (for troubleshooting)
-        if DEBUG_DTC and msg_type not in (3,) and self._allow_debug_dump(interval_ms=1000) and not should_skip_debug:
-
-        # Highlight balance-related messages (gated + throttled)
-        if (
-            DEBUG_DATA
-            and (msg_type == ACCOUNT_BALANCE_UPDATE or "Balance" in msg_name or "AccountBalance" in msg_name)
-            and self._allow_debug_dump()
-        ):
-        elif (
-            DEBUG_DATA and msg_type not in (3, 501) and self._allow_debug_dump() and not should_skip_debug
-        ):  # Skip heartbeats and noisy 501 bursts
-
         # Emit raw message for listeners (e.g., handshake detector / app_manager fallback)
         with contextlib.suppress(Exception):
             self.message.emit(dtc)
@@ -751,14 +733,12 @@ class DTCClientJSON(QtCore.QObject):
                 signal_bus.balanceUpdated.emit(balance, account)
 
             elif app_msg.type == "POSITION_UPDATE":
-                if DEBUG_DATA and self._allow_debug_dump():
                 # DEPRECATED: Blinker signal
                 signal_position.send(app_msg.payload)
                 # NEW: Qt signal via SignalBus
                 signal_bus.positionUpdated.emit(app_msg.payload)
 
             elif app_msg.type == "ORDER_UPDATE":
-                if DEBUG_DATA and self._allow_debug_dump():
                 # DEPRECATED: Blinker signal
                 signal_order.send(app_msg.payload)
                 # NEW: Qt signal via SignalBus
@@ -766,7 +746,6 @@ class DTCClientJSON(QtCore.QObject):
 
         except Exception as e:
             log.warning("dtc.signal.error", type=app_msg.type, err=str(e))
-            if DEBUG_DATA and self._allow_debug_dump():
 
         # MIGRATION: MessageRouter.route() call removed - panels now receive via SignalBus
 
@@ -805,7 +784,6 @@ class DTCClientJSON(QtCore.QObject):
             "TradeAccount": acct,
         }
         log.info(f"dtc.request.balance.{acct}")
-        if DEBUG_DATA and self._allow_debug_dump():
         self.send(msg)
         # Register timeout for this request
         request_id = msg.get("RequestID", 0)
