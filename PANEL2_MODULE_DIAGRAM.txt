@@ -1,0 +1,326 @@
+================================================================================
+PANEL2 DECOMPOSITION: MODULE STRUCTURE & DATA FLOW
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                      PANEL2 ORCHESTRATOR (150 LOC)                          │
+│                                                                             │
+│  Responsibilities:                                                          │
+│  • Signal bus event routing                                                │
+│  • Module coordination                                                      │
+│  • Mode switching orchestration                                            │
+│  • Public API compatibility                                                │
+│                                                                             │
+│  Public Methods:                                                            │
+│  ├─ on_order_update(payload)        → OrderFlowHandler                     │
+│  ├─ on_position_update(payload)     → OrderFlowHandler                     │
+│  ├─ set_trading_mode(mode, account) → all modules + persistence            │
+│  ├─ notify_trade_closed(trade)      → signal bus                           │
+│  ├─ get_current_trade_data()        → OrderFlowHandler + metrics           │
+│  └─ set_position/set_targets()      → OrderFlowHandler                     │
+│                                                                             │
+└──────┬──────────┬─────────────────┬──────────────────┬─────────────────┘
+       │          │                 │                  │
+       ▼          ▼                 ▼                  ▼                  ▼
+┌─────────┐ ┌──────────┐ ┌──────────────┐ ┌─────────────┐  ┌──────────────┐
+│ ORDER   │ │  STATE   │ │   CSV FEED   │ │   VISUAL    │  │   POSITION   │
+│ FLOW    │ │PERSISTENCE│ │   HANDLER    │ │ INDICATORS  │  │   DISPLAY    │
+│(250 LOC)│ │(200 LOC) │ │  (150 LOC)   │ │(200 LOC)    │  │  (300 LOC)   │
+└────┬────┘ └────┬─────┘ └──────┬───────┘ └─────┬───────┘  └──────┬───────┘
+     │           │              │              │                  │
+     │           │              │              │                  │
+     │    ┌──────┴──────────────┴──────────────┴──────────────────┘
+     │    │
+     │    └─► POSITION STATE (100 LOC) + METRICS CALCULATOR (150 LOC)
+     │        └─ Immutable snapshots & metric calculations
+     │
+     ▼
+DOMAIN MODEL: Position class (from domain/position.py)
+└─ P&L calculations: realized_pnl(), mae(), mfe(), r_multiple()
+
+
+================================================================================
+DATA FLOW: Single CSV Tick (500ms)
+================================================================================
+
+CSV File [snapshot.csv]
+   ▼
+   ├─ Read: last_price, high, low, vwap, cum_delta, poc
+   │
+CSV FEED HANDLER
+   ├─ Parse CSV
+   ├─ Update: last_price, session_high, session_low, vwap, cum_delta, poc
+   ├─ Signal: data_updated(feed_state, trade_extremes)
+   │
+   ▼
+PANEL2 ORCHESTRATOR (receives data_updated signal)
+   ├─ VISUAL INDICATORS
+   │  ├─ Update heat tracking (drawdown detection)
+   │  ├─ Update proximity alerts (stop within 1pt?)
+   │  └─ Emit: heat_threshold_crossed, drawdown_state_changed
+   │
+   ├─ METRICS CALCULATOR
+   │  ├─ Calculate: P&L, R-multiple, MAE, MFE, efficiency
+   │  ├─ Input: last_price, entry_price, is_long, stop_price, target_price
+   │  └─ Return: metrics dict
+   │
+   └─ POSITION DISPLAY
+      ├─ _refresh_all_cells()
+      ├─ Update all 15 metric cells
+      ├─ Read: entry_qty, entry_price, is_long, target_price, stop_price
+      ├─ Read: last_price, vwap, cum_delta, poc
+      ├─ Read: _trade_min_price, _trade_max_price
+      └─ Render: all cells + colors + flashing
+
+
+================================================================================
+STATE OWNERSHIP & MUTATIONS
+================================================================================
+
+ORDER FLOW (writes)
+├─ entry_qty
+├─ entry_price
+├─ is_long
+├─ target_price
+├─ stop_price
+├─ symbol
+├─ entry_vwap, entry_delta, entry_poc  [captured on entry]
+└─ entry_time_epoch
+
+CSV FEED HANDLER (writes)
+├─ last_price
+├─ session_high, session_low
+├─ vwap, cum_delta, poc
+└─ _trade_min_price, _trade_max_price  [tracked during trade]
+
+STATE PERSISTENCE (reads + writes for disk/DB)
+├─ Reads: entry_time_epoch, heat_start_epoch, trade extremes
+├─ Writes: JSON file (atomic) + Database (via PositionService)
+└─ Manages: Mode/account scoping
+
+VISUAL INDICATORS (reads + writes visual state)
+├─ Reads: entry_price, is_long, last_price, stop_price
+├─ Reads: entry_time_epoch, heat_start_epoch
+└─ Writes: heat_start_epoch, c_heat flashing, c_stop flashing
+
+POSITION DISPLAY (read-only)
+├─ Reads: everything (position, feed, visual indicators)
+└─ Writes: MetricCell display values only (no state mutation)
+
+
+================================================================================
+DEPENDENCY MATRIX
+================================================================================
+
+                 ORDER   STATE    CSV      VISUAL    POSITION  METRICS
+                FLOW   PERSIST   FEED     IND       DISPLAY   CALC
+
+ORDER FLOW       -       ◄─       -        ◄─         ◄─        ◄─
+STATE PERSIST    ─►      -        -         -          -         -
+CSV FEED         -       ─►       -        ─►         ─►         -
+VISUAL IND       ◄─      ◄─      ◄─        -          ─►         -
+POSITION DSP     ◄─      ◄─      ◄─       ◄─          -         ◄─
+METRICS CALC     -       -        -        -          ◄─         -
+
+Legend: ─► writes state  ◄─ reads state  - no interaction
+
+
+================================================================================
+CIRCULAR DEPENDENCIES TO RESOLVE
+================================================================================
+
+1. REFRESH LOOP (Medium severity)
+   CSV Feed ─►_on_csv_tick() ─► _refresh_all_cells()
+   Order Flow ─► set_position() ─► _refresh_all_cells()
+   Clock Timer ─► _on_clock_tick() ─► _update_time_and_heat_cells()
+   
+   Solution: Decouple via signal callbacks
+   - data_updated(feed_state) signal
+   - position_opened/position_closed signals
+   - time_tick() signal
+   
+   Orchestrator coordinates refresh: only ONE call to _refresh_all_cells()
+
+2. SHARED STATE SYNCHRONIZATION (High severity)
+   Problem: 30+ state variables read/written across modules
+   
+   Solution: Create PositionState dataclass (frozen)
+   - All modules receive snapshots
+   - Only OrderFlow mutates
+   - Reduces race conditions
+
+3. TIMER LIFECYCLE (High severity)
+   Problem: Mode switch while position open; timers still running
+   
+   Solution: Pause timers on mode switch
+   - csv_feed.stop()
+   - Load new state
+   - csv_feed.start()
+
+4. DATABASE SYNC SCATTERED (Medium severity)
+   Problem: DB writes in 3+ places
+   
+   Solution: Consolidate in StatePersistenceManager
+   - Single entry point for all DB operations
+   - Consistent error handling
+
+5. POSITION DOMAIN MODEL (Medium severity)
+   Problem: Immutable style (Position) mixed with mutable properties
+   
+   Solution: Use _position as single source of truth
+   - Remove compatibility properties
+   - Update all code to use _position.qty, etc.
+
+6. SIGNAL BUS ORDERING (Medium severity)
+   Problem: tradeCloseRequested → TradeCloseService → positionClosed
+           May have async gaps
+   
+   Solution: Add sequence validation
+   - Unit test event ordering
+   - Make emissions atomic where possible
+
+
+================================================================================
+EXTRACTED MODULE DESCRIPTIONS
+================================================================================
+
+1. POSITION_STATE.py (100 LOC) - NEW
+   ├─ @dataclass(frozen=True) PositionState
+   ├─ Properties: is_flat, is_in_drawdown
+   └─ Replaces scattered position variables
+
+2. CSV_FEED_HANDLER.py (150 LOC)
+   ├─ _setup_timers()
+   ├─ _on_csv_tick(), _on_clock_tick()
+   ├─ _read_snapshot_csv()
+   ├─ get_feed_state() → dict
+   └─ Signals: data_updated(feed_state, trade_extremes), time_tick()
+
+3. STATE_PERSISTENCE.py (200 LOC)
+   ├─ load_session_state() → dict
+   ├─ save_session_state() → bool
+   ├─ load_position_from_database() → PositionState
+   ├─ save_position_to_database(position) → bool
+   ├─ update_trade_extremes(price) → bool
+   └─ switch_mode(mode, account) → PositionState
+
+4. VISUAL_INDICATORS.py (200 LOC)
+   ├─ update_heat_state(last_price, entry_price, is_long, ...)
+   ├─ update_stop_proximity(stop_price, last_price)
+   ├─ on_timeframe_changed(tf)
+   ├─ update_theme()
+   └─ Signals: heat_threshold_crossed(str), drawdown_state_changed(bool)
+
+5. METRICS_CALCULATOR.py (150 LOC)
+   ├─ calculate_pnl_metrics(position, last_price) → dict
+   ├─ calculate_risk_metrics(entry, qty, stop, target, is_long) → dict
+   ├─ calculate_mae_mfe(position, trade_min, trade_max) → dict
+   └─ calculate_efficiency(position, pnl_pts, mfe_pts) → float
+
+6. ORDER_FLOW.py (250 LOC)
+   ├─ on_order_update(payload)
+   ├─ on_position_update(payload)
+   ├─ set_position(qty, price, is_long)
+   ├─ set_targets(target, stop)
+   ├─ set_symbol(symbol)
+   ├─ get_position_state() → PositionState
+   └─ Signals: position_opened, position_closed, trade_closed
+
+7. POSITION_DISPLAY.py (300 LOC)
+   ├─ _build() → QGridLayout
+   ├─ refresh_all(position, feed_state, metrics, is_theme_dirty)
+   ├─ _update_price_cell()
+   ├─ _update_time_and_heat_cells()
+   ├─ _update_target_stop_cells()
+   ├─ _update_secondary_metrics()
+   ├─ _update_live_banner()
+   └─ update_theme()
+
+8. PANEL2_MAIN.py (150 LOC) - REFACTORED
+   ├─ Thin orchestrator
+   ├─ Instantiate all submodules
+   ├─ Connect internal signals
+   ├─ Maintain signal bus connections
+   └─ Coordinate module interactions
+
+
+================================================================================
+IMPLEMENTATION PHASES
+================================================================================
+
+Phase 1: Setup (1 day)
+├─ Create /panels/_panels2/ subpackage
+├─ Extract helper functions to utils/trading_utils.py
+├─ Create position_state.py dataclass
+└─ Add unit test framework
+
+Phase 2: Extract Independent Modules (3 days)
+├─ Day 1: csv_feed_handler.py + unit tests
+├─ Day 2: state_persistence.py + unit tests
+└─ Day 3: metrics_calculator.py + unit tests
+
+Phase 3: Extract Dependent Modules (3 days)
+├─ Day 1: visual_indicators.py + integration tests
+├─ Day 2: order_flow.py + integration tests
+└─ Day 3: position_display.py + integration tests
+
+Phase 4: Create Orchestrator (2 days)
+├─ Day 1: Refactor Panel2 → thin wrapper + coordination
+└─ Day 2: Migrate signal bus + test mode switching
+
+Phase 5: Testing & Validation (3 days)
+├─ Day 1: Unit tests for each module
+├─ Day 2: Integration tests (full panel startup)
+└─ Day 3: Regression tests + performance profiling
+
+Phase 6: Cleanup (1 day)
+├─ Remove old panel2.py or archive
+├─ Update imports in other modules
+├─ Documentation updates
+└─ Deploy to test environment
+
+**Total Effort**: 2-3 weeks (team), 6-8 weeks (solo)
+
+
+================================================================================
+CODE REDUCTION & IMPROVEMENTS
+================================================================================
+
+Before (Current panel2.py):           1930 LOC
+After (Refactored modules):          ~1500 LOC
+Reduction:                           -430 LOC (-22%)
+
+Benefits:
+✓ Testability: Each module independently unit-testable
+✓ Maintainability: Clear responsibility boundaries
+✓ Performance: Potential 10-15% improvement via smarter refresh batching
+✓ Readability: Reduced cognitive load per file
+✓ Modularity: Modules can be reused/replaced independently
+✓ Debugging: Easier to isolate issues to specific modules
+
+
+================================================================================
+CRITICAL SUCCESS FACTORS
+================================================================================
+
+1. Preserve public API during refactoring
+   → Keep Panel2 as backward-compatible wrapper
+   → Don't change external signal signatures
+
+2. Decouple via signals, not direct dependencies
+   → Modules emit signals, orchestrator coordinates
+   → Reduces circular imports and makes testing easier
+
+3. Immutable snapshots for display rendering
+   → Pass PositionState(frozen=True) to modules
+   → Eliminates race conditions from concurrent reads
+
+4. Comprehensive unit tests for each module
+   → Mock external dependencies
+   → Test in isolation before integration
+
+5. Gradual rollout with fallback plan
+   → Branch for migration
+   → Keep original panel2.py in git history
+   → Can revert quickly if critical issues arise
+

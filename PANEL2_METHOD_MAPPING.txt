@@ -1,0 +1,437 @@
+================================================================================
+PANEL2 DECOMPOSITION: DETAILED METHOD-TO-MODULE MAPPING
+================================================================================
+
+This table shows exactly which methods from the original panel2.py (1930 lines)
+will be extracted to each new module.
+
+================================================================================
+POSITION_DISPLAY.py (300 LOC) - RENDERING & VISUALIZATION
+================================================================================
+
+Methods to extract:
+├─ _build()  [PARTIAL]          ~60 LOC  (grid layout + cell creation)
+├─ _refresh_all_cells()         ~59 LOC  (main refresh dispatcher)
+├─ _update_price_cell()         ~6  LOC  (qty @ entry_price cell)
+├─ _update_time_and_heat_cells()  [PARTIAL - time part only] ~15 LOC
+├─ _update_target_stop_cells()  [PARTIAL - display part only] ~12 LOC
+├─ _update_secondary_metrics()  ~168 LOC (risk, R-mult, MAE, MFE, VWAP, delta, POC, efficiency, Pts)
+├─ _update_live_banner()        ~22 LOC  (symbol & price banners)
+├─ refresh()                    ~6  LOC  (public API)
+├─ _build_theme_stylesheet()    ~3  LOC  (stylesheet building)
+├─ _get_theme_children()        ~22 LOC  (child widgets for theme)
+└─ _on_theme_refresh()          ~8  LOC  (banner style updates)
+
+Total: ~381 LOC (will reduce to ~300 after extracting dependencies)
+
+State/Components to extract:
+├─ MetricCell instances:
+│  ├─ c_price, c_heat, c_time, c_target, c_stop (Row 1)
+│  ├─ c_risk, c_rmult, c_range, c_mae, c_mfe (Row 2)
+│  └─ c_vwap, c_delta, c_poc, c_eff, c_pts (Row 3)
+├─ UI Components:
+│  ├─ symbol_banner, live_banner (top row)
+│  ├─ pills (timeframe selector)
+│  └─ grid, outer (layout objects)
+└─ (No state mutation - read-only rendering layer)
+
+Methods NOT extracted (remain in OrderFlow):
+├─ Heat color thresholds logic → moves to VisualIndicators
+├─ Stop flashing logic → moves to VisualIndicators
+└─ Live banner updates triggered by other modules
+
+
+================================================================================
+ORDER_FLOW.py (250 LOC) - DTC ORDER HANDLING & POSITION MANAGEMENT
+================================================================================
+
+Methods to extract:
+├─ on_order_update()            ~134 LOC (DTC order fill handler)
+│  ├─ Auto-detect stop/target from sell orders
+│  ├─ Seed position in SIM mode
+│  ├─ Detect trade closure (qty decreasing)
+│  ├─ Build trade_dict with P&L calculations
+│  └─ Call notify_trade_closed()
+├─ on_position_update()         ~122 LOC (DTC position update handler)
+│  ├─ Update symbol from position payload
+│  ├─ Detect trade closure (qty 0, was non-zero)
+│  ├─ Call notify_trade_closed()
+│  └─ Call set_position()
+├─ notify_trade_closed()        ~52  LOC (emit trade close request)
+├─ _on_position_closed()        ~40  LOC (handle close completion)
+├─ _clear_position_ui()         ~20  LOC (reset to flat)
+├─ set_position()               ~47  LOC (open/close position, capture snapshots)
+├─ set_targets()                ~5   LOC (set target/stop prices)
+└─ set_symbol()                 ~12  LOC (update symbol)
+
+Total: ~432 LOC (will reduce to ~250 after extracting calculations to MetricsCalculator)
+
+State to extract:
+├─ entry_qty                    (position quantity)
+├─ entry_price                  (entry price)
+├─ is_long                       (direction)
+├─ target_price                  (target price)
+├─ stop_price                    (stop loss price)
+├─ symbol                        (trading symbol)
+├─ current_mode                  (SIM/LIVE/DEBUG)
+├─ current_account               (account identifier)
+├─ _position                     (domain model)
+├─ entry_vwap, entry_delta, entry_poc  (entry snapshots)
+└─ entry_time_epoch             (entry time)
+
+Compatibility properties to REMOVE:
+├─ @property entry_price
+├─ @property entry_qty
+├─ @property is_long
+├─ @property target_price, stop_price
+├─ @property entry_vwap, entry_delta, entry_poc
+└─ @property entry_time_epoch, _trade_min_price, _trade_max_price
+
+
+================================================================================
+VISUAL_INDICATORS.py (200 LOC) - HEAT TIMERS & PROXIMITY ALERTS
+================================================================================
+
+Methods to extract:
+├─ _update_heat_state_transitions()     ~18  LOC (drawdown detection)
+├─ _update_proximity_alerts()           ~14  LOC (stop proximity logging)
+├─ _on_timeframe_changed()              ~17  LOC (timeframe pill handler)
+├─ refresh_pill_colors()                ~18  LOC (pill color updates)
+└─ [EMBEDDED LOGIC] from _update_time_and_heat_cells()
+   └─ Heat color/flash logic            ~30  LOC (thresholds, colors, flashing)
+└─ [EMBEDDED LOGIC] from _update_target_stop_cells()
+   └─ Stop flashing logic               ~10  LOC (proximity check, flashing)
+
+Total: ~107 LOC direct methods + ~40 LOC embedded = ~200 LOC with context
+
+State to extract:
+├─ heat_start_epoch             (when drawdown began)
+├─ _tf                          (timeframe: LIVE, 1D, 1W, 1M, 3M, YTD)
+├─ _pnl_up                      (PnL direction hint for colors)
+├─ _prev_drawdown_state         (implicit tracking state)
+├─ _stop_near_prev              (implicit tracking state)
+└─ pills                        (visual component reference)
+
+Heat thresholds (as constants):
+├─ HEAT_WARN_SEC = 180         (3:00m)
+├─ HEAT_ALERT_FLASH_SEC = 270  (4:30m)
+└─ HEAT_ALERT_SOLID_SEC = 300  (5:00m)
+
+UI Updates (via MetricCell references):
+├─ c_heat.set_value_color()
+├─ c_heat.start_flashing() / stop_flashing()
+├─ c_stop.set_value_color()
+├─ c_stop.start_flashing() / stop_flashing()
+├─ c_time.set_value_color()
+└─ pills.set_live_dot_pulsing(), set_active_color()
+
+
+================================================================================
+CSV_FEED_HANDLER.py (150 LOC) - MARKET DATA POLLING
+================================================================================
+
+Methods to extract:
+├─ _setup_timers()              ~14  LOC (create QTimers)
+├─ _on_csv_tick()               ~60  LOC (CSV read, feed update, extremes tracking)
+├─ _on_clock_tick()             ~3   LOC (clock timer tick)
+└─ _read_snapshot_csv()         ~44  LOC (CSV parser with error handling)
+
+Total: ~121 LOC (will expand to ~150 with additional methods)
+
+State to extract:
+├─ last_price                   (current market price)
+├─ session_high                 (session high)
+├─ session_low                  (session low)
+├─ vwap                         (volume-weighted average price)
+├─ cum_delta                    (cumulative delta)
+├─ poc                          (point of control)
+├─ _csv_timer                   (500ms timer)
+└─ _clock_timer                 (1000ms timer)
+
+Constants to extract:
+├─ CSV_REFRESH_MS = 500         (CSV poll interval)
+├─ TIMER_TICK_MS = 1000         (clock tick interval)
+└─ SNAPSHOT_CSV_PATH            (from config.settings)
+
+Also handles trade extremes tracking (moving to MetricsCalculator):
+├─ _trade_min_price             (min price during trade)
+└─ _trade_max_price             (max price during trade)
+
+Database calls (moving to StatePersistence):
+└─ position_service.update_trade_extremes() [called from _on_csv_tick()]
+
+
+================================================================================
+STATE_PERSISTENCE.py (200 LOC) - JSON & DATABASE SYNC
+================================================================================
+
+Methods to extract:
+├─ _get_state_path()            ~9   LOC (scoped path generation)
+├─ _load_state()                ~20  LOC (load from JSON)
+├─ _save_state()                ~24  LOC (save to JSON, atomic)
+├─ _load_position_from_database()  ~61 LOC (restore position from DB)
+├─ _write_position_to_database()   ~51 LOC (save position to DB)
+├─ _update_trade_extremes_in_database()  ~24 LOC (update extremes in DB)
+├─ set_trading_mode()           ~52  LOC (mode switch orchestration)
+└─ closeEvent()                 ~3   LOC (save on close)
+
+Total: ~244 LOC (will reduce to ~200 after consolidation)
+
+State to extract:
+├─ current_mode                 (active trading mode)
+├─ current_account              (active account)
+├─ entry_time_epoch             (entry time, persisted)
+├─ heat_start_epoch             (heat timer start, persisted)
+├─ _trade_min_price             (for DB persistence)
+└─ _trade_max_price             (for DB persistence)
+
+Database integration:
+├─ position_service.save_open_position()
+├─ position_service.update_trade_extremes()
+└─ position_repo.get_open_position()
+
+Atomic file I/O:
+├─ load_json_atomic()
+└─ save_json_atomic()
+
+Scoped state files (new):
+└─ data/runtime_state_panel2_{mode}_{account}.json
+
+
+================================================================================
+METRICS_CALCULATOR.py (150 LOC) - FINANCIAL CALCULATIONS [NEW MODULE]
+================================================================================
+
+New static methods to extract:
+├─ calculate_pnl_metrics()
+│  ├─ Input: Position, last_price
+│  ├─ Output: {pnl_pts, pnl_dollars, gross_pnl}
+│  └─ Extracted from: _update_secondary_metrics() line ~1667
+├─ calculate_risk_metrics()
+│  ├─ Input: entry_price, entry_qty, stop_price, target_price, is_long
+│  ├─ Output: {risk_dollars, r_multiple, range_pts}
+│  └─ Extracted from: _update_secondary_metrics() lines ~1537-1578
+├─ calculate_mae_mfe()
+│  ├─ Input: Position, trade_min_price, trade_max_price
+│  ├─ Output: {mae_pts, mfe_pts, mae_dollars, mfe_dollars}
+│  └─ Extracted from: _update_secondary_metrics() lines ~1584-1601
+├─ calculate_efficiency()
+│  ├─ Input: Position, pnl_pts, mfe_pts
+│  ├─ Output: efficiency float
+│  └─ Extracted from: _update_secondary_metrics() lines ~1638-1662
+└─ calculate_duration_heat()
+   ├─ Input: entry_time_epoch, heat_start_epoch, current_time
+   ├─ Output: {duration_sec, heat_sec, duration_text, heat_text}
+   └─ Extracted from: _update_time_and_heat_cells() lines ~1445-1477
+
+Total: ~150 LOC (consolidates scattered calculation logic)
+
+Dependencies:
+├─ Position domain model methods:
+│  ├─ realized_pnl(), mae(), mfe(), r_multiple(), efficiency()
+│  └─ unrealized_pnl()
+└─ Constants:
+   ├─ DOLLARS_PER_POINT
+   └─ COMM_PER_CONTRACT
+
+
+================================================================================
+POSITION_STATE.py (100 LOC) - SHARED STATE MODEL [NEW MODULE]
+================================================================================
+
+New dataclass:
+├─ @dataclass(frozen=True)
+├─ class PositionState:
+│  ├─ qty: int
+│  ├─ entry_price: Optional[float]
+│  ├─ is_long: Optional[bool]
+│  ├─ symbol: str
+│  ├─ target_price: Optional[float]
+│  ├─ stop_price: Optional[float]
+│  ├─ entry_vwap: Optional[float]
+│  ├─ entry_delta: Optional[float]
+│  ├─ entry_poc: Optional[float]
+│  ├─ entry_time_epoch: Optional[int]
+│  ├─ heat_start_epoch: Optional[int]
+│  ├─ trade_min_price: Optional[float]
+│  └─ trade_max_price: Optional[float]
+│
+├─ @property is_flat() → bool
+└─ @property is_in_drawdown(last_price) → bool
+
+Purpose:
+- Single source of truth for position state
+- Frozen to prevent accidental mutations
+- Passed as snapshots between modules
+- Replaces scattered instance variables
+
+
+================================================================================
+PANEL2_MAIN.py (150 LOC) - ORCHESTRATOR [REFACTORED]
+================================================================================
+
+Refactored Panel2 class becomes thin wrapper:
+├─ __init__()                   ~50  LOC (instantiate submodules)
+├─ _connect_signal_bus()        ~40  LOC (external signal connections)
+├─ _on_feed_data()              ~20  LOC (CSV data update handler)
+├─ _on_position_opened()        ~10  LOC (order flow position open)
+├─ _on_position_closed()        ~10  LOC (order flow position close)
+├─ set_trading_mode()           ~20  LOC (coordinate mode switch)
+└─ Public API methods           ~30  LOC (backward compatibility)
+
+Total: ~180 LOC (thin orchestrator layer)
+
+Internal signal connections:
+├─ csv_feed.data_updated → _on_feed_data()
+├─ order_flow.position_opened → _on_position_opened()
+├─ order_flow.position_closed → _on_position_closed()
+├─ order_flow.trade_closed → _persist_trade()
+└─ visual_indicators.heat_threshold_crossed → _on_heat_threshold()
+
+External signal connections:
+├─ signal_bus.positionUpdated → order_flow.on_position_update()
+├─ signal_bus.orderUpdateReceived → order_flow.on_order_update()
+├─ signal_bus.modeChanged → set_trading_mode()
+├─ signal_bus.themeChangeRequested → refresh_theme()
+└─ signal_bus.timeframeChangeRequested → _on_timeframe_changed()
+
+Public API preserved:
+├─ get_current_trade_data()
+├─ get_live_feed_data()
+├─ get_trade_state()
+├─ has_active_position()
+├─ seed_demo_position()
+├─ refresh()
+└─ closeEvent()
+
+Submodule instances:
+├─ self.csv_feed: CSVFeedHandler
+├─ self.order_flow: OrderFlowHandler
+├─ self.persistence: StatePersistenceManager
+├─ self.visual_indicators: VisualIndicators
+├─ self.display: PositionDisplay
+└─ self.metrics: MetricsCalculator
+
+
+================================================================================
+UTILITY FUNCTIONS (Move to utils/trading_utils.py)
+================================================================================
+
+Helper functions to extract:
+├─ fmt_time_human()            ~6   LOC (format time as "1:20s")
+├─ sign_from_side()            ~6   LOC (convert side to ±1)
+├─ clamp()                     ~2   LOC (min/max clamping)
+└─ extract_symbol_display()    ~20  LOC (parse DTC symbol)
+
+Total: ~34 LOC
+
+Usage:
+├─ fmt_time_human() → used by VisualIndicators, PositionDisplay
+├─ sign_from_side() → used by OrderFlow
+├─ clamp() → general utilities
+└─ extract_symbol_display() → used by OrderFlow
+
+
+================================================================================
+SUMMARY: WHERE EACH METHOD GOES
+================================================================================
+
+PANEL2.PY (1930 LOC) DECOMPOSED INTO:
+
+✓ CSV_FEED_HANDLER.py (150 LOC)
+  ├─ _setup_timers()
+  ├─ _on_csv_tick()
+  ├─ _on_clock_tick()
+  ├─ _read_snapshot_csv()
+  └─ State: last_price, session_high/low, vwap, cum_delta, poc, timers
+
+✓ STATE_PERSISTENCE.py (200 LOC)
+  ├─ _get_state_path()
+  ├─ _load_state()
+  ├─ _save_state()
+  ├─ _load_position_from_database()
+  ├─ _write_position_to_database()
+  ├─ _update_trade_extremes_in_database()
+  ├─ set_trading_mode()
+  └─ State: current_mode, current_account, epoch timestamps
+
+✓ VISUAL_INDICATORS.py (200 LOC)
+  ├─ _update_heat_state_transitions()
+  ├─ _update_proximity_alerts()
+  ├─ _on_timeframe_changed()
+  ├─ refresh_pill_colors()
+  ├─ Heat/stop flashing logic (from _update_*_cells)
+  └─ State: heat_start_epoch, _tf, tracking flags
+
+✓ ORDER_FLOW.py (250 LOC)
+  ├─ on_order_update()
+  ├─ on_position_update()
+  ├─ notify_trade_closed()
+  ├─ _on_position_closed()
+  ├─ _clear_position_ui()
+  ├─ set_position()
+  ├─ set_targets()
+  ├─ set_symbol()
+  └─ State: entry_qty, entry_price, is_long, targets, symbol, mode/account
+
+✓ METRICS_CALCULATOR.py (150 LOC)
+  ├─ calculate_pnl_metrics()
+  ├─ calculate_risk_metrics()
+  ├─ calculate_mae_mfe()
+  ├─ calculate_efficiency()
+  └─ calculate_duration_heat()
+
+✓ POSITION_DISPLAY.py (300 LOC)
+  ├─ _build() [partial]
+  ├─ _refresh_all_cells()
+  ├─ _update_price_cell()
+  ├─ _update_time_and_heat_cells() [partial]
+  ├─ _update_target_stop_cells() [partial]
+  ├─ _update_secondary_metrics()
+  ├─ _update_live_banner()
+  ├─ refresh()
+  ├─ Theme methods
+  └─ State: All MetricCell instances, banners, pills
+
+✓ POSITION_STATE.py (100 LOC) [NEW]
+  ├─ @dataclass(frozen=True) PositionState
+  └─ Properties: is_flat, is_in_drawdown
+
+✓ PANEL2_MAIN.py (150 LOC) [REFACTORED]
+  ├─ Thin orchestrator
+  ├─ Signal coordination
+  ├─ Public API preservation
+  └─ Submodule instantiation
+
+✓ utils/trading_utils.py (34 LOC) [NEW]
+  ├─ fmt_time_human()
+  ├─ sign_from_side()
+  ├─ clamp()
+  └─ extract_symbol_display()
+
+TOTAL: ~1534 LOC (vs original 1930 LOC, -22% reduction)
+
+
+================================================================================
+METHODS NOT EXTRACTED (Removed/Consolidated)
+================================================================================
+
+Compatibility properties (removed entirely) [150 LOC]
+├─ @property entry_price, entry_qty, is_long
+├─ @property target_price, stop_price
+├─ @property entry_vwap, entry_delta, entry_poc
+├─ @property entry_time_epoch
+└─ @property _trade_min_price, _trade_max_price
+   → Replaced with PositionState dataclass access
+
+Methods consolidated into larger modules:
+├─ Heat color/flash logic → VisualIndicators
+├─ Stop proximity/flashing → VisualIndicators
+├─ P&L calculations → MetricsCalculator
+├─ Duration/heat text formatting → MetricsCalculator + VisualIndicators
+└─ Trade extremes updates → CSV_FEED_HANDLER + STATE_PERSISTENCE
+
+Deleted duplicate signal (line 91-93):
+├─ tradesChanged signal appears twice in original
+└─ Keep only one in PANEL2_MAIN.py
+
