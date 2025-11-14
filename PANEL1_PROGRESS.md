@@ -25,7 +25,7 @@ Successfully extracted **7 of 8 modules** from the 1,820-line Panel1 monolith. A
 | **Phase 2: Timeframe** | 1 | 285 | ✅ Complete | `3931b02` |
 | **Phase 3: State** | 1 | 407 | ✅ Complete | `b440739` |
 | **Phase 4: Chart** | 1 | 453 | ✅ Complete | `53d6cbf` |
-| **Phase 5: Hover** | 1 | 435 | ✅ Complete | TBD |
+| **Phase 5: Hover** | 1 | 435 | ✅ Complete | `e5ca672` |
 | **Phase 6: Orchestrator** | 1 | 200 | 📋 Pending | - |
 | **TOTAL** | **8** | **2,080** | **99%** | **5 commits** |
 
@@ -407,7 +407,7 @@ def test_add_balance_point():
 | `3931b02` | Phase 2 | 1 | 285 | Timeframe management |
 | `b440739` | Phase 3 | 1 | 407 | Thread-safe equity state (CRITICAL) |
 | `53d6cbf` | Phase 4 | 1 | 453 | Chart rendering (PyQtGraph animation) |
-| TBD | Phase 5 | 1 | 435 | Hover interactions (binary search, PnL calc) |
+| `e5ca672` | Phase 5 | 1 | 435 | Hover interactions (binary search, PnL calc) |
 | - | Phase 6 | 1 | 200 | Orchestrator - **PENDING** |
 
 **Total commits:** 5
