@@ -35,6 +35,20 @@ DEBUG_NETWORK: bool = bool(int(os.getenv("DEBUG_NETWORK", "0")))  # Socket conne
 DEBUG_ANALYTICS: bool = bool(int(os.getenv("DEBUG_ANALYTICS", "0")))  # Metrics, performance calculations
 DEBUG_PERF: bool = bool(int(os.getenv("DEBUG_PERF", "0")))  # Latency, CPU, memory measurements
 
+# --- Migration feature flags (can be overridden by environment variables) ---
+# See config/feature_flags.py for full documentation
+FEATURE_FLAGS: Dict[str, bool] = {
+    "USE_NEW_PANEL1": False,  # Default: use old Panel1 (safe)
+    "USE_NEW_PANEL2": False,  # Default: use old Panel2 (safe)
+    "USE_TYPED_EVENTS": False,  # Default: use dict events (gradual migration)
+    "ENABLE_MIGRATION_LOGS": True,  # Default: enable migration logging
+    "ENABLE_PERF_TRACKING": True,  # Default: enable performance tracking
+}
+
+# NOTE: Environment variables override these values. Example:
+#   export USE_NEW_PANEL1=1  # Enable new Panel1
+#   export USE_NEW_PANEL2=1  # Enable new Panel2
+
 # Trading mode selection (DEBUG/LIVE/SIM)
 # Can be set via: environment variable, config.json, or command-line arg
 # Eventually will be auto-detected from DTC LogonResponse message
