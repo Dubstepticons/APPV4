@@ -511,21 +511,40 @@ class MainWindow(QtWidgets.QMainWindow):
             mode: One of "DEBUG", "SIM", or "LIVE"
         """
         try:
+            log.info(f"[THEME DEBUG] _set_theme_mode() called with mode='{mode}'")
+
             if mode not in ("DEBUG", "SIM", "LIVE"):
+                log.warning(f"[THEME DEBUG] Invalid mode: {mode}, skipping")
                 return
+
             # Switch the THEME dictionary
             from config.theme import switch_theme
 
+            log.debug(f"[THEME DEBUG] Calling switch_theme('{mode.lower()}')")
             switch_theme(mode.lower())
+            log.debug(f"[THEME DEBUG] switch_theme() returned successfully")
 
             # Emit signal to trigger on_theme_changed
+            log.debug(f"[THEME DEBUG] Emitting themeChanged signal with mode='{mode}'")
             self.themeChanged.emit(mode)
+            log.debug(f"[THEME DEBUG] themeChanged signal emitted")
+
             # Update central widget background
             central = self.centralWidget()
+            bg_color = THEME.get('bg_primary', '#000000')
+            log.debug(f"[THEME DEBUG] Central widget bg_primary color: {bg_color}")
+
             if central:
-                central.setStyleSheet(f"QWidget#CentralWidget {{ background: {THEME.get('bg_primary', '#000000')}; }}")
+                stylesheet = f"QWidget#CentralWidget {{ background: {bg_color}; }}"
+                log.debug(f"[THEME DEBUG] Setting central widget stylesheet: {stylesheet}")
+                central.setStyleSheet(stylesheet)
+                log.debug(f"[THEME DEBUG] Central widget stylesheet applied")
+            else:
+                log.warning(f"[THEME DEBUG] centralWidget() returned None")
+
+            log.info(f"[THEME DEBUG] _set_theme_mode() completed successfully for mode='{mode}'")
         except Exception as e:
-            log.error(f"[Theme] Error in _set_theme_mode: {e}", exc_info=True)
+            log.error(f"[THEME DEBUG] Error in _set_theme_mode: {e}", exc_info=True)
 
     def on_theme_changed(self, mode: str) -> None:
         """
@@ -536,35 +555,63 @@ class MainWindow(QtWidgets.QMainWindow):
             mode: One of "DEBUG", "SIM", or "LIVE"
         """
         try:
+            log.info(f"[THEME DEBUG] on_theme_changed() called with mode='{mode}'")
+
             if mode not in ("DEBUG", "SIM", "LIVE"):
-                log.warning(f"[Theme] Invalid mode in on_theme_changed: {mode}")
+                log.warning(f"[THEME DEBUG] Invalid mode in on_theme_changed: {mode}")
                 return
+
             self.current_theme_mode = mode
+            log.debug(f"[THEME DEBUG] Set current_theme_mode to: {self.current_theme_mode}")
 
             # CRITICAL FIX: Switch the THEME dictionary to match the mode
             from config.theme import switch_theme
+            log.debug(f"[THEME DEBUG] Calling switch_theme('{mode.lower()}') in on_theme_changed")
             switch_theme(mode.lower())
+            log.debug(f"[THEME DEBUG] switch_theme() completed in on_theme_changed")
 
             # Refresh connection icon
+            log.debug(f"[THEME DEBUG] Looking for connection icon in panel_balance")
             icon = getattr(self.panel_balance, "conn_icon", None)
-            if icon and hasattr(icon, "refresh_theme"):
-                icon.refresh_theme()
+            if icon:
+                log.debug(f"[THEME DEBUG] Found conn_icon: {icon}")
+                if hasattr(icon, "refresh_theme"):
+                    log.debug(f"[THEME DEBUG] Calling icon.refresh_theme()")
+                    icon.refresh_theme()
+                    log.debug(f"[THEME DEBUG] icon.refresh_theme() completed")
+                else:
+                    log.warning(f"[THEME DEBUG] conn_icon does not have refresh_theme method")
+            else:
+                log.debug(f"[THEME DEBUG] No conn_icon found in panel_balance")
 
             # PHASE 4: Refresh all panels via SignalBus (replaces direct calls)
+            log.debug(f"[THEME DEBUG] Attempting to emit themeChangeRequested signal on SignalBus")
             try:
                 from core.signal_bus import get_signal_bus
                 signal_bus = get_signal_bus()
-                log.debug("[Theme] Emitting themeChangeRequested signal")
+                log.debug(f"[THEME DEBUG] Got signal_bus instance: {signal_bus}")
+                log.debug(f"[THEME DEBUG] Emitting themeChangeRequested signal")
                 signal_bus.themeChangeRequested.emit()
+                log.debug(f"[THEME DEBUG] themeChangeRequested signal emitted successfully")
             except Exception as e:
-                log.error(f"[Theme] Failed to emit theme change signal: {e}", exc_info=True)
+                log.error(f"[THEME DEBUG] Failed to emit theme change signal: {e}", exc_info=True)
 
             # Update central widget background
+            log.debug(f"[THEME DEBUG] Updating central widget background")
             central = self.centralWidget()
             if central:
-                central.setStyleSheet(f"QWidget#CentralWidget {{ background: {THEME.get('bg_primary', '#000000')}; }}")
+                bg_color = THEME.get('bg_primary', '#000000')
+                log.debug(f"[THEME DEBUG] Central widget bg_primary: {bg_color}")
+                stylesheet = f"QWidget#CentralWidget {{ background: {bg_color}; }}"
+                log.debug(f"[THEME DEBUG] Setting central widget stylesheet: {stylesheet}")
+                central.setStyleSheet(stylesheet)
+                log.debug(f"[THEME DEBUG] Central widget stylesheet applied")
+            else:
+                log.warning(f"[THEME DEBUG] centralWidget() returned None")
+
+            log.info(f"[THEME DEBUG] on_theme_changed() completed for mode='{mode}'")
         except Exception as e:
-            log.error(f"[Theme] Error in on_theme_changed: {e}", exc_info=True)
+            log.error(f"[THEME DEBUG] Error in on_theme_changed: {e}", exc_info=True)
 
     # -------------------- Theme handler (end)
 

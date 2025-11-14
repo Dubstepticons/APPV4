@@ -529,13 +529,39 @@ def switch_theme(theme_name: str) -> None:
     Args:
         theme_name: One of "debug", "live", or "sim"
     """
+    from utils.logger import get_logger
     global THEME
 
+    log = get_logger(__name__)
+
+    theme_name_original = theme_name
     theme_name = theme_name.lower().strip()
+
+    log.debug(f"[THEME SWITCH] Starting switch_theme('{theme_name_original}') -> normalized: '{theme_name}'")
+
     new_theme = _THEME_MAP.get(theme_name, DEBUG_THEME)
 
+    if theme_name not in _THEME_MAP:
+        log.warning(f"[THEME SWITCH] Unknown theme '{theme_name}', falling back to DEBUG_THEME")
+    else:
+        log.debug(f"[THEME SWITCH] Found theme '{theme_name}' in _THEME_MAP")
+
+    log.debug(f"[THEME SWITCH] THEME dict before clear: {len(THEME)} keys")
+    log.debug(f"[THEME SWITCH] new_theme dict size: {len(new_theme)} keys")
+
     THEME.clear()
+    log.debug(f"[THEME SWITCH] THEME dict after clear: {len(THEME)} keys")
+
     THEME.update(new_theme)
+    log.debug(f"[THEME SWITCH] THEME dict after update: {len(THEME)} keys")
+
+    # Verify critical keys are present
+    critical_keys = ['bg_primary', 'bg_panel', 'card_bg', 'pnl_pos_color', 'pnl_neg_color', 'text_primary']
+    for key in critical_keys:
+        value = THEME.get(key)
+        log.debug(f"[THEME SWITCH] THEME['{key}'] = {value}")
+
+    log.info(f"[THEME SWITCH] Successfully switched to theme: '{theme_name.upper()}'")
 
 
 def apply_trading_mode_theme(mode: str) -> None:

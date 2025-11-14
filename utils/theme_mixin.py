@@ -60,25 +60,50 @@ class ThemeAwareMixin:
         This is the main entry point called when theme changes.
         Override _build_theme_stylesheet() to customize behavior.
         """
+        from utils.logger import get_logger
+        log = get_logger(__name__)
+
+        widget_name = getattr(self, 'objectName', lambda: 'Unknown')()
+        log.debug(f"[THEME MIXIN] refresh_theme() called on {widget_name}")
+
         # Step 1: Update this widget's stylesheet
+        log.debug(f"[THEME MIXIN] {widget_name}: Building stylesheet")
         stylesheet = self._build_theme_stylesheet()
         if stylesheet:
             if isinstance(self, QtWidgets.QWidget):
+                log.debug(f"[THEME MIXIN] {widget_name}: Setting stylesheet ({len(stylesheet)} chars)")
                 self.setStyleSheet(stylesheet)
+                log.debug(f"[THEME MIXIN] {widget_name}: Stylesheet applied")
+        else:
+            log.debug(f"[THEME MIXIN] {widget_name}: No stylesheet returned (empty)")
 
         # Step 2: Refresh child widgets
+        log.debug(f"[THEME MIXIN] {widget_name}: Getting theme children")
         children = self._get_theme_children()
         if children:
-            for child in children:
+            log.debug(f"[THEME MIXIN] {widget_name}: Found {len(children)} theme children")
+            for i, child in enumerate(children):
+                child_name = getattr(child, 'objectName', lambda: f'Child{i}')()
+                log.debug(f"[THEME MIXIN] {widget_name}: Refreshing child {i}: {child_name}")
                 if hasattr(child, "refresh_theme"):
                     child.refresh_theme()
+                else:
+                    log.warning(f"[THEME MIXIN] {widget_name}: Child {child_name} has no refresh_theme method")
+        else:
+            log.debug(f"[THEME MIXIN] {widget_name}: No children to refresh")
 
         # Step 3: Custom refresh logic (hook for subclasses)
+        log.debug(f"[THEME MIXIN] {widget_name}: Calling _on_theme_refresh hook")
         self._on_theme_refresh()
+        log.debug(f"[THEME MIXIN] {widget_name}: _on_theme_refresh hook completed")
 
         # Step 4: Trigger repaint if this is a widget
         if isinstance(self, QtWidgets.QWidget):
+            log.debug(f"[THEME MIXIN] {widget_name}: Calling update() to trigger repaint")
             self.update()
+            log.debug(f"[THEME MIXIN] {widget_name}: update() called")
+
+        log.debug(f"[THEME MIXIN] {widget_name}: refresh_theme() completed")
 
     def _build_theme_stylesheet(self) -> str:
         """

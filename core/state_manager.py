@@ -44,7 +44,9 @@ class StateManager(QtCore.QObject):
 
         # -------------------- mode awareness (start)
         self.current_account: Optional[str] = None
-        self.current_mode: str = "SIM"  # "SIM", "LIVE", or "DEBUG"
+        self.current_mode: str = "LIVE"  # "SIM", "LIVE", or "DEBUG" - MUST MATCH MainWindow default!
+        # FIX: Initialize to LIVE to match MainWindow's default theme mode (line 179 in app_manager.py)
+        # This ensures theme switching works correctly without conflicts
 
         # Mode history: list of (timestamp_utc, mode, account) tuples
         self.mode_history: list[tuple[datetime, str, str]] = []

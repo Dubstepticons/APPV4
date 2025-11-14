@@ -151,18 +151,22 @@ def setup_mode_hotkey(window):
     if hasattr(window, "statusBar"):
         window.statusBar().showMessage(f"Mode: {settings.TRADING_MODE} | Press Ctrl+Shift+M to cycle modes", 8000)
 
-    # Apply initial theme and badge
-    try:
-        from config.theme import apply_trading_mode_theme
+    # FIX: Do NOT apply trading mode theme during startup
+    # The theme is already set by MainWindow._setup_theme() to LIVE (line 179 in app_manager.py)
+    # Trading mode (SIM/LIVE/DEBUG) should NOT control the display theme.
+    # The hotkey only cycles the mode, it does NOT change the theme.
+    # Theme changes are controlled by MainWindow._set_theme_mode() or the toolbar.
 
-        apply_trading_mode_theme(settings.TRADING_MODE)
-        if hasattr(window, "panel_balance"):
-            panel1 = window.panel_balance
-            if hasattr(panel1, "set_trading_mode"):
-                # Note: account parameter is empty string for manual mode switching
-                panel1.set_trading_mode(settings.TRADING_MODE, "")
-    except Exception:
-        pass
+    # OLD CODE (REMOVED - WAS CAUSING THEME MISMATCH):
+    # try:
+    #     from config.theme import apply_trading_mode_theme
+    #     apply_trading_mode_theme(settings.TRADING_MODE)
+    #     if hasattr(window, "panel_balance"):
+    #         panel1 = window.panel_balance
+    #         if hasattr(panel1, "set_trading_mode"):
+    #             panel1.set_trading_mode(settings.TRADING_MODE, "")
+    # except Exception:
+    #     pass
 
 
 # Theme definitions (for reference)
