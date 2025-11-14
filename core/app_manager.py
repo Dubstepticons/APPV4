@@ -315,9 +315,11 @@ class MainWindow(QtWidgets.QMainWindow):
         # Single source of truth for timeframe
         self.current_tf: str = "LIVE"
 
-        # Link Panel1 <-> Panel3 (existing)
-        if hasattr(self.panel_balance, "set_stats_panel"):
-            self.panel_balance.set_stats_panel(self.panel_stats)
+        # Link Panel1 <-> Panel2 and Panel1 <-> Panel3 for theme cascade
+        if hasattr(self.panel_balance, "set_panel_references"):
+            self.panel_balance.set_panel_references(panel2=self.panel_live, panel3=self.panel_stats)
+            if os.getenv("DEBUG_DTC", "0") == "1":
+                log.debug("[Startup] Wired Panel1 -> Panel2 & Panel3 (theme cascade)")
 
         # Link Panel3 -> Panel2 for direct data access
         # Panel 3 grabs live trade data from Panel 2 for statistical analysis
@@ -536,6 +538,10 @@ class MainWindow(QtWidgets.QMainWindow):
             if mode not in ("DEBUG", "SIM", "LIVE"):
                 return
             self.current_theme_mode = mode
+
+            # CRITICAL FIX: Switch the THEME dictionary to match the mode
+            from config.theme import switch_theme
+            switch_theme(mode.lower())
 
             # Refresh connection icon
             icon = getattr(self.panel_balance, "conn_icon", None)
