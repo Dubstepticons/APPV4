@@ -9,7 +9,7 @@ implementing the Repository pattern to decouple business logic from SQL.
 Key Operations:
 - save_open_position(): Upsert open position (write-through)
 - get_open_position(): Read current open position for mode/account
-- close_position(): Move from OpenPosition → TradeRecord
+- close_position(): Move from OpenPosition  TradeRecord
 - update_trade_extremes(): Update MAE/MFE tracking
 - recover_all_open_positions(): Startup recovery
 
@@ -356,7 +356,7 @@ class PositionRepository:
 
                 log.info(
                     f"[PositionRepo] Closed position: {mode}/{account} {open_pos.symbol} "
-                    f"{open_pos.qty}@{open_pos.entry_price}→{exit_price} P&L={realized_pnl:+.2f}"
+                    f"{open_pos.qty}@{open_pos.entry_price}{exit_price} P&L={realized_pnl:+.2f}"
                 )
 
                 return trade.id

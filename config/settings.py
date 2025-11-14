@@ -284,7 +284,7 @@ SNAPSHOT_CSV_PATH: str = str(
     Path(
         _env_str("SNAPSHOT_CSV_PATH")
         or _env_str("CSV_MARKET_FEED_PATH")
-        or f"C:/Users/{os.getenv('USERNAME', 'user')}/Desktop/APPSIERRA/data/snapshot.csv"
+        or f"C:/Users/{os.getenv('USERNAME', 'user')}/Desktop/APPV4/data/snapshot.csv"
     )
 )
 

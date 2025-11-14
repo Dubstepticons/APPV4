@@ -2,7 +2,7 @@ from __future__ import annotations
 
 
 # File: tests/__init__.py
-# Block 22/?? Ã¢â‚¬â€ Test suite initializer
+# Block 22/??  Test suite initializer
 
 
 """

@@ -3,7 +3,7 @@ from __future__ import annotations
 import contextlib
 
 # File: widgets/dev_toolbar.py
-# Block 11/?? Ã¢â‚¬â€ DevToolbar (stub + interface)
+# Block 11/??  DevToolbar (stub + interface)
 from PyQt6 import QtCore, QtWidgets
 
 from config.theme import THEME

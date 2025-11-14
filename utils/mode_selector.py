@@ -84,12 +84,23 @@ def setup_mode_hotkey(window):
 
         # Apply trading mode theme
         try:
-            from config.theme import apply_trading_mode_theme
+            print(f"[MODE DEBUG] About to apply theme for mode: {new_mode}")
 
-            apply_trading_mode_theme(new_mode)
-            info("ui", f"Theme applied: {new_mode}")
+            # CRITICAL: Use MainWindow's _set_theme_mode to emit signals
+            if hasattr(window, '_set_theme_mode'):
+                print(f"[MODE DEBUG] Found _set_theme_mode method, calling it")
+                window._set_theme_mode(new_mode)
+                info("ui", f"Theme applied via _set_theme_mode: {new_mode}")
+            else:
+                print(f"[MODE DEBUG] _set_theme_mode not found, using fallback")
+                from config.theme import apply_trading_mode_theme
+                apply_trading_mode_theme(new_mode)
+                info("ui", f"Theme applied via apply_trading_mode_theme: {new_mode}")
+                print(f"[MODE DEBUG] WARNING: Theme dict updated but panels may not refresh (no signal emitted)")
         except Exception as e:
             print(f"[MODE] Warning: Could not apply theme: {e}")
+            import traceback
+            traceback.print_exc()
 
         # Refresh timeframe pill colors in Panel 2 and Panel 3
         try:

@@ -38,7 +38,7 @@ class DatabaseSetup:
 
     def log(self, level: str, msg: str) -> None:
         """Log with colored output"""
-        colors = {"✓": "\033[92m", "✗": "\033[91m", "⚠": "\033[93m", "ℹ": "\033[94m"}
+        colors = {"": "\033[92m", "": "\033[91m", "": "\033[93m", "": "\033[94m"}
         reset = "\033[0m"
         symbol = level[0]
         color = colors.get(symbol, "")
@@ -47,7 +47,7 @@ class DatabaseSetup:
 
     def check_config(self) -> bool:
         """Step 1: Verify configuration files exist and are valid"""
-        self.log("ℹ Config Check", "Verifying configuration files...")
+        self.log(" Config Check", "Verifying configuration files...")
 
         try:
             from config.settings import (
@@ -64,14 +64,14 @@ class DatabaseSetup:
             }
 
             if not DB_URL:
-                self.log("✗ Config Error", "DB_URL is not set!")
+                self.log(" Config Error", "DB_URL is not set!")
                 return False
 
-            self.log("✓ Config Valid", f"Using DB_URL: {self._mask_url(DB_URL)}")
+            self.log(" Config Valid", f"Using DB_URL: {self._mask_url(DB_URL)}")
             return True
 
         except Exception as e:
-            self.log("✗ Config Error", f"Failed to load config: {e}")
+            self.log(" Config Error", f"Failed to load config: {e}")
             return False
 
     def check_db_type(self) -> str:
@@ -90,7 +90,7 @@ class DatabaseSetup:
 
     def check_connectivity(self) -> bool:
         """Step 2: Test database connectivity"""
-        self.log("ℹ Connectivity Check", f"Testing database connection...")
+        self.log(" Connectivity Check", f"Testing database connection...")
 
         try:
             from data.db_engine import engine, health_check
@@ -99,19 +99,19 @@ class DatabaseSetup:
 
             ok, msg = health_check()
             if ok:
-                self.log("✓ Connected", msg)
+                self.log(" Connected", msg)
                 return True
             else:
-                self.log("✗ Connection Failed", msg)
+                self.log(" Connection Failed", msg)
                 return False
 
         except Exception as e:
-            self.log("✗ Connection Error", f"Failed to connect: {e}")
+            self.log(" Connection Error", f"Failed to connect: {e}")
             return False
 
     def check_tables(self) -> bool:
         """Step 3: Verify database tables exist"""
-        self.log("ℹ Table Check", "Verifying database schema...")
+        self.log(" Table Check", "Verifying database schema...")
 
         try:
             from sqlalchemy import inspect, text
@@ -124,36 +124,36 @@ class DatabaseSetup:
 
             if missing:
                 self.log(
-                    "⚠ Tables Missing",
+                    " Tables Missing",
                     f"Missing tables: {', '.join(missing)}. Run with --init to create.",
                 )
                 return False
             else:
-                self.log("✓ Tables Exist", f"Found {len(tables)} tables: {', '.join(tables)}")
+                self.log(" Tables Exist", f"Found {len(tables)} tables: {', '.join(tables)}")
                 return True
 
         except Exception as e:
-            self.log("✗ Table Check Error", f"Failed to check tables: {e}")
+            self.log(" Table Check Error", f"Failed to check tables: {e}")
             return False
 
     def init_db(self) -> bool:
         """Step 4: Create database tables"""
-        self.log("ℹ Database Init", "Creating tables...")
+        self.log(" Database Init", "Creating tables...")
 
         try:
             from data.db_engine import init_db
 
             init_db()
-            self.log("✓ Tables Created", "Database schema initialized successfully")
+            self.log(" Tables Created", "Database schema initialized successfully")
             return True
 
         except Exception as e:
-            self.log("✗ Init Error", f"Failed to create tables: {e}")
+            self.log(" Init Error", f"Failed to create tables: {e}")
             return False
 
     def test_write(self) -> bool:
         """Step 5: Test writing to database"""
-        self.log("ℹ Write Test", "Testing database write capability...")
+        self.log(" Write Test", "Testing database write capability...")
 
         try:
             from data.db_engine import get_session
@@ -176,16 +176,16 @@ class DatabaseSetup:
                 session.commit()
                 trade_id = test_trade.id
 
-            self.log("✓ Write Test Passed", f"Successfully wrote test trade (ID: {trade_id})")
+            self.log(" Write Test Passed", f"Successfully wrote test trade (ID: {trade_id})")
             return True
 
         except Exception as e:
-            self.log("✗ Write Test Failed", f"Could not write to database: {e}")
+            self.log(" Write Test Failed", f"Could not write to database: {e}")
             return False
 
     def test_read(self) -> bool:
         """Step 6: Test reading from database"""
-        self.log("ℹ Read Test", "Testing database read capability...")
+        self.log(" Read Test", "Testing database read capability...")
 
         try:
             from data.db_engine import get_session
@@ -195,19 +195,19 @@ class DatabaseSetup:
                 trades = session.query(TradeRecord).filter(TradeRecord.symbol == "TEST.US.TEST").all()
 
                 if trades:
-                    self.log("✓ Read Test Passed", f"Found {len(trades)} test record(s)")
+                    self.log(" Read Test Passed", f"Found {len(trades)} test record(s)")
                     return True
                 else:
-                    self.log("⚠ Read Test", "No test records found (may be first run)")
+                    self.log(" Read Test", "No test records found (may be first run)")
                     return True
 
         except Exception as e:
-            self.log("✗ Read Test Failed", f"Could not read from database: {e}")
+            self.log(" Read Test Failed", f"Could not read from database: {e}")
             return False
 
     def cleanup_test_data(self) -> bool:
         """Clean up test trade records"""
-        self.log("ℹ Cleanup", "Removing test data...")
+        self.log(" Cleanup", "Removing test data...")
 
         try:
             from data.db_engine import get_session
@@ -217,11 +217,11 @@ class DatabaseSetup:
                 session.query(TradeRecord).filter(TradeRecord.symbol == "TEST.US.TEST").delete()
                 session.commit()
 
-            self.log("✓ Cleanup Done", "Test data removed")
+            self.log(" Cleanup Done", "Test data removed")
             return True
 
         except Exception as e:
-            self.log("⚠ Cleanup Warning", f"Could not clean test data: {e}")
+            self.log(" Cleanup Warning", f"Could not clean test data: {e}")
             return True  # Non-fatal
 
     def run_full_check(self) -> bool:
@@ -234,11 +234,11 @@ class DatabaseSetup:
 
         # Step 1: Config check
         if not self.check_config():
-            self.log("✗ Fatal Error", "Configuration is invalid. Cannot proceed.")
+            self.log(" Fatal Error", "Configuration is invalid. Cannot proceed.")
             return False
 
         db_type = self.check_db_type()
-        self.log("ℹ Database Type", f"Detected: {db_type.upper()}")
+        self.log(" Database Type", f"Detected: {db_type.upper()}")
 
         # Step 2: Connectivity
         if not self.check_connectivity():
@@ -250,9 +250,9 @@ class DatabaseSetup:
 
         print("\n" + "-" * 70)
         if all_passed:
-            self.log("✓ Full Check Passed", "Database is configured and ready!")
+            self.log(" Full Check Passed", "Database is configured and ready!")
         else:
-            self.log("⚠ Issues Found", "Some checks failed. See above for details.")
+            self.log(" Issues Found", "Some checks failed. See above for details.")
 
         print("-" * 70 + "\n")
         return all_passed
@@ -268,7 +268,7 @@ class DatabaseSetup:
             return False
 
         db_type = self.check_db_type()
-        self.log("ℹ Database Type", f"Detected: {db_type.upper()}")
+        self.log(" Database Type", f"Detected: {db_type.upper()}")
 
         # Step 2: Connectivity
         if not self.check_connectivity():
@@ -290,7 +290,7 @@ class DatabaseSetup:
         self.cleanup_test_data()
 
         print("\n" + "-" * 70)
-        self.log("✓ Init Complete", "Database is fully configured and working!")
+        self.log(" Init Complete", "Database is fully configured and working!")
         print("-" * 70 + "\n")
         return True
 

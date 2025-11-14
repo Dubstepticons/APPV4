@@ -460,7 +460,7 @@ class TestRealWorldScenarios(unittest.TestCase):
     """Test real-world trading scenarios"""
 
     def test_full_order_lifecycle(self):
-        """Test a complete order lifecycle: submit → fill → cancel"""
+        """Test a complete order lifecycle: submit  fill  cancel"""
 
         # Order submitted
         submit_payload = {

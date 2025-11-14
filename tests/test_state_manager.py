@@ -1,5 +1,5 @@
 # File: tests/test_state_manager.py
-# Block 30/?? Ã¢â‚¬â€ Unit tests for StateManager
+# Block 30/??  Unit tests for StateManager
 import pytest
 
 from core.state_manager import StateManager

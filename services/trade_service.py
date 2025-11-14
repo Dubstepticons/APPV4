@@ -92,7 +92,7 @@ class TradeManager:
             print(f"  [WARNING] Position qty-0 detected, but NOT recording trade here!")
             print(f"  [INFO] Panel2.notify_trade_closed() will handle the record_closed_trade() call\n")
 
-            # ⚠ DO NOT call record_closed_trade() here!
+            #  DO NOT call record_closed_trade() here!
             # Panel2.notify_trade_closed() will call it with full exit price data
             # Calling it here would:
             # 1. Create duplicate trade records

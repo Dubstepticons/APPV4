@@ -68,7 +68,7 @@ class TestCrashRecovery:
         assert recovered_pos["target_price"] == 5850.0
         assert recovered_pos["stop_price"] == 5750.0
 
-        print("✓ Test 1.1 PASSED: Basic crash recovery successful")
+        print(" Test 1.1 PASSED: Basic crash recovery successful")
 
     def test_1_2_crash_recovery_live_position(self, db_session, position_repo):
         """
@@ -104,7 +104,7 @@ class TestCrashRecovery:
 
         # Note: In real implementation, recovery service would show
         # "LIVE position detected - verify with broker" warning
-        print("✓ Test 1.2 PASSED: LIVE position recovery successful")
+        print(" Test 1.2 PASSED: LIVE position recovery successful")
 
     def test_1_3_stale_position_detection(self, db_session, old_position_data):
         """
@@ -149,7 +149,7 @@ class TestCrashRecovery:
         is_stale = pos_age > timedelta(hours=24)
 
         assert is_stale, "Position should be flagged as stale"
-        print(f"✓ Test 1.3 PASSED: Stale position detected (age: {pos_age})")
+        print(f" Test 1.3 PASSED: Stale position detected (age: {pos_age})")
 
 
 # ==============================================================================
@@ -161,7 +161,7 @@ class TestModeSwitching:
 
     def test_2_1_mode_switch_preserves_positions(self, db_session, position_repo):
         """
-        Test 2.1: SIM → LIVE → SIM preserves separate positions.
+        Test 2.1: SIM  LIVE  SIM preserves separate positions.
 
         Scenario:
         1. Save SIM position
@@ -196,7 +196,7 @@ class TestModeSwitching:
             assert sim_pos_restored["qty"] == 1
             assert sim_pos_restored["entry_price"] == 5800.0
 
-        print("✓ Test 2.1 PASSED: Mode switching preserves positions")
+        print(" Test 2.1 PASSED: Mode switching preserves positions")
 
     def test_2_2_concurrent_sim_and_live_positions(self, db_session, position_repo):
         """
@@ -240,7 +240,7 @@ class TestModeSwitching:
             assert sim_pos["symbol"] == "MES"
             assert live_pos["symbol"] == "MNQ"
 
-        print("✓ Test 2.2 PASSED: Concurrent SIM + LIVE positions work")
+        print(" Test 2.2 PASSED: Concurrent SIM + LIVE positions work")
 
     def test_2_3_mode_isolation_no_leakage(self, db_session, position_repo):
         """
@@ -266,7 +266,7 @@ class TestModeSwitching:
             live_pos = position_repo.get_open_position("LIVE", "120005")
             assert live_pos is None, "LIVE should remain empty"
 
-        print("✓ Test 2.3 PASSED: No state leakage between modes")
+        print(" Test 2.3 PASSED: No state leakage between modes")
 
 
 # ==============================================================================
@@ -323,7 +323,7 @@ class TestThreadSafety:
         assert pos["trade_min_price"] is not None
         assert pos["trade_max_price"] is not None
 
-        print("✓ Test 3.1 PASSED: Concurrent updates successful (10 threads × 10 updates)")
+        print(" Test 3.1 PASSED: Concurrent updates successful (10 threads  10 updates)")
 
     def test_3_2_concurrent_close_operations(self, db_session, position_repo):
         """
@@ -367,7 +367,7 @@ class TestThreadSafety:
         assert len(successful) == 1, "Exactly one close should succeed"
         assert len(failed) == 1, "Second close should return None"
 
-        print("✓ Test 3.2 PASSED: Race condition prevented (1 success, 1 failure)")
+        print(" Test 3.2 PASSED: Race condition prevented (1 success, 1 failure)")
 
 
 # ==============================================================================
@@ -418,7 +418,7 @@ class TestDatabaseIntegrity:
             assert trade.exit_price == 5850.0
             assert trade.realized_pnl == 250.0
 
-        print("✓ Test 4.1 PASSED: Atomic close transaction verified")
+        print(" Test 4.1 PASSED: Atomic close transaction verified")
 
     def test_4_2_position_not_found_returns_none(self, db_session, position_repo):
         """
@@ -436,7 +436,7 @@ class TestDatabaseIntegrity:
 
             assert result is None, "Should return None for non-existent position"
 
-        print("✓ Test 4.2 PASSED: Non-existent position handled gracefully")
+        print(" Test 4.2 PASSED: Non-existent position handled gracefully")
 
 
 # ==============================================================================
@@ -491,16 +491,16 @@ class TestEndToEnd:
             assert trade.efficiency is not None
             assert trade.r_multiple is not None
 
-        print("✓ Test 5.1 PASSED: Full trading session with MAE/MFE tracking")
+        print(" Test 5.1 PASSED: Full trading session with MAE/MFE tracking")
 
     def test_5_2_multiple_trades_in_session(self, db_session, position_repo):
         """
         Test 5.2: Multiple trades without restart.
 
         Scenario:
-        1. Trade 1: Open → Close
-        2. Trade 2: Open → Close
-        3. Trade 3: Open → Close
+        1. Trade 1: Open  Close
+        2. Trade 2: Open  Close
+        3. Trade 3: Open  Close
         4. Verify all 3 trades in database
         """
         with patch('data.position_repository.get_session', return_value=db_session):
@@ -550,7 +550,7 @@ class TestEndToEnd:
             total_pnl = sum(t.realized_pnl for t in trades)
             assert total_pnl == 350.0  # 250 - 150 + 250
 
-        print("✓ Test 5.2 PASSED: Multiple trades tracked correctly")
+        print(" Test 5.2 PASSED: Multiple trades tracked correctly")
 
 
 # ==============================================================================

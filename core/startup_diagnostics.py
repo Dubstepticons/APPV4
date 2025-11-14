@@ -129,7 +129,7 @@ def check_snapshot_csv(max_age_sec: float = 5.0) -> tuple[bool, str, dict[str, A
 def check_dtc_config() -> tuple[bool, str, str]:
     """
     Validate DTC configuration variables are present.
-    Returns (ok, human_message, status_str) where status_str ∈ {"pending","error"} for summary row.
+    Returns (ok, human_message, status_str) where status_str  {"pending","error"} for summary row.
     """
     host_ok = bool(DTC_HOST)
     port_ok = bool(DTC_PORT)
@@ -158,9 +158,9 @@ def run_diagnostics() -> dict[str, Any]:
     """
     results: dict[str, Any] = {}
 
-    logger.info("──────────────────────────────────────────────")
-    logger.info("🧭  APPSIERRA Startup Diagnostics")
-    logger.info("──────────────────────────────────────────────")
+    logger.info("")
+    logger.info("  APPSIERRA Startup Diagnostics")
+    logger.info("")
 
     # Database
     db_ok, db_msg = check_database()
@@ -199,7 +199,7 @@ def run_diagnostics() -> dict[str, Any]:
     )
     results.update(csv_extras)
 
-    logger.info("──────────────────────────────────────────────")
+    logger.info("")
     if overall_ok:
         if dtc_fail and soft_dtc:
             logger.warning("DTC missing but allowed in soft-DTC mode -- proceeding.")
@@ -207,7 +207,7 @@ def run_diagnostics() -> dict[str, Any]:
             logger.info("All diagnostics passed successfully.")
     else:
         logger.warning("One or more diagnostics failed.")
-    logger.info("──────────────────────────────────────────────")
+    logger.info("")
 
     return results
 

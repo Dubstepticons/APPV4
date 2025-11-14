@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-Test Panel 2 → Panel 3 data handoff and UI updates.
+Test Panel 2  Panel 3 data handoff and UI updates.
 Run this to verify statistics actually update when trades close.
 """
 
@@ -43,9 +43,9 @@ def test_panel3_data_flow():
             s.commit()
             trade_id = trade.id
 
-        print(f"   ✓ Trade created with ID: {trade_id}")
+        print(f"    Trade created with ID: {trade_id}")
     except Exception as e:
-        print(f"   ✗ Failed to create trade: {e}")
+        print(f"    Failed to create trade: {e}")
         return False
 
     # Test 2: Can we query it back?
@@ -57,12 +57,12 @@ def test_panel3_data_flow():
             ).first()
 
         if found:
-            print(f"   ✓ Trade found: {found.symbol}, PnL=${found.realized_pnl}")
+            print(f"    Trade found: {found.symbol}, PnL=${found.realized_pnl}")
         else:
-            print(f"   ✗ Trade not found in database")
+            print(f"    Trade not found in database")
             return False
     except Exception as e:
-        print(f"   ✗ Query failed: {e}")
+        print(f"    Query failed: {e}")
         return False
 
     # Test 3: Can stats_service compute metrics?
@@ -74,12 +74,12 @@ def test_panel3_data_flow():
         print(f"   Stats returned: {list(stats.keys())[:5]}...")
 
         if "Total PnL" in stats:
-            print(f"   ✓ Total PnL: {stats.get('Total PnL')}")
+            print(f"    Total PnL: {stats.get('Total PnL')}")
         if "Trades" in stats:
-            print(f"   ✓ Trades: {stats.get('Trades')}")
+            print(f"    Trades: {stats.get('Trades')}")
 
     except Exception as e:
-        print(f"   ✗ Stats computation failed: {e}")
+        print(f"    Stats computation failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -93,7 +93,7 @@ def test_panel3_data_flow():
                 TradeRecord.mode == "SIM"
             ).all()
 
-        print(f"   ✓ SIM trades: {len(sim_trades)}")
+        print(f"    SIM trades: {len(sim_trades)}")
 
         # Query LIVE trades
         with get_session() as s:
@@ -101,14 +101,14 @@ def test_panel3_data_flow():
                 TradeRecord.mode == "LIVE"
             ).all()
 
-        print(f"   ✓ LIVE trades: {len(live_trades)}")
+        print(f"    LIVE trades: {len(live_trades)}")
 
     except Exception as e:
-        print(f"   ✗ Mode filtering failed: {e}")
+        print(f"    Mode filtering failed: {e}")
         return False
 
     print("\n" + "="*60)
-    print("RESULT: Panel 3 data flow is working ✓")
+    print("RESULT: Panel 3 data flow is working ")
     print("="*60)
     return True
 
@@ -125,9 +125,9 @@ def test_balance_update():
         from data.sim_balance import SIMBalanceManager
         mgr = SIMBalanceManager()
         balance = mgr.get_sim_balance()
-        print(f"   ✓ Current balance: ${balance}")
+        print(f"    Current balance: ${balance}")
     except Exception as e:
-        print(f"   ✗ Failed to read balance: {e}")
+        print(f"    Failed to read balance: {e}")
         return False
 
     # Test 2: Can we update balance?
@@ -139,13 +139,13 @@ def test_balance_update():
         # Verify it was set
         verified = mgr.get_sim_balance()
         if verified == new_balance:
-            print(f"   ✓ Balance updated to: ${verified}")
+            print(f"    Balance updated to: ${verified}")
         else:
-            print(f"   ✗ Balance not updated (expected ${new_balance}, got ${verified})")
+            print(f"    Balance not updated (expected ${new_balance}, got ${verified})")
             return False
 
     except Exception as e:
-        print(f"   ✗ Failed to update balance: {e}")
+        print(f"    Failed to update balance: {e}")
         return False
 
     # Test 3: Does it persist in JSON?
@@ -154,15 +154,15 @@ def test_balance_update():
         json_file = Path(__file__).parent / "data" / "sim_balance.json"
         if json_file.exists():
             content = json_file.read_text()
-            print(f"   ✓ JSON file exists")
+            print(f"    JSON file exists")
             print(f"   Content: {content[:100]}...")
         else:
-            print(f"   ⚠ JSON file doesn't exist at {json_file}")
+            print(f"    JSON file doesn't exist at {json_file}")
     except Exception as e:
-        print(f"   ✗ Error checking JSON: {e}")
+        print(f"    Error checking JSON: {e}")
 
     print("\n" + "="*60)
-    print("RESULT: SIM balance update is working ✓")
+    print("RESULT: SIM balance update is working ")
     print("="*60)
     return True
 
@@ -192,11 +192,11 @@ if __name__ == "__main__":
 
     print("\n" + "="*60)
     if success:
-        print("ALL TESTS PASSED ✓")
+        print("ALL TESTS PASSED ")
         print("\nIf you're still not seeing updates in the UI,")
         print("the issue is in the PyQt signal connections, not the data.")
     else:
-        print("SOME TESTS FAILED ✗")
+        print("SOME TESTS FAILED ")
         print("\nFix the data layer issues above first.")
     print("="*60 + "\n")
 

@@ -1,5 +1,5 @@
 # File: tests/test_trade_metrics.py
-# Block 31/?? Ã¢â‚¬â€ Unit tests for TradeMath
+# Block 31/??  Unit tests for TradeMath
 import pytest
 
 from services.trade_math import TradeMath

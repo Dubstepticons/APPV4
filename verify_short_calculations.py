@@ -9,7 +9,7 @@ def test_risk_calculation():
     """Test RISK calculation for long and short."""
     print("\n=== Testing RISK ===")
 
-    # Long position: Entry=100, Stop=95 → Risk = 5 points
+    # Long position: Entry=100, Stop=95  Risk = 5 points
     entry_long = 100.0
     stop_long = 95.0
     is_long = True
@@ -20,7 +20,7 @@ def test_risk_calculation():
     print(f"Long: Entry={entry_long}, Stop={stop_long} -> Risk={abs(dist_pts)} pts")
     assert abs(dist_pts) == 5.0, "Long risk calculation failed"
 
-    # Short position: Entry=100, Stop=105 → Risk = 5 points
+    # Short position: Entry=100, Stop=105  Risk = 5 points
     entry_short = 100.0
     stop_short = 105.0
     is_long = False
@@ -37,7 +37,7 @@ def test_rlive_calculation():
     """Test R-LIVE calculation for long and short."""
     print("\n=== Testing R-LIVE ===")
 
-    # Long position: Entry=100, Stop=95, Last=105 → R-Live = 1.0R
+    # Long position: Entry=100, Stop=95, Last=105  R-Live = 1.0R
     entry_long = 100.0
     stop_long = 95.0
     last_long = 105.0
@@ -52,7 +52,7 @@ def test_rlive_calculation():
     print(f"Long: Entry={entry_long}, Stop={stop_long}, Last={last_long} -> R-Live={r_live:.2f}R")
     assert abs(r_live - 1.0) < 0.01, f"Long R-Live calculation failed: expected 1.0, got {r_live}"
 
-    # Short position: Entry=100, Stop=105, Last=95 → R-Live = 1.0R
+    # Short position: Entry=100, Stop=105, Last=95  R-Live = 1.0R
     entry_short = 100.0
     stop_short = 105.0
     last_short = 95.0
@@ -73,7 +73,7 @@ def test_rplan_calculation():
     """Test R-PLAN calculation for long and short."""
     print("\n=== Testing R-PLAN ===")
 
-    # Long position: Entry=100, Stop=95, Target=110 → R-Plan = 2.0R
+    # Long position: Entry=100, Stop=95, Target=110  R-Plan = 2.0R
     entry_long = 100.0
     stop_long = 95.0
     target_long = 110.0
@@ -88,7 +88,7 @@ def test_rplan_calculation():
     print(f"Long: Entry={entry_long}, Stop={stop_long}, Target={target_long} -> R-Plan={r_plan:.2f}R")
     assert abs(r_plan - 2.0) < 0.01, f"Long R-Plan calculation failed: expected 2.0, got {r_plan}"
 
-    # Short position: Entry=100, Stop=105, Target=90 → R-Plan = 2.0R
+    # Short position: Entry=100, Stop=105, Target=90  R-Plan = 2.0R
     entry_short = 100.0
     stop_short = 105.0
     target_short = 90.0
@@ -185,7 +185,7 @@ def test_points_calculation():
     """Test Points P&L calculation for long and short."""
     print("\n=== Testing Points P&L ===")
 
-    # Long position: Entry=100, Last=105 → P&L = +5 points
+    # Long position: Entry=100, Last=105  P&L = +5 points
     entry_long = 100.0
     last_long = 105.0
     is_long = True
@@ -196,7 +196,7 @@ def test_points_calculation():
     print(f"Long: Entry={entry_long}, Last={last_long} -> P&L={pnl_pts:.2f} pts")
     assert abs(pnl_pts - 5.0) < 0.01, f"Long Points calculation failed: expected 5.0, got {pnl_pts}"
 
-    # Short position: Entry=100, Last=95 → P&L = +5 points
+    # Short position: Entry=100, Last=95  P&L = +5 points
     entry_short = 100.0
     last_short = 95.0
     is_long = False

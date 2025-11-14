@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 # File: services/trade_math.py
-# Block 32/?? Ã¢â‚¬â€ TradeMath utility functions for PnL and trade stats
+# Block 32/??  TradeMath utility functions for PnL and trade stats
 from typing import List, Tuple, Optional
 
 
@@ -143,7 +143,7 @@ class TradeMath:
 
     @staticmethod
     def mfe_mae(prices: list[float], entry_price: float) -> tuple[float, float]:
-        """Return (MFE, MAE) Ã¢â‚¬â€ max favorable/adverse excursion."""
+        """Return (MFE, MAE)  max favorable/adverse excursion."""
         if not prices:
             return 0.0, 0.0
         deltas = [p - entry_price for p in prices]

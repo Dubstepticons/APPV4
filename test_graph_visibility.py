@@ -46,7 +46,7 @@ def test_basic_graph():
         for _ in range(10):
             app.processEvents()
 
-        print("✓ Basic graph created and shown")
+        print(" Basic graph created and shown")
         print("  - Window visible: YES")
         print("  - Plot widget created: YES")
         print("  - Data plotted: YES (100 points)")
@@ -55,7 +55,7 @@ def test_basic_graph():
         return True
 
     except Exception as e:
-        print(f"✗ Failed: {e}")
+        print(f" Failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -115,7 +115,7 @@ def test_candlestick_graph():
         for _ in range(10):
             app.processEvents()
 
-        print("✓ Candlestick graph created")
+        print(" Candlestick graph created")
         print("  - 20 bars rendered: YES")
         print("  - Colors (green/red): YES")
 
@@ -123,7 +123,7 @@ def test_candlestick_graph():
         return True
 
     except Exception as e:
-        print(f"✗ Failed: {e}")
+        print(f" Failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -137,29 +137,29 @@ def test_panel1_graph_directly():
     try:
         from panels.panel1 import Panel1
 
-        print("✓ Panel1 imported successfully")
+        print(" Panel1 imported successfully")
 
         # Try to create it
         panel = Panel1()
-        print("✓ Panel1 instance created")
+        print(" Panel1 instance created")
 
         # Check if it has a graph widget
         if hasattr(panel, "plot_widget"):
-            print(f"✓ plot_widget exists: {type(panel.plot_widget)}")
+            print(f" plot_widget exists: {type(panel.plot_widget)}")
         elif hasattr(panel, "chart"):
-            print(f"✓ chart exists: {type(panel.chart)}")
+            print(f" chart exists: {type(panel.chart)}")
         else:
-            print("⚠ No obvious graph widget found in Panel1")
+            print(" No obvious graph widget found in Panel1")
             print(f"  Panel1 attributes: {[a for a in dir(panel) if not a.startswith('_')][:10]}")
 
         # Check parent
         if hasattr(panel, "parent"):
-            print(f"✓ Panel1 parent: {type(panel.parent())}")
+            print(f" Panel1 parent: {type(panel.parent())}")
 
         return True
 
     except Exception as e:
-        print(f"✗ Failed: {e}")
+        print(f" Failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -188,8 +188,8 @@ def test_graph_in_window():
         for _ in range(20):
             app.processEvents()
 
-        print("✓ Panel1 added to window and shown")
-        print("  ⚠ CHECK VISUALLY: Do you see a graph in the window?")
+        print(" Panel1 added to window and shown")
+        print("   CHECK VISUALLY: Do you see a graph in the window?")
         print("    - If YES: Graph rendering is working")
         print("    - If NO: Graph may be hidden or not sized correctly")
 
@@ -201,7 +201,7 @@ def test_graph_in_window():
         return True
 
     except Exception as e:
-        print(f"✗ Failed: {e}")
+        print(f" Failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -237,7 +237,7 @@ if __name__ == "__main__":
         print("  3. Panel1 widget visibility settings")
 
     except Exception as e:
-        print(f"\n✗ Tests crashed: {e}")
+        print(f"\n Tests crashed: {e}")
         import traceback
         traceback.print_exc()
 

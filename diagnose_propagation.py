@@ -1,20 +1,25 @@
 #!/usr/bin/env python
-"""
-APPSIERRA Live-Data Propagation Diagnostic
-Identifies where DTC messages stop flowing through the pipeline
+"""APPSIERRA Live-Data Propagation Diagnostic.
+
+Runs a series of checks to identify where DTC messages stop flowing.
+Output is kept plain ASCII to avoid encoding issues.
 """
 
-import os
 import subprocess
 import sys
-import time
+from typing import Iterable, List, Optional
 
 
-def run_test(test_name, command, timeout=10, expected_patterns=None):
-    """Run a diagnostic test and report results"""
-    print(f"\n{'='*80}")
+def run_test(
+    test_name: str,
+    command: str,
+    timeout: int = 10,
+    expected_patterns: Optional[Iterable[str]] = None,
+) -> str:
+    """Run a diagnostic shell command and report results."""
+    print(f"\n{'=' * 80}")
     print(f"TEST: {test_name}")
-    print(f"{'='*80}")
+    print(f"{'=' * 80}")
 
     try:
         result = subprocess.run(
@@ -24,21 +29,21 @@ def run_test(test_name, command, timeout=10, expected_patterns=None):
             text=True,
             timeout=timeout,
         )
-        output = result.stdout + result.stderr
+        output = (result.stdout or "") + (result.stderr or "")
 
         if expected_patterns:
-            found = []
+            found: List[str] = []
             for pattern in expected_patterns:
                 if pattern.lower() in output.lower():
                     found.append(pattern)
 
             if found:
                 print(f"[FOUND] {', '.join(found)}")
-                for line in output.split("\n"):
+                for line in output.splitlines():
                     if any(p.lower() in line.lower() for p in expected_patterns):
                         print(f"  {line[:100]}")
             else:
-                print(f"[NOT FOUND] Expected: {expected_patterns}")
+                print(f"[NOT FOUND] Expected: {list(expected_patterns)}")
         else:
             print(output[:500])
 
@@ -47,17 +52,17 @@ def run_test(test_name, command, timeout=10, expected_patterns=None):
     except subprocess.TimeoutExpired:
         print(f"[TIMEOUT] Test timed out after {timeout} seconds")
         return ""
-    except Exception as e:
-        print(f"[ERROR] {e}")
+    except Exception as exc:
+        print(f"[ERROR] {exc}")
         return ""
 
 
-def main():
+def main() -> None:
     print("\n" + "=" * 80)
     print("APPSIERRA LIVE-DATA PROPAGATION DIAGNOSTIC")
     print("=" * 80)
 
-    # Test 1: Connection
+    # 1. Connection
     print("\n[STEP 1] Checking TCP connection to DTC server...")
     run_test(
         "DTC Connection",
@@ -66,13 +71,16 @@ def main():
         expected_patterns=["dtc.tcp.connected", "Connected"],
     )
 
-    # Test 2: Heartbeats
+    # 2. Heartbeats
     print("\n[STEP 2] Checking for DTC heartbeats (Type 3)...")
     run_test(
-        "DTC Heartbeats", "export DEBUG_NETWORK=1 && timeout 5 python main.py", timeout=6, expected_patterns=["Type: 3"]
+        "DTC Heartbeats",
+        "export DEBUG_NETWORK=1 && timeout 5 python main.py",
+        timeout=6,
+        expected_patterns=["Type: 3"],
     )
 
-    # Test 3: Encoding check
+    # 3. Encoding check
     print("\n[STEP 3] Checking for encoding issues...")
     output = run_test(
         "Encoding Verification",
@@ -93,7 +101,7 @@ def main():
         print("  5. Run this diagnostic again")
         return
 
-    # Test 4: Balance messages
+    # 4. Balance messages
     print("\n[STEP 4] Checking for balance updates (Type 600)...")
     output = run_test(
         "Balance Messages",
@@ -116,7 +124,7 @@ def main():
         print("  3. Ensure DTC Protocol Server is enabled")
         return
 
-    # Test 5: Order messages
+    # 5. Order messages
     print("\n[STEP 5] Checking for order updates (Type 301)...")
     run_test(
         "Order Messages",
@@ -125,7 +133,7 @@ def main():
         expected_patterns=["Type: 301", "OrderUpdate"],
     )
 
-    # Test 6: Position messages
+    # 6. Position messages
     print("\n[STEP 6] Checking for position updates (Type 306)...")
     run_test(
         "Position Messages",
@@ -134,7 +142,7 @@ def main():
         expected_patterns=["Type: 306", "Position"],
     )
 
-    # Test 7: Signal emission
+    # 7. Signal emission
     print("\n[STEP 7] Checking signal propagation...")
     output = run_test(
         "Signal Emission",
@@ -143,25 +151,24 @@ def main():
         expected_patterns=["signal", "SENDING", "RECEIVED"],
     )
 
-    # Final summary
     print("\n" + "=" * 80)
     print("DIAGNOSTIC SUMMARY")
     print("=" * 80)
 
     if "Type: 600" in output:
-        print("\n✓ Sierra is sending balance messages")
-        print("✓ Data is arriving at socket layer")
+        print("\nSierra is sending balance messages")
+        print("Data is arriving at socket layer")
 
         if "signal" in output.lower():
-            print("✓ Signals are being emitted")
-            print("\n→ Data flow is working through app_manager layer")
-            print("→ Check panel implementation if UI still not updating")
+            print("Signals are being emitted")
+            print("\nData flow is working through app_manager layer")
+            print("Check panel implementation if UI still not updating")
         else:
-            print("✗ Signals not being emitted")
-            print("\n→ Issue is in data_bridge or app_manager")
+            print("Signals not being emitted")
+            print("\nIssue is in data_bridge or app_manager")
     else:
-        print("\n✗ Sierra not sending messages")
-        print("→ Check Sierra DTC server configuration")
+        print("\nSierra not sending messages")
+        print("Check Sierra DTC server configuration")
 
     print("\nFor detailed analysis, see: LIVE_DATA_PROPAGATION_REPORT.md")
     print("=" * 80)
@@ -173,6 +180,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\n\nDiagnostic cancelled by user")
         sys.exit(0)
-    except Exception as e:
-        print(f"\nError: {e}")
+    except Exception as exc:
+        print(f"\nError: {exc}")
         sys.exit(1)

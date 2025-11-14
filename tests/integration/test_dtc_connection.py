@@ -27,14 +27,14 @@ def test_connection():
         with DTCTestConnection() as conn:
             # Test 1: TCP connection (handled by context manager)
             print("\n[1] TCP Connection")
-            print("   [✓] TCP connection successful!")
+            print("   [] TCP connection successful!")
 
             # Test 2: Logon handshake (handled by context manager)
             print("\n[2] Logon Handshake")
             if conn.logged_in:
-                print("   [✓] Logon successful!")
+                print("   [] Logon successful!")
             else:
-                print("   [✗] Logon failed")
+                print("   [] Logon failed")
                 return False
 
             # Test 3: Request account balance
@@ -45,10 +45,10 @@ def test_connection():
             )
 
             if not conn.send_message(balance_req):
-                print("   [✗] Failed to send balance request")
+                print("   [] Failed to send balance request")
                 return False
 
-            print("   [✓] Balance request sent")
+            print("   [] Balance request sent")
 
             # Test 4: Wait for balance response
             print("\n[4] Waiting for ACCOUNT_BALANCE_UPDATE...")
@@ -60,13 +60,13 @@ def test_connection():
             )
 
             if not messages:
-                print("   [✗] No balance response received")
+                print("   [] No balance response received")
                 print("   [HINT] Check if account is correct and active")
                 return False
 
             # Found balance response
             balance_msg = messages[0]
-            print("   [✓] Balance received:")
+            print("   [] Balance received:")
 
             # Display balance fields
             balance_fields = [
@@ -88,7 +88,7 @@ def test_connection():
             return True
 
     except ConnectionRefusedError:
-        print("\n[✗] Connection refused - DTC server not running")
+        print("\n[] Connection refused - DTC server not running")
         print("\n[SOLUTION]:")
         print("   1. Open Sierra Chart")
         print("   2. Go to: Global Settings > Data/Trade Service Settings")
@@ -98,7 +98,7 @@ def test_connection():
         return False
 
     except Exception as e:
-        print(f"\n[✗] Test failed: {e}")
+        print(f"\n[] Test failed: {e}")
         import traceback
 
         traceback.print_exc()

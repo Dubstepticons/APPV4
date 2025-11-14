@@ -29,13 +29,13 @@ def remove_bom_from_file(file_path: Path) -> bool:
             with open(file_path, "wb") as f:
                 f.write(content)
 
-            print(f"✓ Removed BOM from: {file_path}")
+            print(f" Removed BOM from: {file_path}")
             return True
 
         return False
 
     except Exception as e:
-        print(f"✗ Error processing {file_path}: {e}")
+        print(f" Error processing {file_path}: {e}")
         return False
 
 

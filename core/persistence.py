@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 
 # File: core/persistence.py
-# Block 29/?? Ã¢â‚¬â€ JSONL and cache helpers
+# Block 29/??  JSONL and cache helpers
 import os
 import time
 from typing import Any, Dict, List, Optional

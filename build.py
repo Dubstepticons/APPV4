@@ -19,21 +19,21 @@ import sys
 
 def clean_build_dirs() -> None:
     """Remove build artifacts and dist directories."""
-    print("🧹 Cleaning build directories...")
+    print("Cleaning build directories...")
     dirs_to_clean = ["build", "dist", "__pycache__"]
 
     for dir_name in dirs_to_clean:
         dir_path = Path(dir_name)
         if dir_path.exists():
             shutil.rmtree(dir_path)
-            print(f"  ✓ Removed {dir_name}/")
+            print(f"  Removed {dir_name}/")
 
     # Remove .spec generated cache
     for spec_cache in Path(".").glob("*.spec.cache"):
         spec_cache.unlink()
-        print(f"  ✓ Removed {spec_cache}")
+        print(f"  Removed {spec_cache}")
 
-    print("✅ Clean complete\n")
+    print("Clean complete\n")
 
 
 def run_pyinstaller(onefile: bool = False, debug: bool = False) -> int:
@@ -47,7 +47,7 @@ def run_pyinstaller(onefile: bool = False, debug: bool = False) -> int:
     Returns:
         Exit code from PyInstaller
     """
-    print("🔨 Building APPSIERRA executable...\n")
+    print("Building APPSIERRA executable...\n")
 
     cmd = ["poetry", "run", "pyinstaller"]
 
@@ -67,7 +67,7 @@ def run_pyinstaller(onefile: bool = False, debug: bool = False) -> int:
     else:
         # Use the spec file for directory build
         if debug:
-            print("⚠️ Debug mode: Modifying spec for console output")
+            print("Debug mode: Modifying spec for console output")
         cmd.append("appsierra.spec")
 
     print(f"Running: {' '.join(cmd)}\n")
@@ -76,10 +76,10 @@ def run_pyinstaller(onefile: bool = False, debug: bool = False) -> int:
         result = subprocess.run(cmd, check=True)
         return result.returncode
     except subprocess.CalledProcessError as e:
-        print(f"❌ Build failed with exit code {e.returncode}")
+        print(f"Build failed with exit code {e.returncode}")
         return e.returncode
     except Exception as e:
-        print(f"❌ Error running PyInstaller: {e}")
+        print(f"Error running PyInstaller: {e}")
         return 1
 
 
@@ -88,19 +88,21 @@ def show_build_info() -> None:
     dist_dir = Path("dist")
 
     if not dist_dir.exists():
-        print("⚠️ No dist/ directory found")
+        print("No dist/ directory found")
         return
 
     print("\n" + "=" * 70)
-    print("✅ Build completed successfully!")
+    print("Build completed successfully!")
     print("=" * 70)
-    print("\n📦 Output location:")
+    print("\nOutput location:")
 
     for item in dist_dir.iterdir():
-        size_mb = sum(f.stat().st_size for f in item.rglob("*") if f.is_file()) / (1024 * 1024)
-        print(f"  • {item.name} ({size_mb:.1f} MB)")
+        size_mb = (
+            sum(f.stat().st_size for f in item.rglob("*") if f.is_file()) / (1024 * 1024)
+        )
+        print(f"  - {item.name} ({size_mb:.1f} MB)")
 
-    print("\n🚀 To run the executable:")
+    print("\nTo run the executable:")
     if (dist_dir / "APPSIERRA").is_dir():
         print("  cd dist/APPSIERRA")
         print("  ./APPSIERRA  (Linux/Mac)")
@@ -114,7 +116,9 @@ def show_build_info() -> None:
 
 def main() -> int:
     """Main entry point for the build script."""
-    parser = argparse.ArgumentParser(description="Build APPSIERRA executable with PyInstaller")
+    parser = argparse.ArgumentParser(
+        description="Build APPSIERRA executable with PyInstaller"
+    )
     parser.add_argument(
         "--clean",
         action="store_true",

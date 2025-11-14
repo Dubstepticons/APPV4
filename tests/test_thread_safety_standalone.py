@@ -46,15 +46,15 @@ class TestRunner:
             print('='*70)
             test_func()
             self.passed += 1
-            print(f"✓ PASSED: {test_name}")
+            print(f" PASSED: {test_name}")
         except AssertionError as e:
             self.failed += 1
-            error_msg = f"✗ FAILED: {test_name}\n  {str(e)}"
+            error_msg = f" FAILED: {test_name}\n  {str(e)}"
             print(error_msg)
             self.errors.append(error_msg)
         except Exception as e:
             self.failed += 1
-            error_msg = f"✗ ERROR: {test_name}\n  {type(e).__name__}: {str(e)}"
+            error_msg = f" ERROR: {test_name}\n  {type(e).__name__}: {str(e)}"
             print(error_msg)
             self.errors.append(error_msg)
 

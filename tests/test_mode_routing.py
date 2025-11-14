@@ -8,7 +8,7 @@ Tests critical trading mode logic to ensure:
 4. Theme switches when mode changes
 5. No cross-contamination between modes
 
-⚠️  CRITICAL: These tests prevent catastrophic trading errors (e.g., SIM orders on LIVE account)
+  CRITICAL: These tests prevent catastrophic trading errors (e.g., SIM orders on LIVE account)
 """
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ class TestAccountDetection:
         """
         Verify TradeAccount starting with "SIM" triggers SIM mode.
 
-        Logon Response: TradeAccount="SIM1" → App Mode="SIM"
+        Logon Response: TradeAccount="SIM1"  App Mode="SIM"
         """
         try:
             from core.app_manager import MainWindow
@@ -79,7 +79,7 @@ class TestAccountDetection:
         """
         Verify TradeAccount NOT starting with "SIM" triggers LIVE mode.
 
-        Logon Response: TradeAccount="120005" → App Mode="LIVE"
+        Logon Response: TradeAccount="120005"  App Mode="LIVE"
         """
         try:
             from core.app_manager import MainWindow
@@ -150,14 +150,14 @@ class TestOrderRouting:
     """
     Verify SIM and LIVE orders are strictly segregated.
 
-    ⚠️  CRITICAL: Cross-contamination = real money at risk
+      CRITICAL: Cross-contamination = real money at risk
     """
 
     def test_sim_orders_ignored_in_live_mode(self, dtc_message_factory, diagnostic_recorder):
         """
         Verify SIM account orders are rejected when app is in LIVE mode.
 
-        Scenario: App in LIVE mode receives order from SIM1 → IGNORE
+        Scenario: App in LIVE mode receives order from SIM1  IGNORE
         """
         try:
             from core.state_manager import StateManager
@@ -203,7 +203,7 @@ class TestOrderRouting:
         """
         Verify LIVE account orders are rejected when app is in SIM mode.
 
-        Scenario: App in SIM mode receives order from 120005 → IGNORE
+        Scenario: App in SIM mode receives order from 120005  IGNORE
         """
         try:
             from core.state_manager import StateManager
@@ -507,7 +507,7 @@ class TestEnvironmentConfiguration:
         """
         Verify TRADING_MODE environment variable matches app mode.
 
-        If ENV=SIM but app connects to LIVE → error.
+        If ENV=SIM but app connects to LIVE  error.
         """
         import os
 
@@ -549,7 +549,7 @@ class TestModeSwitchEdgeCases:
 
     def test_rapid_mode_switches_maintain_consistency(self, qtbot, diagnostic_recorder):
         """
-        Verify rapid SIM→LIVE→SIM switches don't cause state corruption.
+        Verify rapid SIMLIVESIM switches don't cause state corruption.
 
         Scenario: User accidentally double-clicks mode switch.
         """
@@ -603,8 +603,8 @@ class TestModeSwitchEdgeCases:
         Verify mode detection for the actual accounts used in production.
 
         Production accounts:
-            - SIM1 → SIM mode
-            - 120005 → LIVE mode
+            - SIM1  SIM mode
+            - 120005  LIVE mode
         """
         # Test actual SIM account
         assert mode_detector("SIM1") == "SIM", "SIM1 should be detected as SIM mode"
@@ -626,12 +626,12 @@ class TestFullModeScenario:
     """
     End-to-end test of complete mode switch workflow.
 
-    Simulates real user workflow: Start app → Logon → Detect mode → Trade → Switch mode
+    Simulates real user workflow: Start app  Logon  Detect mode  Trade  Switch mode
     """
 
     def test_complete_sim_to_live_workflow(self, qtbot, dtc_message_factory, diagnostic_recorder):
         """
-        Complete workflow: SIM logon → Trade → Switch to LIVE → Verify isolation.
+        Complete workflow: SIM logon  Trade  Switch to LIVE  Verify isolation.
 
         This is the ultimate integration test for mode routing.
         """
@@ -675,7 +675,7 @@ class TestFullModeScenario:
                     sender="app_manager",
                     receiver="*",
                     connected=True,
-                    metadata={"workflow": "SIM→LIVE", "success": True},
+                    metadata={"workflow": "SIMLIVE", "success": True},
                 )
 
                 app.close()

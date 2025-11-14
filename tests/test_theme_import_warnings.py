@@ -59,7 +59,7 @@ def safe_import(name: str, reload: bool = False) -> ModuleType | None:
             module = importlib.reload(module)
         return module
     except Exception:
-        print(f"{Colors.RED}❌ Failed to import module: {name}{Colors.RESET}")
+        print(f"{Colors.RED} Failed to import module: {name}{Colors.RESET}")
         traceback.print_exc()
         return None
 
@@ -84,10 +84,10 @@ def probe_theme_import(reload: bool = False, quiet: bool = False) -> int:
     banner("THEME IMPORT WARNING PROBE REPORT")
 
     if count == 0:
-        print(f"{Colors.GREEN}✅ No warnings captured during import.{Colors.RESET}")
+        print(f"{Colors.GREEN} No warnings captured during import.{Colors.RESET}")
         return 0
 
-    print(f"{Colors.YELLOW}⚠️  Captured {count} warning(s) during import.{Colors.RESET}\n")
+    print(f"{Colors.YELLOW}  Captured {count} warning(s) during import.{Colors.RESET}\n")
 
     for i, wrn in enumerate(captured, 1):
         cat = wrn.category.__name__
@@ -96,7 +96,7 @@ def probe_theme_import(reload: bool = False, quiet: bool = False) -> int:
         line = getattr(wrn, "lineno", None)
         print(f"{Colors.YELLOW}[{i}] {cat}:{Colors.RESET} {msg}")
         if not quiet and src:
-            print(f"    → {src}:{line}")
+            print(f"     {src}:{line}")
     print()
 
     if not quiet:

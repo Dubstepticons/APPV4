@@ -9,10 +9,10 @@ This script runs APPSIERRA and captures all incoming DTC message types,
 verifying that the handshake, routing, and message handlers are working correctly.
 
 Expected Output After Patches:
-    - Type 2 (LogonResponse) ✓
-    - Type 308/401 (Account) ✓
-    - Type 306 (Positions) ✓
-    - Type 600 (Balance) ✓
+    - Type 2 (LogonResponse) 
+    - Type 308/401 (Account) 
+    - Type 306 (Positions) 
+    - Type 600 (Balance) 
     - Type 301 (Orders) - only if active orders exist
 """
 
@@ -95,9 +95,9 @@ def run_test(timeout_sec=30):
                 501: "MktDataResponse",
             }
             type_name = type_names.get(msg_type, f"Type {msg_type}")
-            print(f"  ✓ Type {msg_type:3d} ({type_name:30s}): {count:5d} messages")
+            print(f"   Type {msg_type:3d} ({type_name:30s}): {count:5d} messages")
     else:
-        print("  ✗ NO MESSAGE TYPES FOUND - Check if app is running")
+        print("   NO MESSAGE TYPES FOUND - Check if app is running")
 
     print("\n2. ROUTED EVENTS (via message_router):")
     print("-" * 80)
@@ -108,9 +108,9 @@ def run_test(timeout_sec=30):
             unique_events[event] = unique_events.get(event, 0) + 1
         for event in sorted(unique_events.keys()):
             count = unique_events[event]
-            print(f"  ✓ {event:40s}: {count:5d} events")
+            print(f"   {event:40s}: {count:5d} events")
     else:
-        print("  ✗ NO ROUTER EVENTS - Check message_router.py")
+        print("   NO ROUTER EVENTS - Check message_router.py")
 
     # Verification checklist
     print("\n3. VERIFICATION CHECKLIST:")
@@ -129,14 +129,14 @@ def run_test(timeout_sec=30):
 
     all_passed = True
     for check, passed in checks.items():
-        status = "✅ PASS" if passed else "⚠️  FAIL"
+        status = " PASS" if passed else "  FAIL"
         print(f"  [{status}] {check}")
         if not passed and "Type 301" not in check:  # Type 301 is optional (no active orders)
             all_passed = False
 
     # Special note for Type 301
     if 301 not in message_types:
-        print("\n  ⓘ NOTE: Type 301 (OrderUpdate) not received - this is normal if:")
+        print("\n   NOTE: Type 301 (OrderUpdate) not received - this is normal if:")
         print("    - You have no active orders placed")
         print("    - Place an order in Sierra Chart and run test again")
         print("    - After Patch 3, app now requests: OrderUpdatesAsConnectionDefault: 1")
@@ -155,22 +155,22 @@ def run_test(timeout_sec=30):
     critical_passed = all(msg_type in message_types for msg_type, _ in critical_checks)
 
     if critical_passed:
-        print("\n✅ ALL CRITICAL MESSAGE TYPES RECEIVED")
+        print("\n ALL CRITICAL MESSAGE TYPES RECEIVED")
         print("\nApp is correctly:")
-        print("  • Connecting to Sierra DTC server")
-        print("  • Receiving account information")
-        print("  • Receiving position updates")
-        print("  • Receiving account balance")
+        print("   Connecting to Sierra DTC server")
+        print("   Receiving account information")
+        print("   Receiving position updates")
+        print("   Receiving account balance")
         if 301 in message_types:
-            print("  • Receiving order updates (Type 301)")
+            print("   Receiving order updates (Type 301)")
         else:
-            print("  • Ready to receive order updates (Type 301) when orders are placed")
+            print("   Ready to receive order updates (Type 301) when orders are placed")
     else:
-        print("\n⚠️  SOME CRITICAL MESSAGE TYPES MISSING")
+        print("\n  SOME CRITICAL MESSAGE TYPES MISSING")
         print("\nPlease verify:")
-        print("  • Sierra Chart DTC server is running")
-        print("  • DTC server is in JSON/Compact mode (not Binary)")
-        print("  • Connection string is correct (127.0.0.1:11099)")
+        print("   Sierra Chart DTC server is running")
+        print("   DTC server is in JSON/Compact mode (not Binary)")
+        print("   Connection string is correct (127.0.0.1:11099)")
         all_passed = False
 
     print("\n" + "=" * 80 + "\n")

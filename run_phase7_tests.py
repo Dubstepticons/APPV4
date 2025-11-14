@@ -64,26 +64,26 @@ def print_test_summary():
     print("="*80)
     print("""
 Suite 1: Crash Recovery (3 tests)
-  ✓ Test 1.1: Basic crash recovery (SIM)
-  ✓ Test 1.2: Crash recovery (LIVE with warning)
-  ✓ Test 1.3: Stale position detection (>24h)
+   Test 1.1: Basic crash recovery (SIM)
+   Test 1.2: Crash recovery (LIVE with warning)
+   Test 1.3: Stale position detection (>24h)
 
 Suite 2: Mode Switching (3 tests)
-  ✓ Test 2.1: SIM → LIVE → SIM preserves positions
-  ✓ Test 2.2: Concurrent SIM + LIVE positions
-  ✓ Test 2.3: Mode isolation (no leakage)
+   Test 2.1: SIM  LIVE  SIM preserves positions
+   Test 2.2: Concurrent SIM + LIVE positions
+   Test 2.3: Mode isolation (no leakage)
 
 Suite 3: Thread Safety (2 tests)
-  ✓ Test 3.1: Concurrent position updates (10 threads)
-  ✓ Test 3.2: Concurrent close operations (race condition)
+   Test 3.1: Concurrent position updates (10 threads)
+   Test 3.2: Concurrent close operations (race condition)
 
 Suite 4: Database Integrity (2 tests)
-  ✓ Test 4.1: Atomic position close transaction
-  ✓ Test 4.2: Non-existent position handling
+   Test 4.1: Atomic position close transaction
+   Test 4.2: Non-existent position handling
 
 Suite 5: End-to-End (2 tests)
-  ✓ Test 5.1: Full trading session (MAE/MFE)
-  ✓ Test 5.2: Multiple trades in session
+   Test 5.1: Full trading session (MAE/MFE)
+   Test 5.2: Multiple trades in session
 
 Total: 12 tests across 5 suites
 """)
