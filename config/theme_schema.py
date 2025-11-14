@@ -92,5 +92,8 @@ class ThemeSchema(BaseModel):
     badge_border_color: str
     badge_text_color: str
     glow_color: str
+    bg_tertiary: str
+    mode_indicator_live: str
+    mode_indicator_sim: str
 
     model_config = ConfigDict(extra="forbid")

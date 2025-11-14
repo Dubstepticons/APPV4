@@ -242,6 +242,11 @@ _BASE_THEME: dict[str, Union[int, float, str, bool]] = {
     "badge_radius": 8,
     "badge_width": 50,
     "badge_gap": 4,
+    "badge_live_bg": "#00C97A",  # Live mode badge background
+    "badge_live_fg": "#FFFFFF",  # Live mode badge foreground
+    "badge_sim_bg": "#60A5FA",   # SIM mode badge background
+    "badge_sim_fg": "#000000",   # SIM mode badge foreground
+    "badge_border_radius": 12,   # Badge border radius
     # Glow effect
     "glow_blur_radius": 12,
     "glow_offset_x": 0,
