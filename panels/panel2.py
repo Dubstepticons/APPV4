@@ -214,10 +214,26 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         """Entry price (proxies to _position.entry_price)."""
         return self._position.entry_price if not self._position.is_flat else None
 
+    @entry_price.setter
+    def entry_price(self, value: Optional[float]) -> None:
+        """Set entry price (used during position updates)."""
+        if value is not None:
+            self._position.entry_price = float(value)
+
     @property
     def entry_qty(self) -> int:
         """Entry quantity (proxies to _position.qty_abs)."""
         return self._position.qty_abs
+
+    @entry_qty.setter
+    def entry_qty(self, value: int) -> None:
+        """Set entry quantity (used during position updates)."""
+        # Note: qty is signed (positive for long, negative for short)
+        # but entry_qty should be absolute value
+        if value >= 0:
+            self._position.qty = value
+        else:
+            self._position.qty = -value
 
     @property
     def is_long(self) -> Optional[bool]:
