@@ -101,6 +101,15 @@ class MainWindow(QtWidgets.QMainWindow):
             # Register globally for access throughout the app
             set_state_manager(self._state)
 
+            # ARCHITECTURE FIX (Step 2): Bridge StateManager.modeChanged to SignalBus.modeChanged
+            # This ensures SignalBus is the ONLY event bus that panels subscribe to
+            from core.signal_bus import get_signal_bus
+            signal_bus = get_signal_bus()
+            self._state.modeChanged.connect(
+                lambda mode: signal_bus.modeChanged.emit(mode),
+                QtCore.Qt.ConnectionType.QueuedConnection
+            )
+
             # Load SIM balance from database (sum of all trades' realized P&L)
             loaded_balance = self._state.load_sim_balance_from_trades()
             print(f"\n[INITIAL BALANCE] SIM Account Loaded")
@@ -465,18 +474,19 @@ class MainWindow(QtWidgets.QMainWindow):
         """
         Handler for Ctrl+Shift+R - Reset SIM balance to $10K.
         Called when user presses the hotkey.
+
+        ARCHITECTURE FIX (Step 1):
+        - Only uses StateManager (no fallback to sim_balance manager)
+        - StateManager is the single source of truth for balance
         """
         try:
-            from core.state_manager import StateManager
-            from core.sim_balance import get_sim_balance_manager
+            # Reset SIM balance via StateManager only
+            # StateManager should always exist after _setup_state_manager()
+            if not self._state:
+                log.error("[Hotkey] StateManager not initialized - cannot reset balance")
+                return
 
-            # Reset SIM balance in both places
-            if self._state:
-                new_balance = self._state.reset_sim_balance_to_10k()
-            else:
-                # Fallback to sim_balance manager
-                mgr = get_sim_balance_manager()
-                new_balance = mgr.reset_balance()
+            new_balance = self._state.reset_sim_balance_to_10k()
 
             # PHASE 4: Update Panel1 display via SignalBus (replaces direct calls)
             try:
@@ -792,7 +802,13 @@ class MainWindow(QtWidgets.QMainWindow):
             log.exception(f"[DTC] Init failed: {e}")
 
     def _connect_dtc_signals(self) -> None:
-        """Wire DTC client signals to UI + logs (guarded for presence)."""
+        """
+        Wire DTC client signals to UI + logs (guarded for presence).
+
+        ARCHITECTURE FIX (Step 2): Fixed double-fired DTC messages
+        - Only messageReceived is connected (not both message and messageReceived)
+        - This prevents duplicate event handling
+        """
         try:
             if not getattr(self, "_dtc", None):
                 return
@@ -803,8 +819,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 c.disconnected.connect(self._on_dtc_disconnected)
             if hasattr(c, "errorOccurred"):
                 c.errorOccurred.connect(self._on_dtc_error)
-            if hasattr(c, "message"):
-                c.message.connect(self._on_dtc_message)
+            # ARCHITECTURE FIX: Only connect messageReceived (not both message and messageReceived)
+            # to prevent double-firing the same event
             if hasattr(c, "messageReceived"):
                 c.messageReceived.connect(self._on_dtc_message)
         except Exception:

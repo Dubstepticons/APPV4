@@ -60,14 +60,17 @@ from utils.request_timeout import RequestTimeoutManager
 log = structlog.get_logger(__name__)
 
 # -------------------- App-level normalized signals (start)
-# DEPRECATED: Blinker signals (being migrated to SignalBus)
+# ARCHITECTURE FIX (Step 2): Blinker signals REMOVED from runtime dispatch
+# These signals are kept ONLY for backward-compatibility with offline CLI tools
+# They are NO LONGER emitted during normal application runtime
+# All runtime event dispatch now uses SignalBus (Qt signals) only
 signal_trade_account = Signal("trade_account")
 signal_balance = Signal("balance")
 signal_position = Signal("position")
 signal_order = Signal("order")
 # -------------------- App-level normalized signals (end)
 
-# MIGRATION: Import SignalBus for Qt signal emission
+# SignalBus is the ONLY runtime event bus
 from core.signal_bus import get_signal_bus
 
 
@@ -713,35 +716,23 @@ class DTCClientJSON(QtCore.QObject):
         except Exception:
             DEBUG_DATA = False
 
-        # MIGRATION: Emit to both Blinker (deprecated) and SignalBus (new)
-        # This allows gradual migration - once all consumers use SignalBus, remove Blinker
+        # ARCHITECTURE FIX (Step 2): SignalBus is now the ONLY runtime event bus
+        # Blinker signals have been removed from runtime dispatch
         try:
             signal_bus = get_signal_bus()
 
             if app_msg.type == "TRADE_ACCOUNT":
-                # DEPRECATED: Blinker signal
-                signal_trade_account.send(app_msg.payload)
-                # NEW: Qt signal via SignalBus
                 signal_bus.tradeAccountReceived.emit(app_msg.payload)
 
             elif app_msg.type == "BALANCE_UPDATE":
-                # DEPRECATED: Blinker signal
-                signal_balance.send(app_msg.payload)
-                # NEW: Qt signal via SignalBus
                 balance = app_msg.payload.get("CashBalance", 0.0)
                 account = app_msg.payload.get("TradeAccount", "")
                 signal_bus.balanceUpdated.emit(balance, account)
 
             elif app_msg.type == "POSITION_UPDATE":
-                # DEPRECATED: Blinker signal
-                signal_position.send(app_msg.payload)
-                # NEW: Qt signal via SignalBus
                 signal_bus.positionUpdated.emit(app_msg.payload)
 
             elif app_msg.type == "ORDER_UPDATE":
-                # DEPRECATED: Blinker signal
-                signal_order.send(app_msg.payload)
-                # NEW: Qt signal via SignalBus
                 signal_bus.orderUpdateReceived.emit(app_msg.payload)
 
         except Exception as e:

@@ -1801,10 +1801,9 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
                     state.balanceChanged.connect(self._on_balance_changed)
                     log.info("[Panel1] Connected balance signal")
 
-                # Connect mode change signal
-                if hasattr(state, "modeChanged"):
-                    state.modeChanged.connect(self._on_mode_changed)
-                    log.info("[Panel1] Connected mode change signal")
+                # ARCHITECTURE FIX (Step 2): Mode changes now come via SignalBus only
+                # StateManager.modeChanged is bridged to SignalBus.modeChanged in app_manager
+                # Panel1 already subscribes to SignalBus.modeChanged (line ~308)
         except Exception as e:
             log.error(f"[Panel1] Failed to wire signals: {e}")
 

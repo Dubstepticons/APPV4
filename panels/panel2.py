@@ -10,6 +10,7 @@ from typing import List, Optional, Tuple
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
+from config.settings import SNAPSHOT_CSV_PATH
 from config.theme import THEME, ColorTheme
 from services.trade_constants import COMM_PER_CONTRACT, DOLLARS_PER_POINT
 from utils.logger import get_logger
@@ -21,7 +22,7 @@ from widgets.metric_cell import MetricCell
 log = get_logger(__name__)
 
 # -------------------- Constants & Config (start)
-CSV_FEED_PATH = r"C:\Users\cgrah\Desktop\APPV4\data\snapshot.csv"
+# Removed hard-coded CSV_FEED_PATH - now imported from config.settings as SNAPSHOT_CSV_PATH
 # STATE_PATH removed - now dynamically scoped by (mode, account) via _get_state_path()
 
 CSV_REFRESH_MS = 500
@@ -996,7 +997,7 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
           - Robust to BOM and column re-ordering
         """
         try:
-            with open(CSV_FEED_PATH, newline="", encoding="utf-8-sig") as f:
+            with open(SNAPSHOT_CSV_PATH, newline="", encoding="utf-8-sig") as f:
                 reader = csv.DictReader(f)
                 row = next(reader, None)  # first data row after header
                 if not row:
@@ -1024,7 +1025,7 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         except FileNotFoundError:
             static_key = "_missing_csv_logged"
             if not getattr(self, static_key, False):
-                log.warning(f"[panel2] Snapshot CSV not found at: {CSV_FEED_PATH}")
+                log.warning(f"[panel2] Snapshot CSV not found at: {SNAPSHOT_CSV_PATH}")
                 setattr(self, static_key, True)
             return False
         except StopIteration:
