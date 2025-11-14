@@ -1,0 +1,255 @@
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+2025-11-14 14:49:34 [info     ] signal_bus.initialized         msg='SignalBus created'
+2025-11-14 14:49:34 [info     ] signal_bus.singleton_created   msg='Global SignalBus created'
+[THEME MIXIN] refresh_theme() called on Panel2
+[THEME MIXIN] Panel2: Applying stylesheet (38 chars)
+[THEME MIXIN] Panel2:  Stylesheet applied
+[THEME MIXIN] Panel2: Refreshing 16 children
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] Panel2:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on Panel3
+[THEME MIXIN] Panel3: Applying stylesheet (38 chars)
+[THEME MIXIN] Panel3:  Stylesheet applied
+[THEME MIXIN] Panel3: Refreshing 2 children
+[THEME MIXIN] refresh_theme() called on 
+[THEME MIXIN] : Refreshing 15 children
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] refresh_theme() called on MetricCell
+[THEME MIXIN] MetricCell: Applying stylesheet (171 chars)
+[THEME MIXIN] MetricCell:  Stylesheet applied
+[THEME MIXIN] MetricCell:  refresh_theme() completed
+[THEME MIXIN] :  refresh_theme() completed
+[THEME MIXIN] Panel3:  refresh_theme() completed

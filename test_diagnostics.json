@@ -1,0 +1,316 @@
+{
+  "generated": "2025-11-14T14:37:37.106852",
+  "signals": [
+    {
+      "timestamp": "2025-11-14T14:37:36.405349",
+      "signal": "trading_mode_changed",
+      "sender": "Panel1",
+      "receiver": "Panel1",
+      "connected": true,
+      "metadata": {
+        "mode": "LIVE"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.424849",
+      "signal": "trading_mode_changed",
+      "sender": "Panel1",
+      "receiver": "Panel1",
+      "connected": true,
+      "metadata": {
+        "mode": "SIM"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.447850",
+      "signal": "trading_mode_changed",
+      "sender": "Panel1",
+      "receiver": "Panel1",
+      "connected": true,
+      "metadata": {
+        "mode": "DEBUG"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.469849",
+      "signal": "trading_mode_live",
+      "sender": "Panel1",
+      "receiver": "Panel1",
+      "connected": true,
+      "metadata": {}
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.487850",
+      "signal": "trading_mode_sim",
+      "sender": "Panel1",
+      "receiver": "Panel1",
+      "connected": true,
+      "metadata": {}
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.508849",
+      "signal": "trading_mode_debug",
+      "sender": "Panel1",
+      "receiver": "Panel1",
+      "connected": true,
+      "metadata": {}
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.543350",
+      "signal": "balance_zero",
+      "sender": "Panel1",
+      "receiver": "Panel1",
+      "connected": true,
+      "metadata": {
+        "balance": 0.0
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.561349",
+      "signal": "balance_negative",
+      "sender": "Panel1",
+      "receiver": "Panel1",
+      "connected": true,
+      "metadata": {
+        "balance": -1000.0
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.639349",
+      "signal": "panel2_order_partial",
+      "sender": "DTC",
+      "receiver": "Panel2",
+      "connected": true,
+      "metadata": {
+        "status": "partial"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.665849",
+      "signal": "panel2_order_cancelled",
+      "sender": "DTC",
+      "receiver": "Panel2",
+      "connected": true,
+      "metadata": {}
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.693349",
+      "signal": "panel2_order_filled",
+      "sender": "DTC",
+      "receiver": "Panel2",
+      "connected": true,
+      "metadata": {
+        "status_code": 3
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.720850",
+      "signal": "panel2_order_partial",
+      "sender": "DTC",
+      "receiver": "Panel2",
+      "connected": true,
+      "metadata": {
+        "status_code": 4
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.747849",
+      "signal": "panel2_order_cancelled",
+      "sender": "DTC",
+      "receiver": "Panel2",
+      "connected": true,
+      "metadata": {
+        "status_code": 5
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.773855",
+      "signal": "panel2_order_rejected",
+      "sender": "DTC",
+      "receiver": "Panel2",
+      "connected": true,
+      "metadata": {
+        "status_code": 6
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.833349",
+      "signal": "panel2_position_short",
+      "sender": "DTC",
+      "receiver": "Panel2",
+      "connected": true,
+      "metadata": {
+        "qty": -2,
+        "direction": "short"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.864349",
+      "signal": "panel2_position_flat",
+      "sender": "DTC",
+      "receiver": "Panel2",
+      "connected": true,
+      "metadata": {
+        "qty": 0,
+        "direction": "flat"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.924849",
+      "signal": "panel3_metrics_live",
+      "sender": "Panel3",
+      "receiver": "Database",
+      "connected": true,
+      "metadata": {
+        "timeframe": "LIVE"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.954351",
+      "signal": "panel3_metrics_day",
+      "sender": "Panel3",
+      "receiver": "Database",
+      "connected": true,
+      "metadata": {
+        "timeframe": "DAY"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.984352",
+      "signal": "panel3_metrics_week",
+      "sender": "Panel3",
+      "receiver": "Database",
+      "connected": true,
+      "metadata": {
+        "timeframe": "WEEK"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:37.013849",
+      "signal": "panel3_metrics_month",
+      "sender": "Panel3",
+      "receiver": "Database",
+      "connected": true,
+      "metadata": {
+        "timeframe": "MONTH"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:37.042349",
+      "signal": "panel3_metrics_year",
+      "sender": "Panel3",
+      "receiver": "Database",
+      "connected": true,
+      "metadata": {
+        "timeframe": "YEAR"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:37.071349",
+      "signal": "panel3_metrics_all",
+      "sender": "Panel3",
+      "receiver": "Database",
+      "connected": true,
+      "metadata": {
+        "timeframe": "ALL"
+      }
+    }
+  ],
+  "timing": [
+    {
+      "timestamp": "2025-11-14T14:37:36.525849",
+      "event": "panel1_balance_update",
+      "duration_ms": 0.02390000008745119,
+      "threshold_ms": 100.0,
+      "passed": true,
+      "metadata": {
+        "balance": 50000.0
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.579349",
+      "event": "panel1_rapid_balance_updates",
+      "duration_ms": 0.06359999861160759,
+      "threshold_ms": 100.0,
+      "passed": true,
+      "metadata": {
+        "update_count": 5
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.613349",
+      "event": "panel2_order_update_filled",
+      "duration_ms": 0.0228000008064555,
+      "threshold_ms": 100.0,
+      "passed": true,
+      "metadata": {
+        "symbol": "NQ",
+        "status": "filled"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.803849",
+      "event": "panel2_position_update_long",
+      "duration_ms": 3.276999999798136,
+      "threshold_ms": 100.0,
+      "passed": true,
+      "metadata": {
+        "qty": 2,
+        "direction": "long"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:36.898349",
+      "event": "panel3_load_metrics_live",
+      "duration_ms": 2.6605000002746237,
+      "threshold_ms": 100.0,
+      "passed": true,
+      "metadata": {
+        "timeframe": "LIVE"
+      }
+    },
+    {
+      "timestamp": "2025-11-14T14:37:37.097850",
+      "event": "panel3_refresh_live",
+      "duration_ms": 2.9097000006004237,
+      "threshold_ms": 100.0,
+      "passed": true,
+      "metadata": {}
+    },
+    {
+      "timestamp": "2025-11-14T14:37:37.100349",
+      "event": "panel3_refresh_day",
+      "duration_ms": 2.820199999405304,
+      "threshold_ms": 100.0,
+      "passed": true,
+      "metadata": {}
+    },
+    {
+      "timestamp": "2025-11-14T14:37:37.103349",
+      "event": "panel3_refresh_week",
+      "duration_ms": 2.923000000009779,
+      "threshold_ms": 100.0,
+      "passed": true,
+      "metadata": {}
+    },
+    {
+      "timestamp": "2025-11-14T14:37:37.106349",
+      "event": "panel3_refresh_month",
+      "duration_ms": 2.68800000048941,
+      "threshold_ms": 100.0,
+      "passed": true,
+      "metadata": {}
+    }
+  ],
+  "errors": [],
+  "memory": [],
+  "db_checks": [],
+  "summary": {
+    "total_signals": 22,
+    "connected_signals": 22,
+    "timing_violations": 0,
+    "total_errors": 0,
+    "memory_snapshots": 0,
+    "db_check_failures": 0
+  }
+}

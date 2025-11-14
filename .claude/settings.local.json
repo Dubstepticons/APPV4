@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -m pytest:*)",
+      "Bash(python run_theme_test.py:*)",
+      "Bash(python:*)",
+      "Bash(set PYTHONIOENCODING=utf-8:*)",
+      "Bash(more:*)",
+      "Bash(pytest:*)",
+      "Bash(timeout 30 python:*)",
+      "Bash(cat:*)",
+      "Bash(npm run build:*)",
+      "Bash(dir:*)",
+      "Bash(taskkill:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(nul)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
