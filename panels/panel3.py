@@ -7,8 +7,11 @@ from typing import Any, Dict, List, Optional
 from PyQt6 import QtCore, QtWidgets
 
 from config.theme import THEME, ColorTheme
+from utils.logger import get_logger
 from utils.theme_mixin import ThemeAwareMixin
 from utils.ui_helpers import centered_row
+
+log = get_logger(__name__)
 
 
 # --- Externalized metric set (with safe fallback) ----------------------------
@@ -100,25 +103,25 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
             # Theme change requests (replaces direct calls from app_manager)
             signal_bus.themeChangeRequested.connect(
                 lambda: self.refresh_theme() if hasattr(self, 'refresh_theme') else None,
-                type=QtCore.Qt.ConnectionType.QueuedConnection
+                QtCore.Qt.ConnectionType.QueuedConnection
             )
 
             # Trade closed event for analytics (replaces direct on_trade_closed call)
             signal_bus.tradeClosedForAnalytics.connect(
                 lambda trade: self.on_trade_closed(trade) if hasattr(self, 'on_trade_closed') else None,
-                type=QtCore.Qt.ConnectionType.QueuedConnection
+                QtCore.Qt.ConnectionType.QueuedConnection
             )
 
             # Metrics reload requested (replaces direct call)
             signal_bus.metricsReloadRequested.connect(
                 lambda tf: self._load_metrics_for_timeframe(tf) if hasattr(self, '_load_metrics_for_timeframe') else None,
-                type=QtCore.Qt.ConnectionType.QueuedConnection
+                QtCore.Qt.ConnectionType.QueuedConnection
             )
 
             # Snapshot analysis requested (replaces direct call)
             signal_bus.snapshotAnalysisRequested.connect(
                 lambda: self.analyze_and_store_trade_snapshot() if hasattr(self, 'analyze_and_store_trade_snapshot') else None,
-                type=QtCore.Qt.ConnectionType.QueuedConnection
+                QtCore.Qt.ConnectionType.QueuedConnection
             )
 
             log.info("[Panel3] Connected to SignalBus for Phase 4 command signals")

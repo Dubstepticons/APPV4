@@ -159,43 +159,43 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             # Position updates from DTC
             signal_bus.positionUpdated.connect(
                 self.on_position_update,
-                type=QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
+                QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
             )
 
             # Order updates from DTC
             signal_bus.orderUpdateReceived.connect(
                 self.on_order_update,
-                type=QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
+                QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
             )
 
             # Mode changes
             signal_bus.modeChanged.connect(
                 lambda mode: self.set_trading_mode(mode, None),
-                type=QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
+                QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
             )
 
             # PHASE 4: Theme change requests (replaces direct calls from app_manager)
             signal_bus.themeChangeRequested.connect(
                 lambda: self.refresh_theme() if hasattr(self, 'refresh_theme') else None,
-                type=QtCore.Qt.ConnectionType.QueuedConnection
+                QtCore.Qt.ConnectionType.QueuedConnection
             )
 
             # PHASE 4: Timeframe change requests (replaces direct calls from app_manager)
             signal_bus.timeframeChangeRequested.connect(
                 lambda tf: self.set_timeframe(tf) if hasattr(self, 'set_timeframe') else None,
-                type=QtCore.Qt.ConnectionType.QueuedConnection
+                QtCore.Qt.ConnectionType.QueuedConnection
             )
 
             # PHASE 4: LIVE dot visibility (replaces direct calls from app_manager)
             signal_bus.liveDotVisibilityRequested.connect(
                 lambda visible: self.set_live_dot_visible(visible) if hasattr(self, 'set_live_dot_visible') else None,
-                type=QtCore.Qt.ConnectionType.QueuedConnection
+                QtCore.Qt.ConnectionType.QueuedConnection
             )
 
             # PHASE 4: LIVE dot pulsing (replaces direct calls from app_manager)
             signal_bus.liveDotPulsingRequested.connect(
                 lambda pulsing: self.set_live_dot_pulsing(pulsing) if hasattr(self, 'set_live_dot_pulsing') else None,
-                type=QtCore.Qt.ConnectionType.QueuedConnection
+                QtCore.Qt.ConnectionType.QueuedConnection
             )
 
             log.info("[Panel2] Connected to SignalBus for DTC events and Phase 4 command signals")
