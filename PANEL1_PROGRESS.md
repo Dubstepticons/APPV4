@@ -34,7 +34,7 @@
 | **Phase 3: State** | 1 | 407 | ✅ Complete | `b440739` |
 | **Phase 4: Chart** | 1 | 453 | ✅ Complete | `53d6cbf` |
 | **Phase 5: Hover** | 1 | 435 | ✅ Complete | `e5ca672` |
-| **Phase 6: Orchestrator** | 1 | 579 | ✅ Complete | TBD |
+| **Phase 6: Orchestrator** | 1 | 579 | ✅ Complete | `2ddd704` |
 | **TOTAL** | **8** | **2,459** | **100%** | **6 commits** |
 
 **Original:** 1,820 LOC monolith
@@ -481,7 +481,7 @@ def test_add_balance_point():
 | `b440739` | Phase 3 | 1 | 407 | Thread-safe equity state (CRITICAL) |
 | `53d6cbf` | Phase 4 | 1 | 453 | Chart rendering (PyQtGraph animation) |
 | `e5ca672` | Phase 5 | 1 | 435 | Hover interactions (binary search, PnL calc) |
-| TBD | Phase 6 | 2 | 579 | Orchestrator + updated __init__.py |
+| `2ddd704` | Phase 6 | 2 | 579 | Orchestrator + updated __init__.py (FINAL) |
 
 **Total commits:** 6
 **Total files:** 9 (8 modules + __init__.py)
