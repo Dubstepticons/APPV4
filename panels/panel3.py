@@ -68,12 +68,15 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
         with contextlib.suppress(Exception):
             self._load_metrics_for_timeframe(self._tf)
 
-        # Connect to mode changes so we reload metrics when switching SIM/LIVE
+        # ARCHITECTURE FIX (Step 2): Connect to mode changes via SignalBus
+        # SignalBus is now the ONLY event bus (StateManager.modeChanged is bridged to SignalBus)
         try:
-            from core.app_state import get_state_manager
-            state = get_state_manager()
-            if state and hasattr(state, 'modeChanged'):
-                state.modeChanged.connect(self._on_mode_changed)
+            from core.signal_bus import get_signal_bus
+            signal_bus = get_signal_bus()
+            signal_bus.modeChanged.connect(
+                lambda mode: self._on_mode_changed(mode),
+                QtCore.Qt.ConnectionType.QueuedConnection
+            )
         except Exception as e:
             pass
 

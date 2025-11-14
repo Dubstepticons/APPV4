@@ -217,7 +217,8 @@ class TradeManager:
                     mode = detect_mode_from_account(account)
 
 
-            # Update balance for the mode if state manager provided
+            # ARCHITECTURE FIX (Step 1): Update balance for the mode
+            # StateManager is the ONLY place where balances are updated
             new_balance = None  # Initialize to None for later use
             if self.state and realized_pnl is not None:
                 current_balance = self.state.get_balance_for_mode(mode)
@@ -233,11 +234,28 @@ class TradeManager:
 
                 self.state.set_balance_for_mode(mode, new_balance)
             else:
-                log.debug(
-                    "trade_manager.balance_skip",
-                    has_state=bool(self.state),
-                    has_pnl=realized_pnl is not None
-                )
+                # CRITICAL: Balance updates should ALWAYS happen for closed trades
+                # Missing state or pnl indicates a problem in the trade closure pipeline
+                if mode == "SIM" and not self.state:
+                    log.error(
+                        "trade_manager.balance_update_failed",
+                        reason="StateManager not available",
+                        mode=mode,
+                        pnl=realized_pnl,
+                        message="SIM balance NOT updated - StateManager missing!"
+                    )
+                elif realized_pnl is None:
+                    log.warning(
+                        "trade_manager.balance_skip",
+                        reason="realized_pnl is None",
+                        has_state=bool(self.state)
+                    )
+                else:
+                    log.debug(
+                        "trade_manager.balance_skip",
+                        has_state=bool(self.state),
+                        has_pnl=realized_pnl is not None
+                    )
 
             # CLEANUP FIX: Use structured logging for trade details
             log.debug(

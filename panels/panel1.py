@@ -1152,15 +1152,13 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
 
         # Update balance label for new scope
         try:
+            # ARCHITECTURE FIX (Step 4): Use StateManager only for balance (no JSON)
             from core.app_state import get_state_manager
             state = get_state_manager()
             if state:
-                if mode == "SIM":
-                    # Get balance for this specific SIM account
-                    from core.sim_balance import get_sim_balance
-                    balance = get_sim_balance(account) if account else 10000.0
-                else:
-                    balance = state.live_balance
+                # Get balance from StateManager (single source of truth for in-memory balance)
+                # StateManager loads from DB on startup and is updated by TradeManager
+                balance = state.get_balance_for_mode(mode)
                 self.set_account_balance(balance)
                 # CRITICAL: Also add point to equity curve for new scope
                 self.update_equity_series_from_balance(balance, mode=mode)
@@ -1801,10 +1799,9 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
                     state.balanceChanged.connect(self._on_balance_changed)
                     log.info("[Panel1] Connected balance signal")
 
-                # Connect mode change signal
-                if hasattr(state, "modeChanged"):
-                    state.modeChanged.connect(self._on_mode_changed)
-                    log.info("[Panel1] Connected mode change signal")
+                # ARCHITECTURE FIX (Step 2): Mode changes now come via SignalBus only
+                # StateManager.modeChanged is bridged to SignalBus.modeChanged in app_manager
+                # Panel1 already subscribes to SignalBus.modeChanged (line ~308)
         except Exception as e:
             log.error(f"[Panel1] Failed to wire signals: {e}")
 

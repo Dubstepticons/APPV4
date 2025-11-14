@@ -9,8 +9,24 @@ Clean DTC schema based on what Sierra Chart ACTUALLY sends:
 NO position data comes from Sierra - it only sends market data.
 All position tracking must be INFERRED from order executions.
 
-CRITICAL FIX: Added OpenPosition table for single source of truth.
-Database is now authoritative for position state - fixes crash recovery issues.
+ARCHITECTURE PRINCIPLE (Step 4): Database as Single Source of Truth
+================================================================================
+The database is the ONLY authoritative source for:
+  1. OpenPosition: Current open trades (one per mode/account)
+  2. TradeRecord: Closed trade history and SIM balance ledger
+  3. OrderRecord: Order history for trade reconstruction
+
+All other representations (StateManager, Panel2, JSON) are:
+  - Caches/projections of database state
+  - NEVER authoritative
+  - Rebuilt from database on startup/recovery
+
+Benefits:
+  - Crash safety: Position state survives restarts
+  - Mode isolation: SIM and LIVE never share positions
+  - Audit trail: Complete history in database
+  - No conflicts: Database is the single source of truth
+================================================================================
 """
 
 from datetime import datetime
