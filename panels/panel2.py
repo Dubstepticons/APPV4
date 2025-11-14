@@ -256,15 +256,32 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             return None
         return int(self._position.entry_time.timestamp())
 
+    @entry_time_epoch.setter
+    def entry_time_epoch(self, value: Optional[int]) -> None:
+        """Set entry time from epoch value (used during state restoration)."""
+        if value is not None:
+            from datetime import datetime, timezone
+            self._position.entry_time = datetime.fromtimestamp(value, tz=timezone.utc)
+
     @property
     def _trade_min_price(self) -> Optional[float]:
         """Trade minimum price for MAE (proxies to _position.trade_min_price)."""
         return self._position.trade_min_price
 
+    @_trade_min_price.setter
+    def _trade_min_price(self, value: Optional[float]) -> None:
+        """Set trade min price (used during state restoration)."""
+        self._position.trade_min_price = value
+
     @property
     def _trade_max_price(self) -> Optional[float]:
         """Trade maximum price for MFE (proxies to _position.trade_max_price)."""
         return self._position.trade_max_price
+
+    @_trade_max_price.setter
+    def _trade_max_price(self, value: Optional[float]) -> None:
+        """Set trade max price (used during state restoration)."""
+        self._position.trade_max_price = value
 
     # -------------------- Trade persistence hooks (start)
     def notify_trade_closed(self, trade: dict) -> None:
@@ -597,10 +614,16 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             if avg_price is not None:
                 avg_price = float(avg_price)
 
+            # DEBUG: Log incoming position update
+            log.info(
+                f"[Panel2] Position update received: qty={qty}, avg_entry={avg_price}, "
+                f"symbol={symbol}, account={payload.get('TradeAccount', 'unknown')}"
+            )
+
             # CRITICAL: Reject positions without valid price data (avoid cached stale data)
             if qty != 0 and avg_price is None:
                 log.warning(
-                    f"[panel2] Rejecting position with qty={qty} but missing price"
+                    f"[Panel2] Rejecting position with qty={qty} but missing price"
                 )
                 return
 
@@ -677,12 +700,14 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
 
                 # Call set_position to update timers and capture snapshots
                 self.set_position(abs(qty), avg_price, is_long)
-                log.info(f"[panel2] Position update accepted: symbol={self.symbol}, qty={qty}, avg={avg_price}, long={is_long}")
+                log.info(f"[Panel2] Position update accepted: symbol={self.symbol}, qty={qty}, avg={avg_price}, long={is_long}")
 
                 # Ensure UI refresh happens
+                log.info(f"[Panel2] Calling _refresh_all_cells() to update UI metrics")
                 self._refresh_all_cells()
+                log.info(f"[Panel2] UI refresh complete")
             else:
-                log.warning(f"[panel2] Invalid position data - skipping: qty={qty}, avg={avg_price}")
+                log.warning(f"[Panel2] Invalid position data - skipping: qty={qty}, avg={avg_price}")
         except Exception as e:
             log.error(f"[panel2] on_position_update error: {e}", exc_info=True)
 
