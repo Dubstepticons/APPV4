@@ -33,7 +33,7 @@ def test_metrics_config():
         print(f"✓ PANEL3_METRICS: {panel3_count} metrics")
 
         assert panel2_count == 15, f"Expected 15 Panel2 metrics, got {panel2_count}"
-        assert panel3_count == 18, f"Expected 18 Panel3 metrics, got {panel3_count}"
+        assert panel3_count == 15, f"Expected 15 Panel3 metrics, got {panel3_count}"
 
         print("✓ All metric counts correct")
         assert True

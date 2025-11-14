@@ -161,6 +161,7 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
         self.current_mode: str = "SIM"
         self.current_account: str = ""
         self._active_scope: tuple[str, str] = ("SIM", "")
+        self._current_display_mode: str = "SIM"  # Initialize display mode
 
         # Legacy compatibility - points to active curve
         self._equity_points: list[tuple[float, float]] = []
@@ -220,9 +221,12 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
         self._init_hover_elements()
         self._ensure_live_pill_dot(initial=True)
 
-        # Initialize theme based on default mode
-        switch_theme("live" if self._mode_is_live else "sim")
-        self._setup_theme()  # Initialize theme (ThemeAwareMixin)
+        # Initialize theme - use LIVE as default (MainWindow sets initial mode)
+        # Note: MainWindow will call on_theme_changed() after panel construction to finalize theme
+        # CRITICAL: Don't call _setup_theme() here because panel references (_panel2, _panel3) aren't set yet
+        # They get set in MainWindow._setup_cross_panel_linkage() -> set_panel_references()
+        # The initial on_theme_changed() call in MainWindow.__init__ will handle theme setup
+        switch_theme("live")
 
         # Wire balance signal from StateManager
         self._wire_balance_signal()
@@ -297,37 +301,37 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
 
             signal_bus.balanceUpdated.connect(
                 _on_balance_updated,
-                type=QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
+                QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
             )
 
             # Mode changes
             signal_bus.modeChanged.connect(
                 lambda mode: self.set_trading_mode(mode, None),
-                type=QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
+                QtCore.Qt.ConnectionType.QueuedConnection  # Thread-safe queued connection
             )
 
             # PHASE 4: Balance display requests (replaces direct calls from app_manager)
             signal_bus.balanceDisplayRequested.connect(
                 lambda balance, mode: self.set_account_balance(balance),
-                type=QtCore.Qt.ConnectionType.QueuedConnection
+                QtCore.Qt.ConnectionType.QueuedConnection
             )
 
             # PHASE 4: Equity point requests (replaces direct calls from app_manager)
             signal_bus.equityPointRequested.connect(
                 lambda balance, mode: self.update_equity_series_from_balance(balance, mode=mode),
-                type=QtCore.Qt.ConnectionType.QueuedConnection
+                QtCore.Qt.ConnectionType.QueuedConnection
             )
 
             # PHASE 4: Theme change requests (replaces direct calls from app_manager)
             signal_bus.themeChangeRequested.connect(
                 lambda: self._refresh_theme_colors() if hasattr(self, '_refresh_theme_colors') else None,
-                type=QtCore.Qt.ConnectionType.QueuedConnection
+                QtCore.Qt.ConnectionType.QueuedConnection
             )
 
             # PHASE 4: Timeframe change requests (replaces direct calls from app_manager)
             signal_bus.timeframeChangeRequested.connect(
                 lambda tf: self.set_timeframe(tf),
-                type=QtCore.Qt.ConnectionType.QueuedConnection
+                QtCore.Qt.ConnectionType.QueuedConnection
             )
 
             log.info("[Panel1] Connected to SignalBus for DTC events and Phase 4 command signals")

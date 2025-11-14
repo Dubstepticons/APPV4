@@ -17,6 +17,28 @@ from typing import Optional
 from config.settings import DEBUG_MODE, TRADING_MODE
 
 
+class SafeRotatingFileHandler(RotatingFileHandler):
+    """Custom RotatingFileHandler that gracefully handles rotation errors on Windows.
+
+    Windows file locking can prevent rotation. This handler catches those errors
+    and continues logging without crashing.
+    """
+
+    def doRollover(self) -> None:
+        """Override doRollover to handle Windows file locking gracefully."""
+        try:
+            super().doRollover()
+        except (OSError, PermissionError) as e:
+            # Windows file locking: log to the current file anyway
+            # Don't crash, just skip the rotation
+            if "being used by another process" in str(e) or "Permission" in str(e.__class__.__name__):
+                # Silently skip rotation - the file will continue to be written to
+                pass
+            else:
+                # Re-raise other OS errors
+                raise
+
+
 def _init_logger_system() -> None:
     """Initializes global logging handlers (console + rotating file)."""
     if getattr(_init_logger_system, "_initialized", False):
@@ -37,7 +59,8 @@ def _init_logger_system() -> None:
     formatter = logging.Formatter(fmt, datefmt)
 
     # File handler with rotation (always enabled)
-    file_handler = RotatingFileHandler(log_path, maxBytes=1_000_000, backupCount=3, encoding="utf-8")
+    # SafeRotatingFileHandler gracefully handles Windows file locking on rotation
+    file_handler = SafeRotatingFileHandler(log_path, maxBytes=1_000_000, backupCount=3, encoding="utf-8", delay=True)
     file_handler.setFormatter(formatter)
     file_handler.setLevel(log_level)
 
