@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 # File: utils/error_helpers.py
-# Block 38/?? Ã¢â‚¬â€ Error handling helpers
+# Block 38/??  Error handling helpers
 import traceback
 from typing import Optional
 

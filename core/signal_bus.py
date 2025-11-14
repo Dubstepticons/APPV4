@@ -281,7 +281,7 @@ def wrap_blinker_signal(blinker_signal, qt_signal: QtCore.pyqtSignal):
     """
     Wrap a Blinker signal to emit a Qt signal.
 
-    Temporary migration helper to bridge Blinker → Qt signals.
+    Temporary migration helper to bridge Blinker  Qt signals.
 
     Args:
         blinker_signal: Blinker signal to wrap
@@ -310,7 +310,7 @@ def wrap_blinker_signal(blinker_signal, qt_signal: QtCore.pyqtSignal):
 
             log.debug(
                 "signal_bus.blinker_bridge",
-                msg="Bridged Blinker → Qt signal",
+                msg="Bridged Blinker  Qt signal",
                 blinker_signal=str(blinker_signal),
                 qt_signal=qt_signal.signal,
             )

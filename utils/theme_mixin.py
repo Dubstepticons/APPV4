@@ -64,6 +64,7 @@ class ThemeAwareMixin:
         log = get_logger(__name__)
 
         widget_name = getattr(self, 'objectName', lambda: 'Unknown')()
+        print(f"[THEME MIXIN] refresh_theme() called on {widget_name}")
         log.debug(f"[THEME MIXIN] refresh_theme() called on {widget_name}")
 
         # Step 1: Update this widget's stylesheet
@@ -71,8 +72,10 @@ class ThemeAwareMixin:
         stylesheet = self._build_theme_stylesheet()
         if stylesheet:
             if isinstance(self, QtWidgets.QWidget):
+                print(f"[THEME MIXIN] {widget_name}: Applying stylesheet ({len(stylesheet)} chars)")
                 log.debug(f"[THEME MIXIN] {widget_name}: Setting stylesheet ({len(stylesheet)} chars)")
                 self.setStyleSheet(stylesheet)
+                print(f"[THEME MIXIN] {widget_name}:  Stylesheet applied")
                 log.debug(f"[THEME MIXIN] {widget_name}: Stylesheet applied")
         else:
             log.debug(f"[THEME MIXIN] {widget_name}: No stylesheet returned (empty)")
@@ -81,6 +84,7 @@ class ThemeAwareMixin:
         log.debug(f"[THEME MIXIN] {widget_name}: Getting theme children")
         children = self._get_theme_children()
         if children:
+            print(f"[THEME MIXIN] {widget_name}: Refreshing {len(children)} children")
             log.debug(f"[THEME MIXIN] {widget_name}: Found {len(children)} theme children")
             for i, child in enumerate(children):
                 child_name = getattr(child, 'objectName', lambda: f'Child{i}')()
@@ -103,6 +107,7 @@ class ThemeAwareMixin:
             self.update()
             log.debug(f"[THEME MIXIN] {widget_name}: update() called")
 
+        print(f"[THEME MIXIN] {widget_name}:  refresh_theme() completed")
         log.debug(f"[THEME MIXIN] {widget_name}: refresh_theme() completed")
 
     def _build_theme_stylesheet(self) -> str:

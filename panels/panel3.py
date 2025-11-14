@@ -90,15 +90,17 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
         PHASE 4: This replaces direct method calls from app_manager.
 
         Connected signals:
-        - themeChangeRequested → refresh_theme()
-        - tradeClosedForAnalytics → on_trade_closed()
-        - metricsReloadRequested → _load_metrics_for_timeframe()
-        - snapshotAnalysisRequested → analyze_and_store_trade_snapshot()
+        - themeChangeRequested  refresh_theme()
+        - tradeClosedForAnalytics  on_trade_closed()
+        - metricsReloadRequested  _load_metrics_for_timeframe()
+        - snapshotAnalysisRequested  analyze_and_store_trade_snapshot()
         """
         try:
+            log.info("[Panel3 DEBUG] ========== CONNECTING TO SIGNAL BUS ==========")
             from core.signal_bus import get_signal_bus
 
             signal_bus = get_signal_bus()
+            log.info(f"[Panel3 DEBUG] SignalBus instance obtained: {signal_bus}")
 
             # Theme change requests (replaces direct calls from app_manager)
             signal_bus.themeChangeRequested.connect(
@@ -107,10 +109,12 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
             )
 
             # Trade closed event for analytics (replaces direct on_trade_closed call)
+            log.info("[Panel3 DEBUG] Connecting tradeClosedForAnalytics signal...")
             signal_bus.tradeClosedForAnalytics.connect(
                 lambda trade: self.on_trade_closed(trade) if hasattr(self, 'on_trade_closed') else None,
                 QtCore.Qt.ConnectionType.QueuedConnection
             )
+            log.info("[Panel3 DEBUG] tradeClosedForAnalytics signal connected successfully")
 
             # Metrics reload requested (replaces direct call)
             signal_bus.metricsReloadRequested.connect(
@@ -125,6 +129,7 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
             )
 
             log.info("[Panel3] Connected to SignalBus for Phase 4 command signals")
+            log.info("[Panel3 DEBUG] ========== SIGNAL BUS CONNECTION COMPLETE ==========")
 
         except Exception as e:
             log.error(f"[Panel3] Failed to connect to SignalBus: {e}")
@@ -348,9 +353,13 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
         Prefers TradeRecord.exit_time; falls back to timestamp if absent.
         Filters by active trading mode (SIM/LIVE).
         """
+        log.info(f"[Panel3 DEBUG] ========== _load_metrics_for_timeframe CALLED ==========")
+        log.info(f"[Panel3 DEBUG] Timeframe: {tf}")
+
         try:
             from services.stats_service import compute_trading_stats_for_timeframe
         except Exception as e:
+            log.error(f"[Panel3 DEBUG] Failed to import stats_service: {e}")
             return
 
         # Get active mode from state manager
@@ -361,17 +370,24 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
             # ALWAYS use current_mode (UI mode) not position_mode (open trade mode)
             # Panel 3 should show stats for the mode the UI is displaying
             mode = state.current_mode if state else "SIM"
+            log.info(f"[Panel3 DEBUG] Current mode from state manager: {mode}")
         except Exception as e:
             mode = "SIM"  # Default fallback
+            log.error(f"[Panel3 DEBUG] Error getting mode, defaulting to SIM: {e}")
 
+        log.info(f"[Panel3 DEBUG] Computing stats for timeframe={tf}, mode={mode}...")
         payload = compute_trading_stats_for_timeframe(tf, mode=mode)
+        log.info(f"[Panel3 DEBUG] Stats payload received: {payload}")
 
         # Check if we have any trades for this mode in this timeframe
         trades_count = payload.get("_trade_count", 0)
+        log.info(f"[Panel3 DEBUG] Trades count: {trades_count}")
         if trades_count == 0:
+            log.info("[Panel3 DEBUG] No trades found, displaying empty metrics")
             self.display_empty_metrics(mode, tf)
             return
 
+        log.info("[Panel3 DEBUG] Updating metrics with payload...")
         self.update_metrics(payload)
 
         # Update Sharpe bar widget (Sharpe Ratio not in grid)
@@ -438,20 +454,28 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
             from utils.logger import get_logger
             log = get_logger(__name__)
 
-            log.info(f"[panel3.on_trade_closed] SIGNAL RECEIVED - refreshing metrics for {self._tf}")
+            log.info("[Panel3 DEBUG] ========== on_trade_closed SIGNAL RECEIVED ==========")
+            log.info(f"[Panel3 DEBUG] Trade payload: {trade_payload}")
+            log.info(f"[Panel3 DEBUG] Current timeframe: {self._tf}")
 
             # Refresh the metrics for current timeframe
+            log.info("[Panel3 DEBUG] Calling _load_metrics_for_timeframe...")
             self._load_metrics_for_timeframe(self._tf)
+            log.info("[Panel3 DEBUG] _load_metrics_for_timeframe completed")
 
             # Grab live data from Panel 2 if available
             if hasattr(self, "analyze_and_store_trade_snapshot"):
+                log.info("[Panel3 DEBUG] Calling analyze_and_store_trade_snapshot...")
                 self.analyze_and_store_trade_snapshot()
+                log.info("[Panel3 DEBUG] analyze_and_store_trade_snapshot completed")
             else:
-                pass
+                log.warning("[Panel3 DEBUG] analyze_and_store_trade_snapshot method not found")
 
-            log.debug(f"[panel3] Metrics refreshed on trade close")
+            log.info("[Panel3 DEBUG] ========== on_trade_closed COMPLETE ==========")
         except Exception as e:
             with contextlib.suppress(Exception):
                 from utils.logger import get_logger
                 log = get_logger(__name__)
                 log.error(f"[panel3] Error handling trade close: {e}")
+                import traceback
+                traceback.print_exc()

@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""
-DTC Handshake Capture Tool
-Connects to Sierra Chart DTC and captures the complete handshake + first N messages.
-Shows EXACTLY what Sierra Chart is sending without any assumptions.
+"""DTC Handshake Capture Tool.
+
+Connects to Sierra Chart DTC and captures the complete handshake
+plus the first N messages. Prints exactly what Sierra sends.
 """
 
+import argparse
 import builtins
 import contextlib
 from datetime import datetime
@@ -12,51 +13,53 @@ import json
 from pathlib import Path
 import socket
 import sys
+from typing import Any, Dict, List
 
 
 sys.path.insert(0, str(Path(__file__).parent))
 
 
-def format_message(msg_dict, max_width=120):
-    """Pretty print a DTC message"""
+def format_message(msg_dict: Dict[str, Any], max_width: int = 120) -> None:
+    """Pretty print a DTC message."""
     msg_type = msg_dict.get("Type", "?")
     msg_json = json.dumps(msg_dict, indent=2)
     lines = msg_json.split("\n")
 
-    # Color code by message type
     if msg_type == 1:
-        prefix = "→ [SEND] LOGON_REQUEST"
+        prefix = "-> [SEND] LOGON_REQUEST"
     elif msg_type == 2:
-        prefix = "← [RECV] LOGON_RESPONSE"
+        prefix = "<- [RECV] LOGON_RESPONSE"
     elif msg_type == 3:
-        prefix = "← [RECV] HEARTBEAT"
+        prefix = "<- [RECV] HEARTBEAT"
     elif msg_type == 400:
-        prefix = "→ [SEND] TRADE_ACCOUNTS_REQUEST"
+        prefix = "-> [SEND] TRADE_ACCOUNTS_REQUEST"
     elif msg_type == 401:
-        prefix = "← [RECV] TRADE_ACCOUNT_RESPONSE"
+        prefix = "<- [RECV] TRADE_ACCOUNT_RESPONSE"
     elif msg_type == 500:
-        prefix = "→ [SEND] POSITIONS_REQUEST"
+        prefix = "-> [SEND] POSITIONS_REQUEST"
     elif msg_type == 306:
-        prefix = "← [RECV] POSITION_UPDATE"
+        prefix = "<- [RECV] POSITION_UPDATE"
     elif msg_type == 601:
-        prefix = "→ [SEND] BALANCE_REQUEST"
+        prefix = "-> [SEND] BALANCE_REQUEST"
     elif msg_type in (600, 602):
-        prefix = f"← [RECV] BALANCE_UPDATE (Type {msg_type})"
+        prefix = f"<- [RECV] BALANCE_UPDATE (Type {msg_type})"
     else:
-        prefix = f"← [RECV] Type {msg_type}"
+        prefix = f"<- [RECV] Type {msg_type}"
 
     print(f"\n{prefix}")
-    print("─" * max_width)
+    print("-" * max_width)
     for line in lines:
         print(line)
-    print("─" * max_width)
+    print("-" * max_width)
 
 
-def capture_handshake(host="127.0.0.1", port=11099, timeout=10, max_messages=20):
-    """
-    Connect to DTC and capture the complete handshake.
-    Shows exactly what Sierra Chart sends.
-    """
+def capture_handshake(
+    host: str = "127.0.0.1",
+    port: int = 11099,
+    timeout: int = 10,
+    max_messages: int = 20,
+) -> List[Dict[str, Any]]:
+    """Connect to DTC and capture the complete handshake."""
     print("\n" + "=" * 80)
     print("DTC HANDSHAKE CAPTURE")
     print("=" * 80)
@@ -65,24 +68,28 @@ def capture_handshake(host="127.0.0.1", port=11099, timeout=10, max_messages=20)
     print(f"Max messages to capture: {max_messages}")
     print("=" * 80)
 
-    sock = None
+    sock: socket.socket | None = None
+    messages: List[Dict[str, Any]] = []
+
     try:
-        # Connect
         print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Connecting to {host}:{port}...")
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(timeout)
         sock.connect((host, port))
-        print(f"[{datetime.now().strftime('%H:%M:%S')}] ✓ Connected\n")
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Connected\n")
 
         # Send logon
-        logon_msg = {"Type": 1, "ProtocolVersion": 12, "Username": "admin", "Password": "admin"}
+        logon_msg: Dict[str, Any] = {
+            "Type": 1,
+            "ProtocolVersion": 12,
+            "Username": "admin",
+            "Password": "admin",
+        }
         format_message(logon_msg)
         sock.send((json.dumps(logon_msg) + "\x00").encode())
 
-        # Capture responses
         buffer = b""
         message_count = 0
-        messages = []
 
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Waiting for responses...\n")
 
@@ -90,12 +97,14 @@ def capture_handshake(host="127.0.0.1", port=11099, timeout=10, max_messages=20)
             while message_count < max_messages:
                 chunk = sock.recv(4096)
                 if not chunk:
-                    print(f"\n[{datetime.now().strftime('%H:%M:%S')}] ✗ Connection closed by server")
+                    print(
+                        f"\n[{datetime.now().strftime('%H:%M:%S')}] "
+                        "Connection closed by server"
+                    )
                     break
 
                 buffer += chunk
 
-                # Process all complete messages in buffer
                 while b"\x00" in buffer:
                     msg_bytes, buffer = buffer.split(b"\x00", 1)
 
@@ -104,22 +113,19 @@ def capture_handshake(host="127.0.0.1", port=11099, timeout=10, max_messages=20)
                         message_count += 1
                         messages.append(msg)
                         format_message(msg)
-
-                    except json.JSONDecodeError as e:
-                        print(f"\n✗ JSON DECODE ERROR: {e}")
+                    except json.JSONDecodeError as exc:
+                        print(f"\nJSON DECODE ERROR: {exc}")
                         print(f"Raw bytes: {msg_bytes[:100]}")
 
-                # Check for timeout
                 if message_count > 0:
                     break
 
         except socket.timeout:
             print(f"\n[{datetime.now().strftime('%H:%M:%S')}] Timeout waiting for messages")
 
-        # Summary
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print("CAPTURE COMPLETE")
-        print(f"{'='*80}")
+        print(f"{'=' * 80}")
         print(f"Messages received: {message_count}")
 
         if messages:
@@ -142,7 +148,6 @@ def capture_handshake(host="127.0.0.1", port=11099, timeout=10, max_messages=20)
                 type_name = type_map.get(msg_type, f"Type {msg_type}")
                 print(f"  - {type_name}")
 
-                # Show key fields
                 if msg_type == 2:
                     print(f"    - LogonStatus: {msg.get('LogonStatus')}")
                     print(f"    - ServerName: {msg.get('ServerName')}")
@@ -153,15 +158,17 @@ def capture_handshake(host="127.0.0.1", port=11099, timeout=10, max_messages=20)
                     print(f"    - Quantity: {msg.get('Quantity')}")
                 elif msg_type in (600, 602):
                     print(f"    - Has 'balance' field: {'balance' in msg}")
-                    print(f"    - Has 'AccountValue' field: {'AccountValue' in msg}")
+                    print(
+                        f"    - Has 'AccountValue' field: "
+                        f\"{'AccountValue' in msg}\"
+                    )
                     print(f"    - Available fields: {list(msg.keys())}")
 
-        print(f"{'='*80}\n")
-
+        print(f"{'=' * 80}\n")
         return messages
 
-    except Exception as e:
-        print(f"\n✗ ERROR: {e}")
+    except Exception as exc:  # pragma: no cover - defensive
+        print(f"\nERROR: {exc}")
         import traceback
 
         traceback.print_exc()
@@ -172,20 +179,31 @@ def capture_handshake(host="127.0.0.1", port=11099, timeout=10, max_messages=20)
                 sock.close()
 
 
-if __name__ == "__main__":
-    import argparse
-
+def main() -> None:
     parser = argparse.ArgumentParser(description="Capture DTC handshake")
     parser.add_argument("--host", default="127.0.0.1", help="DTC host")
     parser.add_argument("--port", type=int, default=11099, help="DTC port")
     parser.add_argument("--timeout", type=int, default=10, help="Timeout in seconds")
-    parser.add_argument("--max-messages", type=int, default=20, help="Max messages to capture")
+    parser.add_argument(
+        "--max-messages",
+        type=int,
+        default=20,
+        help="Max messages to capture",
+    )
 
     args = parser.parse_args()
-
-    messages = capture_handshake(host=args.host, port=args.port, timeout=args.timeout, max_messages=args.max_messages)
+    messages = capture_handshake(
+        host=args.host,
+        port=args.port,
+        timeout=args.timeout,
+        max_messages=args.max_messages,
+    )
 
     if messages:
-        print("\n✓ Successfully captured messages. Review above for details.")
+        print("\nSuccessfully captured messages. Review above for details.")
     else:
-        print("\n✗ No messages captured. Check your Sierra Chart DTC connection.")
+        print("\nNo messages captured. Check your Sierra Chart DTC connection.")
+
+
+if __name__ == "__main__":
+    main()

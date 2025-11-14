@@ -253,8 +253,8 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
         Panels now subscribe to SignalBus Qt signals instead of being called directly.
 
         Connected signals:
-        - balanceUpdated → updates StateManager and triggers UI update
-        - modeChanged → set_trading_mode()
+        - balanceUpdated  updates StateManager and triggers UI update
+        - modeChanged  set_trading_mode()
         """
         try:
             from core.signal_bus import get_signal_bus

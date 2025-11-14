@@ -21,7 +21,7 @@ from widgets.metric_cell import MetricCell
 log = get_logger(__name__)
 
 # -------------------- Constants & Config (start)
-CSV_FEED_PATH = r"C:\Users\cgrah\Desktop\APPSIERRA\data\snapshot.csv"
+CSV_FEED_PATH = r"C:\Users\cgrah\Desktop\APPV4\data\snapshot.csv"
 # STATE_PATH removed - now dynamically scoped by (mode, account) via _get_state_path()
 
 CSV_REFRESH_MS = 500
@@ -147,9 +147,9 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         Panels now subscribe to SignalBus Qt signals instead of being called directly.
 
         Connected signals:
-        - positionUpdated → on_position_update()
-        - orderUpdateReceived → on_order_update()
-        - modeChanged → set_trading_mode()
+        - positionUpdated  on_position_update()
+        - orderUpdateReceived  on_order_update()
+        - modeChanged  set_trading_mode()
         """
         try:
             from core.signal_bus import get_signal_bus
@@ -342,6 +342,9 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         Expects keys: symbol, side, qty, entry_price, exit_price, realized_pnl,
         optional: entry_time, exit_time, commissions, r_multiple, mae, mfe, account.
         """
+        log.info("[Panel2 DEBUG] ========== notify_trade_closed CALLED ==========")
+        log.info(f"[Panel2 DEBUG] Trade data: {trade}")
+
         # Get current balance BEFORE processing
         try:
             from core.app_state import get_state_manager
@@ -350,9 +353,11 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             # CONSOLIDATION FIX: Use canonical mode detection (single source of truth)
             mode = detect_mode_from_account(account)
             balance_before = state.get_balance_for_mode(mode) if state else None
-        except Exception:
+            log.info(f"[Panel2 DEBUG] Mode: {mode}, Account: {account}, Balance: {balance_before}")
+        except Exception as e:
             balance_before = None
             mode = "UNKNOWN"
+            log.error(f"[Panel2 DEBUG] Error getting state: {e}")
 
         # Log trade close summary
         symbol = trade.get("symbol", "UNKNOWN")
@@ -362,9 +367,13 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         exit_p = trade.get("exit_price", "?")
         qty = trade.get("qty", "?")
 
+        log.info(f"[Panel2 DEBUG] Trade summary: {symbol} {qty} @ {entry} -> {exit_p}, P&L: {pnl_sign}{pnl}")
+
         # CRITICAL: Close position in database (single source of truth)
         # This replaces the old TradeManager approach
+        log.info("[Panel2 DEBUG] Calling _close_position_in_database...")
         ok = self._close_position_in_database(trade)
+        log.info(f"[Panel2 DEBUG] Database close result: {ok}")
 
         if not ok:
             # Fallback to old TradeManager approach if database close fails
@@ -374,12 +383,17 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         try:
             payload = dict(trade)
             payload["ok"] = ok
+            log.info(f"[Panel2 DEBUG] Emitting tradesChanged signal with payload: {payload}")
             self.tradesChanged.emit(payload)
 
             # PHASE 4: Also emit to SignalBus for Panel3 analytics (replaces direct call)
+            log.info("[Panel2 DEBUG] Getting SignalBus instance...")
             from core.signal_bus import get_signal_bus
             signal_bus = get_signal_bus()
+            log.info(f"[Panel2 DEBUG] SignalBus instance: {signal_bus}")
+            log.info("[Panel2 DEBUG] Emitting tradeClosedForAnalytics signal to SignalBus...")
             signal_bus.tradeClosedForAnalytics.emit(payload)
+            log.info("[Panel2 DEBUG] ========== Signal emission COMPLETE ==========")
         except Exception as e:
             log.error(f"[panel2.notify_trade_closed] Error emitting signal: {e}")
             import traceback
@@ -568,6 +582,8 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                 return
 
             # If we reach here, it's a CLOSE
+            log.info("[Panel2 DEBUG] ========== CLOSING TRADE DETECTED ==========")
+            log.info(f"[Panel2 DEBUG] Previous qty: {current_qty}, New qty: {qty}")
 
             # Extract exit price from payload
             exit_price = (
@@ -580,6 +596,7 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                 log.warning("[panel2] Fill detected but no exit price available")
                 return
             exit_price = float(exit_price)
+            log.info(f"[Panel2 DEBUG] Exit price: {exit_price}")
 
             qty = int(abs(self.entry_qty))
             side = "long" if self.is_long else "short"
@@ -628,7 +645,8 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                 "account": account,  # <- Include account for mode detection (SIM/LIVE)
             }
 
-
+            log.info(f"[Panel2 DEBUG] Trade dict created: {trade}")
+            log.info("[Panel2 DEBUG] Calling notify_trade_closed...")
             self.notify_trade_closed(trade)
 
             # Reset position context after close
@@ -1594,7 +1612,7 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             self.c_rmult.set_value_text("--")
             self.c_rmult.set_value_color(THEME.get("text_dim", "#5B6C7A"))
 
-        # Range = distance from target compared to live price (signed with +/−)
+        # Range = distance from target compared to live price (signed with +/)
         if self.target_price is not None and self.last_price is not None:
             dist = (self.target_price - self.last_price) * (1 if self.is_long else -1)
             sign_char = "+" if dist >= 0 else "-"

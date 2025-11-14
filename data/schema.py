@@ -122,7 +122,7 @@ class OpenPosition(SQLModel, table=True):
     Composite unique constraint enforces this at database level.
 
     Design:
-    - Write-through: Every position change → immediate DB write
+    - Write-through: Every position change  immediate DB write
     - Read on startup: Recover position state from DB
     - Read on mode switch: Load correct position for new mode
     - Delete on close: Move to TradeRecord table when trade completes

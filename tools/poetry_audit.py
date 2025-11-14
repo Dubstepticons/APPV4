@@ -60,7 +60,7 @@ def map_import_to_package(import_name):
 
 
 def main():
-    print("\n🔍 Running Poetry Dependency Audit...\n")
+    print("\n Running Poetry Dependency Audit...\n")
     imported_raw = extract_imports()
     imported = {map_import_to_package(i) for i in imported_raw}
     poetry_pkgs = get_poetry_packages()
@@ -187,31 +187,31 @@ def main():
     # Only show truly unused packages
     extra_filtered = sorted((poetry_pkgs - imported) - known_subdeps - dev_tools)
 
-    print(f"✅ Total imported modules found: {len(imported)}")
-    print(f"📦 Poetry-managed packages: {len(poetry_pkgs)}\n")
+    print(f" Total imported modules found: {len(imported)}")
+    print(f" Poetry-managed packages: {len(poetry_pkgs)}\n")
 
     # Missing Packages
     if missing:
-        print("⚠️  Missing (imported but not in Poetry):")
+        print("  Missing (imported but not in Poetry):")
         for m in missing:
             print(f"   - {m}")
-        print("\n💡 Suggested fix:")
+        print("\n Suggested fix:")
         print(f"poetry add {' '.join(missing)}")
     else:
-        print("✅ No missing packages!\n")
+        print(" No missing packages!\n")
 
     # Unused Packages (filtered)
     if extra_filtered:
-        print("\n🧹 Possibly Unused (in Poetry but not imported):")
+        print("\n Possibly Unused (in Poetry but not imported):")
         for e in extra_filtered:
             print(f"   - {e}")
-        print("\n💡 Suggested cleanup:")
+        print("\n Suggested cleanup:")
         print(f"poetry remove {' '.join(extra_filtered)}")
         print("\nNote: Filtered out dev tools and known sub-dependencies")
     else:
-        print("✅ No extra packages!\n")
+        print(" No extra packages!\n")
 
-    print("📋 Audit complete.\n")
+    print(" Audit complete.\n")
 
 
 if __name__ == "__main__":

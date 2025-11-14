@@ -11,7 +11,7 @@ import unittest
 
 
 class TestExpectancyCalculation(unittest.TestCase):
-    """Test expectancy formula: (Win% × AvgWin) - (Loss% × AvgLoss)"""
+    """Test expectancy formula: (Win%  AvgWin) - (Loss%  AvgLoss)"""
 
     def test_expectancy_basic(self):
         """
@@ -20,7 +20,7 @@ class TestExpectancyCalculation(unittest.TestCase):
         - Wins: 3 trades, sum=$1200, avg=$400
         - Losses: 2 trades, sum=$300, avg=$150
         - Win rate: 60%
-        - Expected: (0.6 × 400) - (0.4 × 150) = 240 - 60 = $180
+        - Expected: (0.6  400) - (0.4  150) = 240 - 60 = $180
         """
         from services.trade_math import TradeMath
 

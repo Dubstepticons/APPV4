@@ -239,7 +239,7 @@ def main(argv: list[str]) -> int:
 
     # File-level analysis (dead code within files)
     if args.level in ("file", "all"):
-        print("🔍 Scanning for unused code in files...")
+        print(" Scanning for unused code in files...")
         file_report = find_dead_code_in_files(args.paths, repo)
         report["file_level"] = file_report
 
@@ -252,7 +252,7 @@ def main(argv: list[str]) -> int:
 
     # Module-level analysis (unused modules)
     if args.level in ("module", "all"):
-        print("🔍 Scanning for unused modules...")
+        print(" Scanning for unused modules...")
         module_report = find_unused_modules(repo)
         report["module_level"] = module_report
         print(f"   Found {len(module_report)} unused modules")
@@ -262,7 +262,7 @@ def main(argv: list[str]) -> int:
     write_json(report, out_path)
 
     if not args.quiet:
-        print(f"\n✅ Code cleanup report written to {out_path}")
+        print(f"\n Code cleanup report written to {out_path}")
         if args.level in ("file", "all") and report.get("file_level"):
             print(f"   File-level: {len(report['file_level'])} files with unused code")
         if args.level in ("module", "all") and report.get("module_level"):

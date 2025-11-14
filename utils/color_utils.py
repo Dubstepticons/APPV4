@@ -43,7 +43,7 @@ def oklch_to_hex(oklch):
 
 # -------------------- Lightness adjuster (start)
 def adjust_lightness(oklch, delta):
-    """Lighten or darken an OKLCH color by ΔL (±)."""
+    """Lighten or darken an OKLCH color by L ()."""
     L, C, H = oklch
     return (np.clip(L + delta, 0, 1), C, H)
 
@@ -55,7 +55,7 @@ def adjust_lightness(oklch, delta):
 def blend_oklch(color_a, color_b, t):
     """
     Interpolate smoothly between two OKLCH colors.
-    t ∈ [0, 1] where 0 = color_a and 1 = color_b.
+    t  [0, 1] where 0 = color_a and 1 = color_b.
     Hue interpolation handles wrap-around correctly.
     """
     L1, C1, H1 = color_a

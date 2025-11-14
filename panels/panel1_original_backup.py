@@ -249,8 +249,8 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
         Panels now subscribe to SignalBus Qt signals instead of being called directly.
 
         Connected signals:
-        - balanceUpdated → updates StateManager and triggers UI update
-        - modeChanged → set_trading_mode()
+        - balanceUpdated  updates StateManager and triggers UI update
+        - modeChanged  set_trading_mode()
         """
         try:
             from core.signal_bus import get_signal_bus
@@ -528,7 +528,7 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
         plot.setGeometry(self.graph_container.contentsRect())
 
     def resizeEvent(self, e: QtGui.QResizeEvent) -> None:
-        """Keep the plot synced with the container’s inner rect."""
+        """Keep the plot synced with the containers inner rect."""
         try:
             if getattr(self, "_plot", None) and self.graph_container:
                 self._plot.setGeometry(self.graph_container.contentsRect())

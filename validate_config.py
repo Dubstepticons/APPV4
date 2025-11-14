@@ -20,16 +20,16 @@ def validate_toml(file_path: Path) -> bool:
         try:
             import tomllib as tomli  # Python 3.11+
         except ImportError:
-            print("⚠️  Warning: tomli/tomllib not available, skipping TOML validation")
+            print("  Warning: tomli/tomllib not available, skipping TOML validation")
             return True
 
     try:
         with open(file_path, "rb") as f:
             tomli.load(f)
-        print(f"✅ {file_path.name} - Valid TOML")
+        print(f" {file_path.name} - Valid TOML")
         return True
     except Exception as e:
-        print(f"❌ {file_path.name} - Invalid TOML: {e}")
+        print(f" {file_path.name} - Invalid TOML: {e}")
         return False
 
 
@@ -38,26 +38,26 @@ def validate_yaml(file_path: Path) -> bool:
     try:
         import yaml
     except ImportError:
-        print("⚠️  Warning: PyYAML not available, skipping YAML validation")
+        print("  Warning: PyYAML not available, skipping YAML validation")
         return True
 
     try:
         with open(file_path, encoding="utf-8") as f:
             yaml.safe_load(f)
-        print(f"✅ {file_path.name} - Valid YAML")
+        print(f" {file_path.name} - Valid YAML")
         return True
     except Exception as e:
-        print(f"❌ {file_path.name} - Invalid YAML: {e}")
+        print(f" {file_path.name} - Invalid YAML: {e}")
         return False
 
 
 def check_file_exists(file_path: Path) -> bool:
     """Check if file exists"""
     if file_path.exists():
-        print(f"✅ {file_path.name} - Exists")
+        print(f" {file_path.name} - Exists")
         return True
     else:
-        print(f"❌ {file_path.name} - Not found")
+        print(f" {file_path.name} - Not found")
         return False
 
 
@@ -71,7 +71,7 @@ def main():
     all_valid = True
 
     # Check files exist
-    print("\n📁 Checking file existence...")
+    print("\n Checking file existence...")
     files_to_check = [
         project_root / "ruff.toml",
         project_root / "pyproject.toml",
@@ -83,7 +83,7 @@ def main():
             all_valid = False
 
     # Validate TOML files
-    print("\n📝 Validating TOML files...")
+    print("\n Validating TOML files...")
     toml_files = [
         project_root / "ruff.toml",
         project_root / "pyproject.toml",
@@ -94,7 +94,7 @@ def main():
             all_valid = False
 
     # Validate YAML files
-    print("\n📝 Validating YAML files...")
+    print("\n Validating YAML files...")
     yaml_files = [
         project_root / ".pre-commit-config.yaml",
     ]
@@ -106,7 +106,7 @@ def main():
     # Summary
     print("\n" + "=" * 60)
     if all_valid:
-        print("✅ All configuration files are valid!")
+        print(" All configuration files are valid!")
         print("=" * 60)
         print("\nNext steps:")
         print("  1. Install dependencies: pip install ruff pre-commit")
@@ -116,7 +116,7 @@ def main():
         print("\nSee LINTING_SETUP.md for detailed instructions.")
         return 0
     else:
-        print("❌ Some configuration files have errors")
+        print(" Some configuration files have errors")
         print("=" * 60)
         return 1
 

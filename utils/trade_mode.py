@@ -3,7 +3,7 @@ Trading Mode Detection and Management Utilities
 
 Provides centralized mode detection logic for APPSIERRA trading system.
 Detects trading mode (DEBUG/SIM/LIVE) from various sources:
-- Account names (e.g., "Sim1" → SIM, "120005" → LIVE)
+- Account names (e.g., "Sim1"  SIM, "120005"  LIVE)
 - DTC message fields
 - Configuration settings
 
@@ -50,9 +50,9 @@ def detect_mode_from_account(account: str) -> str:
     This is the canonical mode detection function used throughout the system.
 
     Detection rules:
-    - Account starting with "Sim" (case-insensitive) → SIM
-    - Account that is all digits → LIVE
-    - Everything else → DEBUG
+    - Account starting with "Sim" (case-insensitive)  SIM
+    - Account that is all digits  LIVE
+    - Everything else  DEBUG
 
     Args:
         account: Account identifier string (e.g., "Sim1", "120005", "TestAccount")
@@ -432,22 +432,22 @@ if __name__ == "__main__":
     print("-" * 40)
     for account, expected in test_accounts:
         result = detect_mode_from_account(account)
-        status = "✓" if result == expected else "✗"
-        print(f"{status} Account: '{account}' → {result} (expected: {expected})")
+        status = "" if result == expected else ""
+        print(f"{status} Account: '{account}'  {result} (expected: {expected})")
 
     print()
     print("Mode Comparison Tests:")
     print("-" * 40)
-    print(f"✓ is_sim_mode('SIM'): {is_sim_mode('SIM')}")
-    print(f"✓ is_live_mode('LIVE'): {is_live_mode('LIVE')}")
-    print(f"✓ is_debug_mode('DEBUG'): {is_debug_mode('DEBUG')}")
-    print(f"✓ modes_match('SIM', 'sim'): {modes_match('SIM', 'sim')}")
+    print(f" is_sim_mode('SIM'): {is_sim_mode('SIM')}")
+    print(f" is_live_mode('LIVE'): {is_live_mode('LIVE')}")
+    print(f" is_debug_mode('DEBUG'): {is_debug_mode('DEBUG')}")
+    print(f" modes_match('SIM', 'sim'): {modes_match('SIM', 'sim')}")
 
     print()
     print("Display Names:")
     print("-" * 40)
     for mode in ["SIM", "LIVE", "DEBUG"]:
-        print(f"  {mode} → {get_mode_display_name(mode)}")
+        print(f"  {mode}  {get_mode_display_name(mode)}")
 
     print()
     print("=" * 60)

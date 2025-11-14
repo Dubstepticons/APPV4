@@ -65,7 +65,7 @@ class LivePillButton(QtWidgets.QToolButton):
     """
     A QToolButton that renders a small dot INSIDE the pill (left side),
     and can pulse via opacity changes. The dot is a child widget, so it
-    sits within the pill’s rounded background.
+    sits within the pills rounded background.
     """
 
     def __init__(self, text: str = "LIVE", parent: Optional[QtWidgets.QWidget] = None) -> None:
@@ -102,7 +102,7 @@ class LivePillButton(QtWidgets.QToolButton):
         self._timer.setInterval(int(THEME["live_dot_pulse_ms"]))
         self._timer.timeout.connect(self._on_pulse_tick)
 
-        # Keep some extra left padding so text doesn’t collide with the dot
+        # Keep some extra left padding so text doesnt collide with the dot
         # (We already have padding in QSS; we just position the dot precisely.)
         self._left_inset_px = 10  # distance from left edge to dot center + radius margin
 

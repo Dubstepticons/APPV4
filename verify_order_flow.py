@@ -53,7 +53,7 @@ def monitor_order_fills(duration_sec=60):
             # Look for order-related messages
             if "Type: 301" in line or "OrderUpdate" in line or "router.order" in line:
                 timestamp = datetime.now().strftime("%H:%M:%S")
-                print(f"[{timestamp}] ✅ ORDER DETECTED: {line.strip()[:100]}")
+                print(f"[{timestamp}]  ORDER DETECTED: {line.strip()[:100]}")
                 order_updates_found.append(line.strip())
 
             # Show other Type messages for context
@@ -91,17 +91,17 @@ def monitor_order_fills(duration_sec=60):
     print("=" * 80)
 
     if order_updates_found:
-        print(f"\n✅ SUCCESS: Found {len(order_updates_found)} OrderUpdate message(s)\n")
+        print(f"\n SUCCESS: Found {len(order_updates_found)} OrderUpdate message(s)\n")
         print("Your app IS receiving Type 301 (OrderUpdate) fills!")
         print("\nMessages received:")
         for msg in order_updates_found[:5]:  # Show first 5
             print(f"  {msg}")
         if len(order_updates_found) > 5:
             print(f"  ... and {len(order_updates_found) - 5} more")
-        print("\n✅ Order flow is working correctly")
+        print("\n Order flow is working correctly")
         return True
     else:
-        print("\n⚠️  NO OrderUpdate messages found\n")
+        print("\n  NO OrderUpdate messages found\n")
         print("Possible reasons:")
         print("  1. You didn't place an order during the monitoring window")
         print("  2. Order was placed but didn't fill")

@@ -206,7 +206,7 @@ print("[SIGNALS] Exported to: signal_connections.json")
 
 print()
 print("=" * 80)
-print("\033[32mALL TESTS PASSED! ✓\033[0m")
+print("\033[32mALL TESTS PASSED! \033[0m")
 print("=" * 80)
 print()
 print("Test Summary:")

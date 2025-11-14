@@ -8,8 +8,8 @@ after crashes, restarts, or unexpected shutdowns.
 
 Key Operations:
 - recover_positions_on_startup(): Main entry point for app startup
-- restore_position_to_state_manager(): Sync DB → StateManager
-- restore_position_to_panel2(): Sync DB → Panel2 UI
+- restore_position_to_state_manager(): Sync DB  StateManager
+- restore_position_to_panel2(): Sync DB  Panel2 UI
 - reconcile_stale_positions(): Handle positions older than threshold
 
 Thread Safety: All operations are thread-safe via repository pattern.
@@ -287,25 +287,25 @@ class PositionRecoveryService:
         lines = []
 
         if recovered_count > 0:
-            lines.append(f"✅ Recovered {recovered_count} open position(s) from previous session:")
+            lines.append(f" Recovered {recovered_count} open position(s) from previous session:")
             for pos in recovery_summary.get("positions", []):
                 side = pos['side']
                 qty = abs(pos['qty'])
                 symbol = pos['symbol']
                 entry = pos['entry_price']
                 mode = pos['mode']
-                lines.append(f"  • {mode}: {side} {qty} {symbol} @ {entry}")
+                lines.append(f"   {mode}: {side} {qty} {symbol} @ {entry}")
 
         if stale_count > 0:
             lines.append("")
-            lines.append(f"⚠️  WARNING: {stale_count} stale position(s) detected (>24h old)")
+            lines.append(f"  WARNING: {stale_count} stale position(s) detected (>24h old)")
             lines.append("These positions may have been closed by your broker.")
             lines.append("Please verify with Sierra Chart and manually close if needed.")
             for pos in recovery_summary.get("stale_positions", []):
                 symbol = pos['symbol']
                 mode = pos['mode']
                 age_hours = (datetime.now(timezone.utc) - pos['updated_at']).total_seconds() / 3600
-                lines.append(f"  • {mode}: {symbol} (age: {age_hours:.1f}h)")
+                lines.append(f"   {mode}: {symbol} (age: {age_hours:.1f}h)")
 
         return "\n".join(lines)
 

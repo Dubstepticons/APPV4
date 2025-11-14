@@ -21,7 +21,7 @@ from widgets.metric_cell import MetricCell
 log = get_logger(__name__)
 
 # -------------------- Constants & Config (start)
-CSV_FEED_PATH = r"C:\Users\cgrah\Desktop\APPSIERRA\data\snapshot.csv"
+CSV_FEED_PATH = r"C:\Users\cgrah\Desktop\APPV4\data\snapshot.csv"
 # STATE_PATH removed - now dynamically scoped by (mode, account) via _get_state_path()
 
 CSV_REFRESH_MS = 500
@@ -147,9 +147,9 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         Panels now subscribe to SignalBus Qt signals instead of being called directly.
 
         Connected signals:
-        - positionUpdated → on_position_update()
-        - orderUpdateReceived → on_order_update()
-        - modeChanged → set_trading_mode()
+        - positionUpdated  on_position_update()
+        - orderUpdateReceived  on_order_update()
+        - modeChanged  set_trading_mode()
         """
         try:
             from core.signal_bus import get_signal_bus
@@ -1513,7 +1513,7 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             self.c_rmult.set_value_text("--")
             self.c_rmult.set_value_color(THEME.get("text_dim", "#5B6C7A"))
 
-        # Range = distance from target compared to live price (signed with +/−)
+        # Range = distance from target compared to live price (signed with +/)
         if self.target_price is not None and self.last_price is not None:
             dist = (self.target_price - self.last_price) * (1 if self.is_long else -1)
             sign_char = "+" if dist >= 0 else "-"

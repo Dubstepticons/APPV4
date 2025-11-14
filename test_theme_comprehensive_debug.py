@@ -378,7 +378,7 @@ class TestThemeColorValues:
             assert actual_value is not None, f"{key} is None"
             assert actual_value == expected_value, f"{key} mismatch"
             assert actual_value not in ["#000000", "#FFFFFF", "transparent"], f"{key} looks like placeholder: {actual_value}"
-            log.debug(f"[TEST] LIVE.{key} = {actual_value} ✓")
+            log.debug(f"[TEST] LIVE.{key} = {actual_value} ")
 
         log.info("[TEST] test_live_colors_are_not_placeholder: PASSED")
 

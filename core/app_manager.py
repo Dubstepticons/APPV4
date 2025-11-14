@@ -152,7 +152,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
             # Log recovery results
             if recovered_count > 0:
-                log.info(f"[PositionRecovery] ✅ Recovered {recovered_count} open position(s)")
+                log.info(f"[PositionRecovery]  Recovered {recovered_count} open position(s)")
 
                 # Show recovery dialog to user
                 service = get_recovery_service()
@@ -167,7 +167,7 @@ class MainWindow(QtWidgets.QMainWindow):
                     )
 
             if stale_count > 0:
-                log.warning(f"[PositionRecovery] ⚠️  {stale_count} stale position(s) detected (>24h old)")
+                log.warning(f"[PositionRecovery]   {stale_count} stale position(s) detected (>24h old)")
 
         except Exception as e:
             log.error(f"[PositionRecovery] Error during position recovery: {e}")
@@ -382,7 +382,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # DTCClientJSON emits events via SignalBus, panels subscribe directly.
         #
         # Event flow:
-        #   - DTC Thread → DTCClientJSON → SignalBus.emit() → Panel (Qt Thread)
+        #   - DTC Thread  DTCClientJSON  SignalBus.emit()  Panel (Qt Thread)
         #   - Qt automatically marshals signals to main thread (thread-safe)
         #
         # Benefits:
@@ -525,8 +525,10 @@ class MainWindow(QtWidgets.QMainWindow):
             log.debug(f"[THEME DEBUG] switch_theme() returned successfully")
 
             # Emit signal to trigger on_theme_changed
+            print(f"[THEME DEBUG] Emitting themeChanged signal with mode='{mode}'")
             log.debug(f"[THEME DEBUG] Emitting themeChanged signal with mode='{mode}'")
             self.themeChanged.emit(mode)
+            print(f"[THEME DEBUG]  themeChanged signal emitted")
             log.debug(f"[THEME DEBUG] themeChanged signal emitted")
 
             # Update central widget background
@@ -585,15 +587,20 @@ class MainWindow(QtWidgets.QMainWindow):
                 log.debug(f"[THEME DEBUG] No conn_icon found in panel_balance")
 
             # PHASE 4: Refresh all panels via SignalBus (replaces direct calls)
+            print(f"[THEME DEBUG] Attempting to emit themeChangeRequested signal on SignalBus")
             log.debug(f"[THEME DEBUG] Attempting to emit themeChangeRequested signal on SignalBus")
             try:
                 from core.signal_bus import get_signal_bus
                 signal_bus = get_signal_bus()
+                print(f"[THEME DEBUG] Got signal_bus instance: {signal_bus}")
                 log.debug(f"[THEME DEBUG] Got signal_bus instance: {signal_bus}")
+                print(f"[THEME DEBUG] Emitting themeChangeRequested signal")
                 log.debug(f"[THEME DEBUG] Emitting themeChangeRequested signal")
                 signal_bus.themeChangeRequested.emit()
+                print(f"[THEME DEBUG]  themeChangeRequested signal emitted successfully")
                 log.debug(f"[THEME DEBUG] themeChangeRequested signal emitted successfully")
             except Exception as e:
+                print(f"[THEME DEBUG]  Failed to emit theme change signal: {e}")
                 log.error(f"[THEME DEBUG] Failed to emit theme change signal: {e}", exc_info=True)
 
             # Update central widget background
@@ -870,20 +877,20 @@ class MainWindow(QtWidgets.QMainWindow):
             if hasattr(self, 'panel_live') and self.panel_live:
                 if hasattr(self.panel_live, 'save_state'):
                     self.panel_live.save_state()
-                    print("  ✓ Panel 2 (Live Trading) state saved")
+                    print("   Panel 2 (Live Trading) state saved")
                 elif hasattr(self.panel_live, '_save_panel_state'):
                     self.panel_live._save_panel_state()
-                    print("  ✓ Panel 2 (Live Trading) state saved")
+                    print("   Panel 2 (Live Trading) state saved")
                 else:
-                    print("  ℹ Panel 2 has no save_state method (expected)")
+                    print("   Panel 2 has no save_state method (expected)")
 
             # Panel1 and Panel3 typically don't need state saving
-            print("  ✓ Panel states saved")
+            print("   Panel states saved")
 
         except Exception as e:
             error_msg = f"Failed to save panel states: {e}"
             shutdown_errors.append(error_msg)
-            print(f"  ✗ {error_msg}")
+            print(f"   {error_msg}")
             log.error(f"[Shutdown] {error_msg}")
 
         # Step 2: Disconnect from DTC server gracefully
@@ -893,17 +900,17 @@ class MainWindow(QtWidgets.QMainWindow):
             if hasattr(self, '_dtc') and self._dtc:
                 if hasattr(self._dtc, 'disconnect'):
                     self._dtc.disconnect()
-                    print("  ✓ DTC connection closed gracefully")
+                    print("   DTC connection closed gracefully")
                     log.info("[Shutdown] DTC disconnected")
                 else:
-                    print("  ℹ DTC client has no disconnect method")
+                    print("   DTC client has no disconnect method")
             else:
-                print("  ℹ No DTC connection to close")
+                print("   No DTC connection to close")
 
         except Exception as e:
             error_msg = f"Failed to disconnect DTC: {e}"
             shutdown_errors.append(error_msg)
-            print(f"  ✗ {error_msg}")
+            print(f"   {error_msg}")
             log.error(f"[Shutdown] {error_msg}")
 
         # Step 3: Flush any pending database writes
@@ -918,12 +925,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 with get_session() as session:
                     session.flush()
 
-            print("  ✓ Database writes flushed")
+            print("   Database writes flushed")
 
         except Exception as e:
             error_msg = f"Failed to flush database: {e}"
             shutdown_errors.append(error_msg)
-            print(f"  ✗ {error_msg}")
+            print(f"   {error_msg}")
             log.error(f"[Shutdown] {error_msg}")
 
         # Step 4: Log final balance state
@@ -932,22 +939,22 @@ class MainWindow(QtWidgets.QMainWindow):
 
             if hasattr(self, '_state') and self._state:
                 final_balance = self._state.sim_balance
-                print(f"\n  {'─'*70}")
+                print(f"\n  {''*70}")
                 print(f"  Final Balance Check")
-                print(f"  {'─'*70}")
+                print(f"  {''*70}")
                 print(f"  Final SIM Balance: ${final_balance:,.2f}")
                 print(f"  Starting Balance: $10,000.00")
                 print(f"  Session P&L: ${final_balance - 10000.0:+,.2f}")
                 print(f"  Status: {'PERSISTENT [OK]' if final_balance != 10000.0 else 'Default (no trades)'}")
-                print(f"  {'─'*70}\n")
+                print(f"  {''*70}\n")
                 log.info(f"[Shutdown] App closing with SIM balance: ${final_balance:,.2f}")
             else:
-                print("  ℹ No state manager to log balance from")
+                print("   No state manager to log balance from")
 
         except Exception as e:
             error_msg = f"Failed to log balance: {e}"
             shutdown_errors.append(error_msg)
-            print(f"  ✗ {error_msg}")
+            print(f"   {error_msg}")
             log.error(f"[Shutdown] {error_msg}")
 
         # Step 5: Dispose database connections
@@ -959,15 +966,15 @@ class MainWindow(QtWidgets.QMainWindow):
             if engine:
                 # Dispose of connection pool
                 engine.dispose()
-                print("  ✓ Database connection pool disposed")
+                print("   Database connection pool disposed")
                 log.info("[Shutdown] Database connections closed")
             else:
-                print("  ℹ No database engine to dispose")
+                print("   No database engine to dispose")
 
         except Exception as e:
             error_msg = f"Failed to dispose database: {e}"
             shutdown_errors.append(error_msg)
-            print(f"  ✗ {error_msg}")
+            print(f"   {error_msg}")
             log.error(f"[Shutdown] {error_msg}")
 
         # Step 6: Final summary
@@ -975,11 +982,11 @@ class MainWindow(QtWidgets.QMainWindow):
             print("[6/6] Shutdown complete")
 
             if shutdown_errors:
-                print(f"\n  ⚠ Shutdown completed with {len(shutdown_errors)} error(s):")
+                print(f"\n   Shutdown completed with {len(shutdown_errors)} error(s):")
                 for err in shutdown_errors:
                     print(f"    - {err}")
             else:
-                print("  ✓ Clean shutdown (no errors)")
+                print("   Clean shutdown (no errors)")
 
             print(f"{'='*80}")
             print("[APP SHUTDOWN] Application closed gracefully")
@@ -988,7 +995,7 @@ class MainWindow(QtWidgets.QMainWindow):
             log.info("[Shutdown] Shutdown sequence completed", errors=len(shutdown_errors))
 
         except Exception as e:
-            print(f"  ✗ Failed to log shutdown summary: {e}")
+            print(f"   Failed to log shutdown summary: {e}")
 
         # Finally, call parent closeEvent to complete Qt cleanup
         super().closeEvent(event)

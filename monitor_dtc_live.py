@@ -19,7 +19,7 @@ def monitor_logs(log_file="logs/app.log", follow_delay=0.5):
     log_path = Path(log_file)
 
     if not log_path.exists():
-        print(f"✗ Log file not found: {log_path}")
+        print(f" Log file not found: {log_path}")
         sys.exit(1)
 
     print(f"\n{'='*80}")
@@ -57,30 +57,30 @@ def monitor_logs(log_file="logs/app.log", follow_delay=0.5):
 
                 # Color code by type
                 if type_num == "2":
-                    prefix = "→ LOGON_RESPONSE"
+                    prefix = " LOGON_RESPONSE"
                     color = "\033[92m"  # Green
                 elif type_num == "600" or type_num == "602":
-                    prefix = "→ BALANCE"
+                    prefix = " BALANCE"
                     color = "\033[94m"  # Blue
                     message_counts["BALANCE"] += 1
                 elif type_num == "306":
-                    prefix = "→ POSITION"
+                    prefix = " POSITION"
                     color = "\033[93m"  # Yellow
                     message_counts["POSITION"] += 1
                 elif type_num == "301":
-                    prefix = "→ ORDER"
+                    prefix = " ORDER"
                     color = "\033[95m"  # Magenta
                     message_counts["ORDER"] += 1
                 elif type_num in ("400", "401"):
-                    prefix = "→ ACCOUNTS"
+                    prefix = " ACCOUNTS"
                     color = "\033[96m"  # Cyan
                     message_counts["ACCOUNTS"] += 1
                 elif "request" in line.lower():
-                    prefix = "→ REQUEST"
+                    prefix = " REQUEST"
                     color = "\033[97m"  # White
                     message_counts["REQUEST"] += 1
                 else:
-                    prefix = f"→ Type {type_num}"
+                    prefix = f" Type {type_num}"
                     color = "\033[0m"  # Normal
 
                 reset = "\033[0m"
@@ -89,18 +89,18 @@ def monitor_logs(log_file="logs/app.log", follow_delay=0.5):
 
                 # Show summary occasionally
                 if sum(message_counts.values()) % 10 == 0:
-                    print("\n📊 Message Summary:")
+                    print("\n Message Summary:")
                     for msg_type, count in sorted(message_counts.items()):
                         print(f"   {msg_type}: {count}")
                     print()
 
             # Also show connection status
             elif "DTC connected" in line:
-                print(f"\033[92m✓ DTC Connected\033[0m {line}")
+                print(f"\033[92m DTC Connected\033[0m {line}")
             elif "DTC disconnected" in line:
-                print(f"\033[91m✗ DTC Disconnected\033[0m {line}")
+                print(f"\033[91m DTC Disconnected\033[0m {line}")
             elif "error" in line.lower():
-                print(f"\033[91m✗ Error\033[0m {line}")
+                print(f"\033[91m Error\033[0m {line}")
 
     except KeyboardInterrupt:
         print(f"\n{'='*80}")
@@ -110,7 +110,7 @@ def monitor_logs(log_file="logs/app.log", follow_delay=0.5):
         for msg_type, count in sorted(message_counts.items(), key=lambda x: x[1], reverse=True):
             print(f"  {msg_type}: {count}")
     except Exception as e:
-        print(f"✗ Error: {e}")
+        print(f" Error: {e}")
     finally:
         with contextlib.suppress(builtins.BaseException):
             process.terminate()

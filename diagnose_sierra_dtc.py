@@ -1,44 +1,45 @@
 #!/usr/bin/env python3
-"""
-Diagnose Sierra Chart DTC server configuration.
-Tests both Binary and JSON encoding capabilities.
+"""Diagnose Sierra Chart DTC server configuration.
+
+Tests both Binary and JSON encoding capabilities using plain ASCII output.
 """
 
-import builtins
 import contextlib
 import json
 import socket
 import struct
 import sys
 import time
+from typing import Tuple
 
-
-if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding="utf-8")
 
 HOST = "127.0.0.1"
 PORT = 11099
 
 
-def test_json_encoding():
+def test_json_encoding() -> bool:
     """Test if Sierra accepts JSON encoding negotiation."""
     print("\n" + "=" * 80)
     print("TEST 1: JSON ENCODING NEGOTIATION")
     print("=" * 80)
 
+    sock: socket.socket | None = None
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(5)
         sock.connect((HOST, PORT))
-        print(f"✓ Connected to {HOST}:{PORT}")
+        print(f"[OK] Connected to {HOST}:{PORT}")
 
-        # Send ENCODING_REQUEST for JSON_COMPACT
-        encoding_req = {"Type": 5, "ProtocolVersion": 8, "Encoding": 2, "ProtocolType": "DTC"}
+        encoding_req = {
+            "Type": 5,
+            "ProtocolVersion": 8,
+            "Encoding": 2,
+            "ProtocolType": "DTC",
+        }
         msg = json.dumps(encoding_req).encode("utf-8") + b"\x00"
         sock.send(msg)
-        print(f"→ Sent ENCODING_REQUEST: {encoding_req}")
+        print(f"[SEND] ENCODING_REQUEST: {encoding_req}")
 
-        # Wait for response
         buffer = b""
         start = time.time()
 
@@ -46,7 +47,7 @@ def test_json_encoding():
             try:
                 chunk = sock.recv(4096)
                 if not chunk:
-                    print("✗ Server closed connection (REJECTED)")
+                    print("[CLOSE] Server closed connection (rejected)")
                     return False
                 buffer += chunk
 
@@ -55,77 +56,67 @@ def test_json_encoding():
                     frame = buffer[:idx]
                     buffer = buffer[idx + 1 :]
 
-                    if frame:
-                        try:
-                            msg = json.loads(frame)
-                            msg_type = msg.get("Type")
+                    if not frame:
+                        continue
 
-                            if msg_type == 6:  # ENCODING_RESPONSE
-                                print(f"✓ ENCODING_RESPONSE received: {msg}")
-                                return True
-                            elif msg_type == 5:  # LOGOFF
-                                print(f"✗ Server sent LOGOFF: {msg.get('Reason', 'Unknown')}")
-                                print("\n[DIAGNOSIS] Sierra Chart is rejecting JSON encoding!")
-                                print("   Possible causes:")
-                                print("   1. DTC server is in Binary-only mode")
-                                print("   2. JSON support not enabled in Sierra settings")
-                                return False
-                            else:
-                                print(f"  Received Type {msg_type}: {msg}")
-                        except json.JSONDecodeError:
-                            print("✗ Invalid JSON (server might be in Binary mode)")
-                            print(f"   Raw: {frame[:80]}")
+                    try:
+                        msg_obj = json.loads(frame)
+                        msg_type = msg_obj.get("Type")
+
+                        if msg_type == 6:  # ENCODING_RESPONSE
+                            print(f"[OK] ENCODING_RESPONSE received: {msg_obj}")
+                            return True
+                        if msg_type == 5:  # LOGOFF
+                            print(
+                                f"[CLOSE] Server sent LOGOFF: "
+                                f\"{msg_obj.get('Reason', 'Unknown')}\"
+                            )
+                            print("\n[DIAGNOSIS] Sierra Chart is rejecting JSON encoding.")
+                            print("   Possible causes:")
+                            print("   1. DTC server is in Binary-only mode")
+                            print("   2. JSON support not enabled in Sierra settings")
                             return False
+
+                        print(f"  Received Type {msg_type}: {msg_obj}")
+                    except json.JSONDecodeError:
+                        print("Invalid JSON (server might be in Binary mode)")
+                        print(f"   Raw: {frame[:80]}")
+                        return False
             except socket.timeout:
                 break
 
-        print("✗ Timeout waiting for ENCODING_RESPONSE")
+        print("Timeout waiting for ENCODING_RESPONSE")
         return False
 
-    except Exception as e:
-        print(f"✗ Error: {e}")
+    except Exception as exc:
+        print(f"[ERROR] {exc}")
         return False
     finally:
-        with contextlib.suppress(builtins.BaseException):
-            sock.close()
+        if sock is not None:
+            with contextlib.suppress(Exception):
+                sock.close()
 
 
-def test_binary_encoding():
+def test_binary_encoding() -> bool:
     """Test if Sierra accepts Binary DTC protocol."""
     print("\n" + "=" * 80)
     print("TEST 2: BINARY DTC PROTOCOL")
     print("=" * 80)
 
+    sock: socket.socket | None = None
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(5)
         sock.connect((HOST, PORT))
-        print(f"✓ Connected to {HOST}:{PORT}")
+        print(f"[OK] Connected to {HOST}:{PORT}")
 
-        # Build Binary LOGON_REQUEST (Type=1)
-        # DTC Binary format: [uint16 size][uint16 type][...fields...]
-        # For simplicity, send minimal binary header
-
-        # Type 1 = LOGON_REQUEST
-        msg_type = 1
-        # Minimal size (we'll calculate)
-
-        # Binary fields (little-endian):
-        # - Size (uint16)
-        # - Type (uint16)
-        # - ProtocolVersion (int32)
-        # - Username (char[36])
-        # - Password (char[36])
-        # etc.
-
-        # For diagnosis, just send the header and see if server responds differently
-        size = 4  # Just size + type
+        msg_type = 1  # LOGON_REQUEST
+        size = 4  # size + type
         data = struct.pack("<HH", size, msg_type)
 
         sock.send(data)
-        print(f"→ Sent Binary LOGON_REQUEST header (Type={msg_type})")
+        print(f"[SEND] Binary LOGON_REQUEST header (Type={msg_type})")
 
-        # Wait for response
         buffer = b""
         start = time.time()
 
@@ -133,52 +124,58 @@ def test_binary_encoding():
             try:
                 chunk = sock.recv(4096)
                 if not chunk:
-                    print("✗ Server closed connection")
+                    print("Server closed connection")
                     return False
                 buffer += chunk
 
-                # Try to decode binary response
                 if len(buffer) >= 4:
-                    size, msg_type = struct.unpack("<HH", buffer[:4])
-                    print(f"✓ Received Binary message: Size={size}, Type={msg_type}")
+                    size_val, msg_type_val = struct.unpack("<HH", buffer[:4])
+                    print(
+                        f"[RECV] Binary message: Size={size_val}, "
+                        f"Type={msg_type_val}"
+                    )
 
-                    if msg_type == 2:  # LOGON_RESPONSE
-                        print("✓ Server accepts BINARY protocol!")
+                    if msg_type_val == 2:
+                        print("[OK] Server accepts BINARY protocol.")
                         return True
-                    elif 1 <= msg_type <= 900:
-                        print(f"✓ Server is in BINARY mode (Type {msg_type})")
+                    if 1 <= msg_type_val <= 900:
+                        print(
+                            f"[OK] Server is in BINARY mode "
+                            f"(Type {msg_type_val})"
+                        )
                         return True
 
             except socket.timeout:
                 break
-            except Exception as e:
-                print(f"  Parse error: {e}")
+            except Exception as exc:
+                print(f"Parse error: {exc}")
                 break
 
-        print("✗ No valid binary response")
+        print("No valid binary response")
         return False
 
-    except Exception as e:
-        print(f"✗ Error: {e}")
+    except Exception as exc:
+        print(f"[ERROR] {exc}")
         return False
     finally:
-        with contextlib.suppress(builtins.BaseException):
-            sock.close()
+        if sock is not None:
+            with contextlib.suppress(Exception):
+                sock.close()
 
 
-def test_no_encoding_negotiation():
+def test_no_encoding_negotiation() -> bool:
     """Test direct LOGON without ENCODING_REQUEST."""
     print("\n" + "=" * 80)
     print("TEST 3: DIRECT JSON LOGON (No Encoding Negotiation)")
     print("=" * 80)
 
+    sock: socket.socket | None = None
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(5)
         sock.connect((HOST, PORT))
-        print(f"✓ Connected to {HOST}:{PORT}")
+        print(f"[OK] Connected to {HOST}:{PORT}")
 
-        # Send LOGON_REQUEST directly (some servers accept this)
         logon_req = {
             "Type": 1,
             "ProtocolVersion": 8,
@@ -190,9 +187,8 @@ def test_no_encoding_negotiation():
         }
         msg = json.dumps(logon_req).encode("utf-8") + b"\x00"
         sock.send(msg)
-        print(f"→ Sent LOGON_REQUEST: {logon_req}")
+        print(f"[SEND] LOGON_REQUEST: {logon_req}")
 
-        # Wait for response
         buffer = b""
         start = time.time()
 
@@ -200,7 +196,7 @@ def test_no_encoding_negotiation():
             try:
                 chunk = sock.recv(4096)
                 if not chunk:
-                    print("✗ Server closed connection (REJECTED)")
+                    print("Server closed connection (rejected)")
                     return False
                 buffer += chunk
 
@@ -209,35 +205,74 @@ def test_no_encoding_negotiation():
                     frame = buffer[:idx]
                     buffer = buffer[idx + 1 :]
 
-                    if frame:
-                        try:
-                            msg = json.loads(frame)
-                            msg_type = msg.get("Type")
+                    if not frame:
+                        continue
 
-                            if msg_type == 2:  # LOGON_RESPONSE
-                                print(f"✓ LOGON_RESPONSE received: {msg}")
-                                print("✓ Server accepts direct JSON LOGON (encoding negotiation not required)!")
-                                return True
-                            else:
-                                print(f"  Received Type {msg_type}: {msg}")
-                        except json.JSONDecodeError:
-                            print("✗ Invalid JSON response")
-                            return False
+                    try:
+                        msg_obj = json.loads(frame)
+                        msg_type = msg_obj.get("Type")
+
+                        if msg_type == 2:
+                            print(f"[OK] LOGON_RESPONSE received: {msg_obj}")
+                            print(
+                                "[OK] Server accepts direct JSON LOGON "
+                                "(no encoding negotiation required)."
+                            )
+                            return True
+
+                        print(f"  Received Type {msg_type}: {msg_obj}")
+                    except json.JSONDecodeError:
+                        print("Invalid JSON response")
+                        return False
             except socket.timeout:
                 break
 
-        print("✗ Timeout waiting for LOGON_RESPONSE")
+        print("Timeout waiting for LOGON_RESPONSE")
         return False
 
-    except Exception as e:
-        print(f"✗ Error: {e}")
+    except Exception as exc:
+        print(f"[ERROR] {exc}")
         return False
     finally:
-        with contextlib.suppress(builtins.BaseException):
-            sock.close()
+        if sock is not None:
+            with contextlib.suppress(Exception):
+                sock.close()
 
 
-if __name__ == "__main__":
+def summarize(json_ok: bool, binary_ok: bool, direct_ok: bool) -> None:
+    """Print a summary of capability results."""
+    print("\n" + "=" * 80)
+    print("DIAGNOSIS SUMMARY")
+    print("=" * 80)
+    print(
+        "JSON Encoding Negotiation:  "
+        f\"{'SUPPORTED' if json_ok else 'NOT SUPPORTED'}\"
+    )
+    print(
+        "Binary DTC Protocol:        "
+        f\"{'SUPPORTED' if binary_ok else 'NOT SUPPORTED'}\"
+    )
+    print(
+        "Direct JSON Logon:          "
+        f\"{'SUPPORTED' if direct_ok else 'NOT SUPPORTED'}\"
+    )
+
+    print("\n" + "=" * 80)
+    print("RECOMMENDATION")
+    print("=" * 80)
+
+    if json_ok:
+        print("Sierra Chart supports JSON encoding.")
+    elif binary_ok:
+        print(
+            "Sierra Chart accepts JSON but skips encoding negotiation, "
+            "or is Binary-only."
+        )
+    else:
+        print("Cannot establish DTC connection; check Sierra configuration.")
+
+
+def main() -> None:
     print("=" * 80)
     print("SIERRA CHART DTC CONFIGURATION DIAGNOSIS")
     print("=" * 80)
@@ -246,36 +281,8 @@ if __name__ == "__main__":
     json_ok = test_json_encoding()
     binary_ok = test_binary_encoding()
     direct_ok = test_no_encoding_negotiation()
+    summarize(json_ok, binary_ok, direct_ok)
 
-    print("\n" + "=" * 80)
-    print("DIAGNOSIS SUMMARY")
-    print("=" * 80)
-    print(f"JSON Encoding Negotiation:  {'✓ SUPPORTED' if json_ok else '✗ NOT SUPPORTED'}")
-    print(f"Binary DTC Protocol:        {'✓ SUPPORTED' if binary_ok else '✗ NOT SUPPORTED'}")
-    print(f"Direct JSON Logon:          {'✓ SUPPORTED' if direct_ok else '✗ NOT SUPPORTED'}")
 
-    print("\n" + "=" * 80)
-    print("RECOMMENDATION")
-    print("=" * 80)
-
-    if json_ok:
-        print("✓ Sierra Chart supports JSON encoding!")
-        print("  Your app should work correctly.")
-    elif direct_ok:
-        print("⚠ Sierra Chart accepts JSON but skips encoding negotiation.")
-        print("  SOLUTION: Skip ENCODING_REQUEST and send LOGON_REQUEST directly.")
-        print("  Update your code to use --skip-encoding-request flag.")
-    elif binary_ok:
-        print("✗ Sierra Chart is in BINARY-ONLY mode!")
-        print("  SOLUTION:")
-        print("  1. Open Sierra Chart")
-        print("  2. Go to: Global Settings > Data/Trade Service Settings")
-        print("  3. Under 'DTC Protocol Server' section:")
-        print("     - Enable 'Use JSON Encoding' or 'JSON Compact'")
-        print("     - OR: Disable 'Use Binary Encoding Only'")
-        print("  4. Click OK and restart Sierra Chart")
-    else:
-        print("✗ Cannot establish DTC connection!")
-        print("  Verify Sierra Chart DTC server is running and configured.")
-
-    print("=" * 80)
+if __name__ == "__main__":
+    main()
