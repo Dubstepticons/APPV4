@@ -240,30 +240,60 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         """Position direction (proxies to _position.is_long)."""
         return self._position.is_long
 
+    @is_long.setter
+    def is_long(self, value: Optional[bool]) -> None:
+        """Set position direction (syncs to _position.is_long)."""
+        self._position.is_long = value
+
     @property
     def target_price(self) -> Optional[float]:
         """Target price (proxies to _position.target_price)."""
         return self._position.target_price
+
+    @target_price.setter
+    def target_price(self, value: Optional[float]) -> None:
+        """Set target price (syncs to _position.target_price)."""
+        self._position.target_price = value
 
     @property
     def stop_price(self) -> Optional[float]:
         """Stop price (proxies to _position.stop_price)."""
         return self._position.stop_price
 
+    @stop_price.setter
+    def stop_price(self, value: Optional[float]) -> None:
+        """Set stop price (syncs to _position.stop_price)."""
+        self._position.stop_price = value
+
     @property
     def entry_vwap(self) -> Optional[float]:
         """Entry VWAP snapshot (proxies to _position.entry_vwap)."""
         return self._position.entry_vwap
+
+    @entry_vwap.setter
+    def entry_vwap(self, value: Optional[float]) -> None:
+        """Set entry VWAP snapshot (syncs to _position.entry_vwap)."""
+        self._position.entry_vwap = value
 
     @property
     def entry_delta(self) -> Optional[float]:
         """Entry cumulative delta snapshot (proxies to _position.entry_cum_delta)."""
         return self._position.entry_cum_delta
 
+    @entry_delta.setter
+    def entry_delta(self, value: Optional[float]) -> None:
+        """Set entry delta snapshot (syncs to _position.entry_cum_delta)."""
+        self._position.entry_cum_delta = value
+
     @property
     def entry_poc(self) -> Optional[float]:
         """Entry POC snapshot (proxies to _position.entry_poc)."""
         return self._position.entry_poc
+
+    @entry_poc.setter
+    def entry_poc(self, value: Optional[float]) -> None:
+        """Set entry POC snapshot (syncs to _position.entry_poc)."""
+        self._position.entry_poc = value
 
     @property
     def entry_time_epoch(self) -> Optional[int]:
@@ -332,16 +362,12 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         exit_p = trade.get("exit_price", "?")
         qty = trade.get("qty", "?")
 
-        # Simple one-line trade close notification
-        print(f"[TRADE CLOSE] {symbol} {qty} @ {entry} -> {exit_p} | P&L: {pnl_sign}${abs(pnl):,.2f} | Mode: {mode}")
-
         # CRITICAL: Close position in database (single source of truth)
         # This replaces the old TradeManager approach
         ok = self._close_position_in_database(trade)
 
         if not ok:
             # Fallback to old TradeManager approach if database close fails
-            print("[TRADE CLOSE] Database close failed, falling back to TradeManager...")
             ok = self._close_position_legacy(trade)
 
         # Emit regardless; consumers may refresh their views
@@ -355,6 +381,9 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
             signal_bus = get_signal_bus()
             signal_bus.tradeClosedForAnalytics.emit(payload)
         except Exception as e:
+            log.error(f"[panel2.notify_trade_closed] Error emitting signal: {e}")
+            import traceback
+            traceback.print_exc()
             pass
 
     def _close_position_in_database(self, trade: dict) -> bool:
@@ -539,7 +568,6 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                 return
 
             # If we reach here, it's a CLOSE
-            print(f"  CLOSE DETECTED: qty decreased from {current_qty} to {qty}")
 
             # Extract exit price from payload
             exit_price = (
@@ -715,7 +743,11 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                 self.entry_qty = abs(qty) if qty != 0 else 0
 
                 # Call set_position to update timers and capture snapshots
-                self.set_position(abs(qty), avg_price, is_long)
+                try:
+                    self.set_position(abs(qty), avg_price, is_long)
+                except Exception as e:
+                    import traceback
+                    traceback.print_exc()
                 log.info(f"[Panel2] Position update accepted: symbol={self.symbol}, qty={qty}, avg={avg_price}, long={is_long}")
 
                 # Ensure UI refresh happens
@@ -965,8 +997,10 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
                 self.session_high = fnum("high")
                 self.session_low = fnum("low")
                 self.vwap = fnum("vwap")
-                self.cum_delta = fnum("cum_delta")
                 self.poc = fnum("poc")
+                self.cum_delta = fnum("cum_delta")
+
+
                 return True
 
         except FileNotFoundError:
@@ -1170,9 +1204,15 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         # Start duration timer if entering a position
         if self.entry_qty > 0 and entry_price is not None:
             self.entry_price = float(entry_price)
-            self.is_long = is_long
-            if not self.entry_time_epoch:
-                self.entry_time_epoch = int(time.time())
+            # Set is_long on Position domain via qty sign (not via is_long property which is read-only)
+            if is_long is not None:
+                self._position.qty = abs(qty) if is_long else -abs(qty)
+
+            # Always capture snapshots when position qty goes from 0 to non-zero
+            # Check if we're entering a fresh position (entry_vwap not set yet)
+            if self.entry_vwap is None:
+                if not self.entry_time_epoch:
+                    self.entry_time_epoch = int(time.time())
                 # Capture VWAP, Delta, and POC snapshots at entry (static values)
                 self.entry_vwap = self.vwap
                 self.entry_delta = self.cum_delta
@@ -1190,7 +1230,7 @@ class Panel2(QtWidgets.QWidget, ThemeAwareMixin):
         else:
             # No position - clear all position-specific data
             self.entry_price = None
-            self.is_long = None
+            self._position.qty = 0  # Flatten position (is_long is derived from qty)
             self.target_price = None
             self.stop_price = None
             self.entry_vwap = None

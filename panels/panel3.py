@@ -438,6 +438,8 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
             from utils.logger import get_logger
             log = get_logger(__name__)
 
+            log.info(f"[panel3.on_trade_closed] SIGNAL RECEIVED - refreshing metrics for {self._tf}")
+
             # Refresh the metrics for current timeframe
             self._load_metrics_for_timeframe(self._tf)
 
