@@ -28,9 +28,7 @@ Usage:
 
 from __future__ import annotations
 
-# When fully implemented, this will import from panel2_main
-# For now, maintain backwards compatibility
-__all__ = ["Panel2"]
+# Import from panel2_main orchestrator
+from .panel2_main import Panel2
 
-# Placeholder - will be replaced when implementation is complete
-# from .panel2_main import Panel2
+__all__ = ["Panel2"]
