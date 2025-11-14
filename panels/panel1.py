@@ -221,9 +221,12 @@ class Panel1(QtWidgets.QWidget, ThemeAwareMixin):
         self._init_hover_elements()
         self._ensure_live_pill_dot(initial=True)
 
-        # Initialize theme based on default mode
-        switch_theme("live" if self._mode_is_live else "sim")
-        self._setup_theme()  # Initialize theme (ThemeAwareMixin)
+        # Initialize theme - use LIVE as default (MainWindow sets initial mode)
+        # Note: MainWindow will call on_theme_changed() after panel construction to finalize theme
+        # CRITICAL: Don't call _setup_theme() here because panel references (_panel2, _panel3) aren't set yet
+        # They get set in MainWindow._setup_cross_panel_linkage() -> set_panel_references()
+        # The initial on_theme_changed() call in MainWindow.__init__ will handle theme setup
+        switch_theme("live")
 
         # Wire balance signal from StateManager
         self._wire_balance_signal()

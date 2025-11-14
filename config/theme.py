@@ -283,11 +283,11 @@ DEBUG_THEME: dict[str, Union[int, float, str, bool]] = {
     "text_dim": "#5B6C7A",
     # Backgrounds
     "bg_primary": "#1E1E1E",
-    "bg_secondary": "#000000",
-    "bg_panel": "#000000",
-    "bg_elevated": "#000000",
+    "bg_secondary": "#1E1E1E",
+    "bg_panel": "#1E1E1E",
+    "bg_elevated": "#2A2A2A",
     "bg_tertiary": "#0F0F1A",
-    "card_bg": "#1A1F2E",
+    "card_bg": "#3A3A3A",  # Grey for metric cards in DEBUG mode
     # Borders
     "border": "#374151",
     "cell_border": "none",
@@ -356,8 +356,12 @@ LIVE_THEME: dict[str, Union[int, float, str, bool]] = {
     "badge_border_color": "#00C97A",
     "badge_text_color": "#FFFFFF",
     "glow_color": "#00C97A",
-    # Live palette overrides
+    # Live palette overrides - CRITICAL FIX: Update panel backgrounds too
     "bg_primary": "#000000",
+    "bg_secondary": "#000000",
+    "bg_panel": "#000000",
+    "bg_elevated": "#1A1A1A",
+    "card_bg": "#0F2540",  # Dark blue for metric cards in LIVE mode
     "ink": "#FFD700",
     "border": "#FFD700",
 }
@@ -383,17 +387,23 @@ SIM_THEME: dict[str, Union[int, float, str, bool]] = {
     "badge_border_color": "#4DA7FF",
     "badge_text_color": "#000000",
     "glow_color": "#4DA7FF",
-    # Sim palette overrides
+    # Sim palette overrides - CRITICAL FIX: Update panel backgrounds too
     "bg_primary": "#FFFFFF",
+    "bg_secondary": "#F5F5F5",
+    "bg_panel": "#FFFFFF",
+    "bg_elevated": "#E8E8E8",
+    "card_bg": "#E3F2FD",  # Light blue for metric cards in SIM mode
     "ink": "#000000",
     "border": "#00D4FF",
 }
 
 
 # ========================================================================
-# ACTIVE THEME (Points to current theme, default: SIM)
+# ACTIVE THEME (Points to current theme, default: LIVE)
 # ========================================================================
-THEME: dict[str, Union[int, float, str, bool]] = SIM_THEME.copy()
+# FIX: Initialize to LIVE instead of SIM to match app default mode
+# This prevents initial render with wrong colors before switch_theme() is called
+THEME: dict[str, Union[int, float, str, bool]] = LIVE_THEME.copy()
 
 
 # ========================================================================

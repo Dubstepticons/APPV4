@@ -517,14 +517,15 @@ class MainWindow(QtWidgets.QMainWindow):
             from config.theme import switch_theme
 
             switch_theme(mode.lower())
+
             # Emit signal to trigger on_theme_changed
             self.themeChanged.emit(mode)
             # Update central widget background
             central = self.centralWidget()
             if central:
                 central.setStyleSheet(f"QWidget#CentralWidget {{ background: {THEME.get('bg_primary', '#000000')}; }}")
-        except Exception:
-            pass
+        except Exception as e:
+            log.error(f"[Theme] Error in _set_theme_mode: {e}", exc_info=True)
 
     def on_theme_changed(self, mode: str) -> None:
         """
@@ -536,6 +537,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """
         try:
             if mode not in ("DEBUG", "SIM", "LIVE"):
+                log.warning(f"[Theme] Invalid mode in on_theme_changed: {mode}")
                 return
             self.current_theme_mode = mode
 
@@ -552,16 +554,17 @@ class MainWindow(QtWidgets.QMainWindow):
             try:
                 from core.signal_bus import get_signal_bus
                 signal_bus = get_signal_bus()
+                log.debug("[Theme] Emitting themeChangeRequested signal")
                 signal_bus.themeChangeRequested.emit()
             except Exception as e:
-                log.error(f"[Theme] Failed to emit theme change signal: {e}")
+                log.error(f"[Theme] Failed to emit theme change signal: {e}", exc_info=True)
 
             # Update central widget background
             central = self.centralWidget()
             if central:
                 central.setStyleSheet(f"QWidget#CentralWidget {{ background: {THEME.get('bg_primary', '#000000')}; }}")
-        except Exception:
-            pass
+        except Exception as e:
+            log.error(f"[Theme] Error in on_theme_changed: {e}", exc_info=True)
 
     # -------------------- Theme handler (end)
 
