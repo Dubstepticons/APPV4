@@ -23,7 +23,7 @@ Successfully extracted **6 of 8 modules** from the 1,820-line Panel1 monolith. A
 | **Phase 1: Foundation** | 3 | 300 | ✅ Complete | `5031ef8` |
 | **Phase 2: Timeframe** | 1 | 285 | ✅ Complete | `3931b02` |
 | **Phase 3: State** | 1 | 407 | ✅ Complete | `b440739` |
-| **Phase 4: Chart** | 1 | 453 | ✅ Complete | TBD |
+| **Phase 4: Chart** | 1 | 453 | ✅ Complete | `53d6cbf` |
 | **Phase 5: Hover** | 1 | 250 | 📋 Pending | - |
 | **Phase 6: Orchestrator** | 1 | 200 | 📋 Pending | - |
 | **TOTAL** | **8** | **1,895** | **76%** | **4 commits** |
@@ -375,7 +375,7 @@ def test_add_balance_point():
 | `5031ef8` | Phase 1 | 4 | 479 | Foundation modules (helpers, masked_frame, pnl_calculator) |
 | `3931b02` | Phase 2 | 1 | 285 | Timeframe management |
 | `b440739` | Phase 3 | 1 | 407 | Thread-safe equity state (CRITICAL) |
-| TBD | Phase 4 | 1 | 453 | Chart rendering (PyQtGraph animation) |
+| `53d6cbf` | Phase 4 | 1 | 453 | Chart rendering (PyQtGraph animation) |
 | - | Phase 5 | 1 | 250 | Hover interactions - **PENDING** |
 | - | Phase 6 | 1 | 200 | Orchestrator - **PENDING** |
 
