@@ -23,14 +23,22 @@ import os
 
 from PyQt6 import QtCore, QtWidgets
 
+from config.feature_flags import FeatureFlags
 from config.settings import DEBUG_DATA, DTC_HOST, DTC_PORT, LIVE_ACCOUNT
 from config.theme import THEME, ColorTheme, set_theme  # noqa: F401  # theme tokens used by helpers
 from core.data_bridge import DTCClientJSON
 # MIGRATION: MessageRouter removed - using SignalBus now
-from panels.panel1 import Panel1
-from panels.panel2 import Panel2
 from panels.panel3 import Panel3
 from utils.logger import get_logger
+
+# MIGRATION: Feature-flag based panel imports
+# Old panels (monolithic) - renamed with _old suffix
+from panels.panel1_old import Panel1 as Panel1Old
+from panels.panel2_old import Panel2 as Panel2Old
+
+# New panels (decomposed architecture) - imported from directories
+from panels.panel1 import Panel1 as Panel1New
+from panels.panel2 import Panel2 as Panel2New
 
 
 # -------------------- Module logger (start)
@@ -53,6 +61,38 @@ class MainWindow(QtWidgets.QMainWindow):
     """Main application window tying together all three panels, theme logic, and DTC wiring."""
 
     themeChanged = QtCore.pyqtSignal(str)  # emits "DEBUG" | "SIM" | "LIVE"
+
+    @staticmethod
+    def _create_panel1():
+        """
+        Create Panel1 based on feature flag.
+
+        Returns:
+            Panel1Old or Panel1New instance based on USE_NEW_PANEL1 flag
+        """
+        use_new = FeatureFlags.USE_NEW_PANEL1
+        if use_new:
+            log.info("[Migration] Using NEW Panel1 (decomposed architecture)")
+            return Panel1New()
+        else:
+            log.info("[Migration] Using OLD Panel1 (monolithic)")
+            return Panel1Old()
+
+    @staticmethod
+    def _create_panel2():
+        """
+        Create Panel2 based on feature flag.
+
+        Returns:
+            Panel2Old or Panel2New instance based on USE_NEW_PANEL2 flag
+        """
+        use_new = FeatureFlags.USE_NEW_PANEL2
+        if use_new:
+            log.info("[Migration] Using NEW Panel2 (decomposed architecture)")
+            return Panel2New()
+        else:
+            log.info("[Migration] Using OLD Panel2 (monolithic)")
+            return Panel2Old()
 
     def __init__(self) -> None:
         super().__init__()
@@ -250,12 +290,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
         if os.getenv("DEBUG_DTC", "0") == "1":
             print("DEBUG: About to create panels (Panel1, Panel2, Panel3)...")
-        self.panel_balance: Panel1 = Panel1()
+        # MIGRATION: Use feature flags to select panel implementation
+        self.panel_balance = self._create_panel1()
         if os.getenv("DEBUG_DTC", "0") == "1":
-            print("DEBUG: Panel1 created")
-        self.panel_live: Panel2 = Panel2()
+            print(f"DEBUG: Panel1 created (new={FeatureFlags.USE_NEW_PANEL1})")
+        self.panel_live = self._create_panel2()
         if os.getenv("DEBUG_DTC", "0") == "1":
-            print("DEBUG: Panel2 created")
+            print(f"DEBUG: Panel2 created (new={FeatureFlags.USE_NEW_PANEL2})")
         self.panel_stats: Panel3 = Panel3()
         if os.getenv("DEBUG_DTC", "0") == "1":
             print("DEBUG: Panel3 created")
