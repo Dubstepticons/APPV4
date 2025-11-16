@@ -1,0 +1,1811 @@
+// OrderFlowReversalEngine_v2.cpp
+// Professional-Grade Multi-Cluster Order Flow Reversal System
+// Version: 2.0 - Institutional Architecture
+// Compatible with Sierra Chart 2000+ 
+
+#include "sierrachart.h"
+#include <vector>
+#include <deque>
+#include <map>
+#include <algorithm>
+#include <cmath>
+#include <numeric>
+#include <sstream>
+#include <iomanip>
+
+SCDLLName("Order Flow Reversal Engine v2.0 Professional")
+
+// ============================================================================
+// CONSTANTS AND ENUMS
+// ============================================================================
+
+namespace Constants {
+    constexpr int MIN_BARS_REQUIRED = 100;
+    constexpr float TICK_EPSILON = 0.0001f;
+    constexpr int MAX_CLUSTERS = 5;
+    constexpr float DEFAULT_IMBALANCE_RATIO = 3.0f;
+    constexpr int TAPE_VELOCITY_LOOKBACK = 100;
+    constexpr float ZONE_DECAY_RATE = 0.02f;  // 2% per bar
+    constexpr int MAX_ZONE_BARS = 100;
+}
+
+enum class SessionType {
+    RTH_OPEN,     // 9:30-10:30
+    RTH_MID,      // 10:30-15:00
+    RTH_CLOSE,    // 15:00-16:00
+    ETH,          // All other times
+    UNKNOWN
+};
+
+enum class VolatilityRegime {
+    LOW,          // ATR < 50% of median
+    NORMAL,       // ATR 50-150% of median
+    HIGH,         // ATR 150-200% of median
+    EXTREME       // ATR > 200% of median
+};
+
+enum class SignalPhase {
+    IDLE = 0,
+    CONTEXT_ACTIVE = 1,
+    ABSORPTION_BUILDING = 2,
+    ABSORPTION_CONFIRMED = 3,
+    EXHAUSTION_DETECTED = 4,
+    AGGRESSION_CONFIRMED = 5,
+    TRAP_PENDING = 6,
+    SIGNAL_ACTIVE = 7
+};
+
+enum class AggressionType {
+    NONE,
+    SWEEP,        // Large market order
+    LADDER,       // Sequential lifting
+    ICEBERG       // Hidden size
+};
+
+enum class BiasStrength {
+    STRONG_BEARISH,   // < -50
+    BEARISH,          // -50 to -20
+    NEUTRAL,          // -20 to +20
+    BULLISH,          // +20 to +50
+    STRONG_BULLISH    // > +50
+};
+
+// ============================================================================
+// DATA STRUCTURES
+// ============================================================================
+
+struct PriceCluster {
+    float centerPrice;
+    float topPrice;
+    float bottomPrice;
+    float totalVolume;
+    float bidVolume;
+    float askVolume;
+    float delta;
+    int touchCount;
+    float density;  // Volume per tick
+    
+    PriceCluster() : centerPrice(0), topPrice(0), bottomPrice(0),
+                     totalVolume(0), bidVolume(0), askVolume(0),
+                     delta(0), touchCount(0), density(0) {}
+    
+    float GetRange() const {
+        return topPrice - bottomPrice;
+    }
+    
+    bool ContainsPrice(float price) const {
+        return price >= bottomPrice && price <= topPrice;
+    }
+    
+    float GetQualityScore(float tickSize) const {
+        float rangeTicks = GetRange() / tickSize;
+        if (rangeTicks == 0) return 0;
+        return (density * touchCount) / rangeTicks;
+    }
+};
+
+struct AbsorptionZoneV2 {
+    std::vector<PriceCluster> clusters;
+    float topBoundary;
+    float bottomBoundary;
+    float corePrice;  // Highest quality cluster center
+    float totalVolume;
+    float deltaAbsorbed;
+    int startBarIndex;
+    int defenseAttempts;
+    int successfulDefenses;
+    float qualityScore;
+    float strength;  // Decays over time
+    SCDateTime creationTime;
+    bool isActive;
+    
+    AbsorptionZoneV2() : topBoundary(0), bottomBoundary(0), corePrice(0),
+                         totalVolume(0), deltaAbsorbed(0), startBarIndex(0),
+                         defenseAttempts(0), successfulDefenses(0),
+                         qualityScore(0), strength(100), isActive(false) {}
+    
+    float GetDefenseRatio() const {
+        return defenseAttempts > 0 ? 
+               static_cast<float>(successfulDefenses) / defenseAttempts : 0;
+    }
+    
+    void ApplyTimeDecay(float decayRate) {
+        strength *= (1.0f - decayRate);
+    }
+    
+    bool IsViable() const {
+        return isActive && strength > 30 && GetDefenseRatio() > 0.5f;
+    }
+    
+    bool ContainsPrice(float price) const {
+        return price >= bottomBoundary && price <= topBoundary;
+    }
+};
+
+struct ExhaustionPoint {
+    float price;
+    float volume;
+    float tapeVelocity;
+    float decayRate;
+    int barIndex;
+    bool hasDoubleButtom;
+    float confidence;
+    
+    ExhaustionPoint() : price(0), volume(0), tapeVelocity(0),
+                        decayRate(0), barIndex(0), hasDoubleButtom(false),
+                        confidence(0) {}
+};
+
+struct ImbalanceLevel {
+    float price;
+    float askVolume;
+    float bidVolume;
+    float ratio;
+    int barIndex;
+    
+    ImbalanceLevel() : price(0), askVolume(0), bidVolume(0), 
+                       ratio(0), barIndex(0) {}
+    
+    bool IsValid(float minRatio) const {
+        return ratio >= minRatio;
+    }
+};
+
+struct MarketContext {
+    SessionType session;
+    VolatilityRegime volatility;
+    float vwapPrice;
+    float vwapSlope;
+    float pocPrice;
+    float ibHigh;
+    float ibLow;
+    float dayHigh;
+    float dayLow;
+    float currentATR;
+    float medianATR;
+    BiasStrength biasStrength;
+    float biasScore;
+    
+    MarketContext() : session(SessionType::UNKNOWN), 
+                      volatility(VolatilityRegime::NORMAL),
+                      vwapPrice(0), vwapSlope(0), pocPrice(0),
+                      ibHigh(0), ibLow(0), dayHigh(0), dayLow(0),
+                      currentATR(0), medianATR(0),
+                      biasStrength(BiasStrength::NEUTRAL), biasScore(0) {}
+};
+
+struct SignalStateV2 {
+    SignalPhase phase;
+    int phaseStartBar;
+    bool isLongSetup;
+    AbsorptionZoneV2 activeZone;
+    ExhaustionPoint exhaustion;
+    std::vector<ImbalanceLevel> aggressionImbalances;
+    AggressionType aggressionType;
+    int aggressionBar;
+    float entryPrice;
+    float stopPrice;
+    float confidence;
+    MarketContext context;
+    
+    SignalStateV2() : phase(SignalPhase::IDLE), phaseStartBar(0),
+                      isLongSetup(true), aggressionBar(0),
+                      entryPrice(0), stopPrice(0), confidence(0) {}
+    
+    void Reset() {
+        phase = SignalPhase::IDLE;
+        phaseStartBar = 0;
+        activeZone = AbsorptionZoneV2();
+        exhaustion = ExhaustionPoint();
+        aggressionImbalances.clear();
+        aggressionType = AggressionType::NONE;
+        aggressionBar = 0;
+        confidence = 0;
+    }
+    
+    bool PhaseTimeout(int currentBar, int maxBars) const {
+        return (currentBar - phaseStartBar) > maxBars;
+    }
+};
+
+struct SignalMetrics {
+    SCDateTime timestamp;
+    SCString signalType;
+    SignalPhase finalPhase;
+    float entryPrice;
+    float stopPrice;
+    
+    // Absorption Metrics
+    int clusterCount;
+    float absorptionDensity;
+    float zoneQuality;
+    int defenseAttempts;
+    
+    // Exhaustion Metrics
+    float exhaustionDecayRate;
+    float tapeVelocityPercentile;
+    bool hadDoubleButtom;
+    
+    // Aggression Metrics
+    int imbalanceCount;
+    int stackedImbalances;
+    float deltaVelocity;
+    AggressionType aggressionPattern;
+    
+    // Context Metrics
+    float distanceToVWAP;
+    float distanceToPOC;
+    float atrAtSignal;
+    float volumeVsAverage;
+    BiasStrength marketBias;
+    
+    // Delta Profile
+    float deltaPre5Bars;
+    float deltaAtSignal;
+    float deltaPost5Bars;
+    
+    // Performance
+    float MAE;
+    float MFE;
+    bool hitTarget1;
+    bool hitTarget2;
+    float finalPnL;
+    
+    SCString ToString() const {
+        SCString result;
+        result.Format("Signal[%s] Phase:%d Entry:%.2f Stop:%.2f Quality:%.1f Bias:%d Clusters:%d Imbalances:%d",
+                     signalType.GetChars(), static_cast<int>(finalPhase),
+                     entryPrice, stopPrice, zoneQuality, 
+                     static_cast<int>(marketBias), clusterCount, imbalanceCount);
+        return result;
+    }
+};
+
+// ============================================================================
+// MODULE CLASSES
+// ============================================================================
+
+class VolatilityModule {
+private:
+    std::deque<float> atrHistory;
+    const int historySize = 20;
+    
+public:
+    void UpdateATR(float currentATR) {
+        atrHistory.push_back(currentATR);
+        if (atrHistory.size() > historySize) {
+            atrHistory.pop_front();
+        }
+    }
+    
+    float GetMedianATR() const {
+        if (atrHistory.empty()) return 0;
+        
+        std::vector<float> sorted(atrHistory.begin(), atrHistory.end());
+        std::sort(sorted.begin(), sorted.end());
+        
+        size_t n = sorted.size();
+        return n % 2 == 0 ? 
+               (sorted[n/2 - 1] + sorted[n/2]) / 2.0f : 
+               sorted[n/2];
+    }
+    
+    VolatilityRegime GetRegime(float currentATR) const {
+        float median = GetMedianATR();
+        if (median == 0) return VolatilityRegime::NORMAL;
+        
+        float ratio = currentATR / median;
+        
+        if (ratio < 0.5f) return VolatilityRegime::LOW;
+        if (ratio < 1.5f) return VolatilityRegime::NORMAL;
+        if (ratio < 2.0f) return VolatilityRegime::HIGH;
+        return VolatilityRegime::EXTREME;
+    }
+    
+    float GetThresholdMultiplier(VolatilityRegime regime) const {
+        switch (regime) {
+            case VolatilityRegime::LOW: return 0.8f;
+            case VolatilityRegime::NORMAL: return 1.0f;
+            case VolatilityRegime::HIGH: return 1.3f;
+            case VolatilityRegime::EXTREME: return 1.5f;
+            default: return 1.0f;
+        }
+    }
+};
+
+class TapeVelocityTracker {
+private:
+    struct TickData {
+        SCDateTime time;
+        float volume;
+        float price;
+    };
+    
+    std::deque<TickData> ticks;
+    std::deque<float> velocityHistory;
+    const int maxTicks = 1000;
+    const int velocityWindow = 100;
+    
+public:
+    void AddTick(SCDateTime time, float price, float volume) {
+        ticks.push_back({time, volume, price});
+        if (ticks.size() > maxTicks) {
+            ticks.pop_front();
+        }
+        UpdateVelocity();
+    }
+    
+    float GetCurrentVelocity() const {
+        if (ticks.size() < 2) return 0;
+        
+        // Calculate ticks per second over recent window
+        int windowSize = std::min(10, static_cast<int>(ticks.size()));
+        auto recentStart = ticks.end() - windowSize;
+        auto recentEnd = ticks.end() - 1;
+        
+        double timeDiff = (recentEnd->time - recentStart->time).GetAsDouble();
+        if (timeDiff <= 0) return 0;
+        
+        return static_cast<float>(windowSize / timeDiff);
+    }
+    
+    float GetVelocityPercentile(float currentVelocity) const {
+        if (velocityHistory.empty()) return 50;
+        
+        int count = 0;
+        for (float vel : velocityHistory) {
+            if (vel <= currentVelocity) count++;
+        }
+        
+        return (static_cast<float>(count) / velocityHistory.size()) * 100;
+    }
+    
+private:
+    void UpdateVelocity() {
+        float velocity = GetCurrentVelocity();
+        velocityHistory.push_back(velocity);
+        if (velocityHistory.size() > velocityWindow) {
+            velocityHistory.pop_front();
+        }
+    }
+};
+
+// ============================================================================
+// MAIN STUDY FUNCTION
+// ============================================================================
+
+SCSFExport scsf_OrderFlowReversalV2(SCStudyInterfaceRef sc)
+{
+    // ========================================================================
+    // SUBGRAPHS
+    // ========================================================================
+    
+    SCSubgraphRef AbsorptionZoneTop = sc.Subgraph[0];
+    SCSubgraphRef AbsorptionZoneBottom = sc.Subgraph[1];
+    SCSubgraphRef AbsorptionZoneCore = sc.Subgraph[2];
+    SCSubgraphRef ExhaustionMarker = sc.Subgraph[3];
+    SCSubgraphRef AggressionMarker = sc.Subgraph[4];
+    SCSubgraphRef LongSignal = sc.Subgraph[5];
+    SCSubgraphRef ShortSignal = sc.Subgraph[6];
+    SCSubgraphRef BiasIndicator = sc.Subgraph[7];
+    SCSubgraphRef ConfidenceLevel = sc.Subgraph[8];
+    SCSubgraphRef ZoneStrength = sc.Subgraph[9];
+    
+    // ========================================================================
+    // INPUTS
+    // ========================================================================
+    
+    // Context Inputs (0-4)
+    SCInputRef EnableContextFilter = sc.Input[0];
+    SCInputRef ContextProximityATR = sc.Input[1];
+    SCInputRef UseRTHOnly = sc.Input[2];
+    SCInputRef RequireStructuralAlignment = sc.Input[3];
+    SCInputRef MinimumBiasScore = sc.Input[4];
+    
+    // Absorption Inputs (5-10)
+    SCInputRef AbsorptionVolumeMultiplier = sc.Input[5];
+    SCInputRef MinClusterVolume = sc.Input[6];
+    SCInputRef MaxClusterRange = sc.Input[7];
+    SCInputRef MinClusterQuality = sc.Input[8];
+    SCInputRef ClusterLookback = sc.Input[9];
+    SCInputRef RequireMultipleClusters = sc.Input[10];
+    
+    // Exhaustion Inputs (11-15)
+    SCInputRef ExhaustionVolumePercent = sc.Input[11];
+    SCInputRef RequireSequentialDecay = sc.Input[12];
+    SCInputRef TapeVelocityThreshold = sc.Input[13];
+    SCInputRef RequireDoubleButtom = sc.Input[14];
+    SCInputRef ExhaustionConfidenceMin = sc.Input[15];
+    
+    // Aggression Inputs (16-20)
+    SCInputRef ImbalanceRatioMin = sc.Input[16];
+    SCInputRef StackedImbalanceCount = sc.Input[17];
+    SCInputRef DeltaVelocityMin = sc.Input[18];
+    SCInputRef AggressionVolumeMultiplier = sc.Input[19];
+    SCInputRef RequireImbalanceStack = sc.Input[20];
+    
+    // Trap Inputs (21-25)
+    SCInputRef RequireHigherLow = sc.Input[21];
+    SCInputRef RequirePOCShift = sc.Input[22];
+    SCInputRef RetestWindowBars = sc.Input[23];
+    SCInputRef MinTrapConfidence = sc.Input[24];
+    SCInputRef RequireFootprintConfirmation = sc.Input[25];
+    
+    // Volatility Adaptation (26-30)
+    SCInputRef EnableVolatilityAdaptation = sc.Input[26];
+    SCInputRef LowVolMultiplier = sc.Input[27];
+    SCInputRef HighVolMultiplier = sc.Input[28];
+    SCInputRef ExtremeVolPause = sc.Input[29];
+    SCInputRef ATRLookbackPeriod = sc.Input[30];
+    
+    // Zone Management (31-35)
+    SCInputRef ZoneDecayRate = sc.Input[31];
+    SCInputRef ZonePersistenceBars = sc.Input[32];
+    SCInputRef MinZoneStrength = sc.Input[33];
+    SCInputRef WickViolationTicks = sc.Input[34];
+    SCInputRef VolumeWeightedBreakThreshold = sc.Input[35];
+    
+    // Session Settings (36-40)
+    SCInputRef RTHOpenMultiplier = sc.Input[36];
+    SCInputRef RTHMidMultiplier = sc.Input[37];
+    SCInputRef RTHCloseMultiplier = sc.Input[38];
+    SCInputRef ETHMultiplier = sc.Input[39];
+    SCInputRef DisableLastMinutes = sc.Input[40];
+    
+    // Logging & Alerts (41-45)
+    SCInputRef EnableDetailedLogging = sc.Input[41];
+    SCInputRef EnableAlerts = sc.Input[42];
+    SCInputRef LogPerformanceMetrics = sc.Input[43];
+    SCInputRef SaveToFile = sc.Input[44];
+    SCInputRef AlertSoundNumber = sc.Input[45];
+    
+    // ========================================================================
+    // INITIALIZATION
+    // ========================================================================
+    
+    if (sc.SetDefaults)
+    {
+        sc.GraphName = "Order Flow Reversal Engine v2.0 [Professional]";
+        sc.StudyDescription = "Multi-cluster institutional order flow reversal system with adaptive thresholds";
+        
+        sc.AutoLoop = 1;
+        sc.GraphRegion = 0;
+        sc.CalculationPrecedence = LOW_PREC_LEVEL;
+        sc.AlertOnlyOncePerBar = true;
+        
+        // Subgraph Configuration
+        AbsorptionZoneTop.Name = "Absorption Zone Top";
+        AbsorptionZoneTop.DrawStyle = DRAWSTYLE_LINE;
+        AbsorptionZoneTop.LineWidth = 2;
+        AbsorptionZoneTop.PrimaryColor = RGB(0, 150, 255);
+        AbsorptionZoneTop.LineStyle = LINESTYLE_DOT;
+        AbsorptionZoneTop.DrawZeros = false;
+        
+        AbsorptionZoneBottom.Name = "Absorption Zone Bottom";
+        AbsorptionZoneBottom.DrawStyle = DRAWSTYLE_LINE;
+        AbsorptionZoneBottom.LineWidth = 2;
+        AbsorptionZoneBottom.PrimaryColor = RGB(0, 150, 255);
+        AbsorptionZoneBottom.LineStyle = LINESTYLE_DOT;
+        AbsorptionZoneBottom.DrawZeros = false;
+        
+        AbsorptionZoneCore.Name = "Zone Core (Highest Quality)";
+        AbsorptionZoneCore.DrawStyle = DRAWSTYLE_DASH;
+        AbsorptionZoneCore.LineWidth = 3;
+        AbsorptionZoneCore.PrimaryColor = RGB(255, 255, 0);
+        AbsorptionZoneCore.DrawZeros = false;
+        
+        ExhaustionMarker.Name = "Exhaustion Point";
+        ExhaustionMarker.DrawStyle = DRAWSTYLE_DIAMOND;
+        ExhaustionMarker.LineWidth = 4;
+        ExhaustionMarker.PrimaryColor = RGB(255, 128, 0);
+        ExhaustionMarker.DrawZeros = false;
+        
+        AggressionMarker.Name = "Aggression Shift";
+        AggressionMarker.DrawStyle = DRAWSTYLE_TRIANGLE;
+        AggressionMarker.LineWidth = 4;
+        AggressionMarker.PrimaryColor = RGB(128, 255, 128);
+        AggressionMarker.DrawZeros = false;
+        
+        LongSignal.Name = "Long Trap Signal";
+        LongSignal.DrawStyle = DRAWSTYLE_ARROWUP;
+        LongSignal.LineWidth = 5;
+        LongSignal.PrimaryColor = RGB(0, 255, 0);
+        LongSignal.DrawZeros = false;
+        
+        ShortSignal.Name = "Short Trap Signal";
+        ShortSignal.DrawStyle = DRAWSTYLE_ARROWDOWN;
+        ShortSignal.LineWidth = 5;
+        ShortSignal.PrimaryColor = RGB(255, 0, 0);
+        ShortSignal.DrawZeros = false;
+        
+        BiasIndicator.Name = "Market Bias Score";
+        BiasIndicator.DrawStyle = DRAWSTYLE_IGNORE;
+        BiasIndicator.DrawZeros = false;
+        
+        ConfidenceLevel.Name = "Signal Confidence";
+        ConfidenceLevel.DrawStyle = DRAWSTYLE_IGNORE;
+        ConfidenceLevel.DrawZeros = false;
+        
+        ZoneStrength.Name = "Zone Strength";
+        ZoneStrength.DrawStyle = DRAWSTYLE_IGNORE;
+        ZoneStrength.DrawZeros = false;
+        
+        // Input Defaults - Context
+        EnableContextFilter.Name = "Enable Context Filter";
+        EnableContextFilter.SetYesNo(1);
+        
+        ContextProximityATR.Name = "Context Proximity (ATR Multiplier)";
+        ContextProximityATR.SetFloat(0.3f);
+        ContextProximityATR.SetFloatLimits(0.1f, 1.0f);
+        
+        UseRTHOnly.Name = "Use RTH Only";
+        UseRTHOnly.SetYesNo(0);
+        
+        RequireStructuralAlignment.Name = "Require Structural Alignment";
+        RequireStructuralAlignment.SetYesNo(1);
+        
+        MinimumBiasScore.Name = "Minimum Bias Score (abs)";
+        MinimumBiasScore.SetFloat(20.0f);
+        MinimumBiasScore.SetFloatLimits(0.0f, 100.0f);
+        
+        // Input Defaults - Absorption
+        AbsorptionVolumeMultiplier.Name = "Absorption Volume Multiplier";
+        AbsorptionVolumeMultiplier.SetFloat(3.5f);
+        AbsorptionVolumeMultiplier.SetFloatLimits(2.0f, 10.0f);
+        
+        MinClusterVolume.Name = "Minimum Cluster Volume";
+        MinClusterVolume.SetInt(300);
+        MinClusterVolume.SetIntLimits(100, 2000);
+        
+        MaxClusterRange.Name = "Max Cluster Range (Ticks)";
+        MaxClusterRange.SetInt(5);
+        MaxClusterRange.SetIntLimits(2, 10);
+        
+        MinClusterQuality.Name = "Minimum Cluster Quality Score";
+        MinClusterQuality.SetFloat(60.0f);
+        MinClusterQuality.SetFloatLimits(30.0f, 90.0f);
+        
+        ClusterLookback.Name = "Cluster Lookback Bars";
+        ClusterLookback.SetInt(20);
+        ClusterLookback.SetIntLimits(10, 50);
+        
+        RequireMultipleClusters.Name = "Require Multiple Clusters";
+        RequireMultipleClusters.SetYesNo(1);
+        
+        // Input Defaults - Exhaustion
+        ExhaustionVolumePercent.Name = "Exhaustion Volume Percentage";
+        ExhaustionVolumePercent.SetFloat(0.15f);
+        ExhaustionVolumePercent.SetFloatLimits(0.05f, 0.30f);
+        
+        RequireSequentialDecay.Name = "Require Sequential Decay";
+        RequireSequentialDecay.SetYesNo(1);
+        
+        TapeVelocityThreshold.Name = "Tape Velocity Percentile Threshold";
+        TapeVelocityThreshold.SetFloat(30.0f);
+        TapeVelocityThreshold.SetFloatLimits(10.0f, 50.0f);
+        
+        RequireDoubleButtom.Name = "Require Double Bottom/Top";
+        RequireDoubleButtom.SetYesNo(1);
+        
+        ExhaustionConfidenceMin.Name = "Minimum Exhaustion Confidence";
+        ExhaustionConfidenceMin.SetFloat(70.0f);
+        ExhaustionConfidenceMin.SetFloatLimits(50.0f, 90.0f);
+        
+        // Input Defaults - Aggression
+        ImbalanceRatioMin.Name = "Minimum Imbalance Ratio";
+        ImbalanceRatioMin.SetFloat(3.0f);
+        ImbalanceRatioMin.SetFloatLimits(2.0f, 10.0f);
+        
+        StackedImbalanceCount.Name = "Required Stacked Imbalances";
+        StackedImbalanceCount.SetInt(3);
+        StackedImbalanceCount.SetIntLimits(2, 5);
+        
+        DeltaVelocityMin.Name = "Minimum Delta Velocity";
+        DeltaVelocityMin.SetFloat(100.0f);
+        DeltaVelocityMin.SetFloatLimits(50.0f, 500.0f);
+        
+        AggressionVolumeMultiplier.Name = "Aggression Volume Multiplier";
+        AggressionVolumeMultiplier.SetFloat(2.5f);
+        AggressionVolumeMultiplier.SetFloatLimits(1.5f, 5.0f);
+        
+        RequireImbalanceStack.Name = "Require Imbalance Stack";
+        RequireImbalanceStack.SetYesNo(1);
+        
+        // Input Defaults - Trap
+        RequireHigherLow.Name = "Require Higher Low/Lower High";
+        RequireHigherLow.SetYesNo(1);
+        
+        RequirePOCShift.Name = "Require POC Shift";
+        RequirePOCShift.SetYesNo(1);
+        
+        RetestWindowBars.Name = "Retest Window Bars";
+        RetestWindowBars.SetInt(5);
+        RetestWindowBars.SetIntLimits(3, 10);
+        
+        MinTrapConfidence.Name = "Minimum Trap Confidence";
+        MinTrapConfidence.SetFloat(75.0f);
+        MinTrapConfidence.SetFloatLimits(50.0f, 95.0f);
+        
+        RequireFootprintConfirmation.Name = "Require Footprint Confirmation";
+        RequireFootprintConfirmation.SetYesNo(1);
+        
+        // Input Defaults - Volatility
+        EnableVolatilityAdaptation.Name = "Enable Volatility Adaptation";
+        EnableVolatilityAdaptation.SetYesNo(1);
+        
+        LowVolMultiplier.Name = "Low Volatility Multiplier";
+        LowVolMultiplier.SetFloat(0.8f);
+        LowVolMultiplier.SetFloatLimits(0.5f, 1.0f);
+        
+        HighVolMultiplier.Name = "High Volatility Multiplier";
+        HighVolMultiplier.SetFloat(1.3f);
+        HighVolMultiplier.SetFloatLimits(1.0f, 2.0f);
+        
+        ExtremeVolPause.Name = "Pause in Extreme Volatility";
+        ExtremeVolPause.SetYesNo(1);
+        
+        ATRLookbackPeriod.Name = "ATR Lookback Period";
+        ATRLookbackPeriod.SetInt(14);
+        ATRLookbackPeriod.SetIntLimits(5, 30);
+        
+        // Input Defaults - Zone Management
+        ZoneDecayRate.Name = "Zone Decay Rate per Bar";
+        ZoneDecayRate.SetFloat(0.02f);
+        ZoneDecayRate.SetFloatLimits(0.0f, 0.1f);
+        
+        ZonePersistenceBars.Name = "Zone Persistence Bars";
+        ZonePersistenceBars.SetInt(100);
+        ZonePersistenceBars.SetIntLimits(20, 200);
+        
+        MinZoneStrength.Name = "Minimum Zone Strength";
+        MinZoneStrength.SetFloat(30.0f);
+        MinZoneStrength.SetFloatLimits(10.0f, 50.0f);
+        
+        WickViolationTicks.Name = "Wick Violation Ticks";
+        WickViolationTicks.SetInt(2);
+        WickViolationTicks.SetIntLimits(1, 5);
+        
+        VolumeWeightedBreakThreshold.Name = "Volume Weighted Break Threshold";
+        VolumeWeightedBreakThreshold.SetFloat(0.4f);
+        VolumeWeightedBreakThreshold.SetFloatLimits(0.2f, 0.6f);
+        
+        // Input Defaults - Session
+        RTHOpenMultiplier.Name = "RTH Open Multiplier";
+        RTHOpenMultiplier.SetFloat(1.2f);
+        RTHOpenMultiplier.SetFloatLimits(0.8f, 2.0f);
+        
+        RTHMidMultiplier.Name = "RTH Mid Multiplier";
+        RTHMidMultiplier.SetFloat(1.0f);
+        RTHMidMultiplier.SetFloatLimits(0.8f, 2.0f);
+        
+        RTHCloseMultiplier.Name = "RTH Close Multiplier";
+        RTHCloseMultiplier.SetFloat(0.8f);
+        RTHCloseMultiplier.SetFloatLimits(0.5f, 1.5f);
+        
+        ETHMultiplier.Name = "ETH Multiplier";
+        ETHMultiplier.SetFloat(1.5f);
+        ETHMultiplier.SetFloatLimits(1.0f, 3.0f);
+        
+        DisableLastMinutes.Name = "Disable Last N Minutes";
+        DisableLastMinutes.SetInt(30);
+        DisableLastMinutes.SetIntLimits(0, 60);
+        
+        // Input Defaults - Logging
+        EnableDetailedLogging.Name = "Enable Detailed Logging";
+        EnableDetailedLogging.SetYesNo(1);
+        
+        EnableAlerts.Name = "Enable Alerts";
+        EnableAlerts.SetYesNo(1);
+        
+        LogPerformanceMetrics.Name = "Log Performance Metrics";
+        LogPerformanceMetrics.SetYesNo(1);
+        
+        SaveToFile.Name = "Save Signals to File";
+        SaveToFile.SetYesNo(0);
+        
+        AlertSoundNumber.Name = "Alert Sound Number";
+        AlertSoundNumber.SetInt(1);
+        AlertSoundNumber.SetIntLimits(0, 50);
+        
+        return;
+    }
+    
+    // ========================================================================
+    // PERSISTENT STORAGE SETUP
+    // ========================================================================
+    
+    SignalStateV2& state = *reinterpret_cast<SignalStateV2*>(sc.GetPersistentPointer(1));
+    std::vector<AbsorptionZoneV2>& zones = *reinterpret_cast<std::vector<AbsorptionZoneV2>*>(sc.GetPersistentPointer(2));
+    std::vector<SignalMetrics>& signalLog = *reinterpret_cast<std::vector<SignalMetrics>*>(sc.GetPersistentPointer(3));
+    VolatilityModule& volatility = *reinterpret_cast<VolatilityModule*>(sc.GetPersistentPointer(4));
+    TapeVelocityTracker& tapeTracker = *reinterpret_cast<TapeVelocityTracker*>(sc.GetPersistentPointer(5));
+    
+    // Initialize on first run
+    if (sc.Index == 0)
+    {
+        if (sc.GetPersistentPointer(1) == nullptr)
+            sc.SetPersistentPointer(1, new SignalStateV2());
+        if (sc.GetPersistentPointer(2) == nullptr)
+            sc.SetPersistentPointer(2, new std::vector<AbsorptionZoneV2>());
+        if (sc.GetPersistentPointer(3) == nullptr)
+            sc.SetPersistentPointer(3, new std::vector<SignalMetrics>());
+        if (sc.GetPersistentPointer(4) == nullptr)
+            sc.SetPersistentPointer(4, new VolatilityModule());
+        if (sc.GetPersistentPointer(5) == nullptr)
+            sc.SetPersistentPointer(5, new TapeVelocityTracker());
+            
+        state.Reset();
+        zones.clear();
+        signalLog.clear();
+    }
+    
+    // Skip if insufficient data
+    if (sc.Index < Constants::MIN_BARS_REQUIRED)
+        return;
+    
+    // ========================================================================
+    // HELPER FUNCTIONS
+    // ========================================================================
+    
+    auto GetSessionType = [&]() -> SessionType {
+        SCDateTime currentTime = sc.BaseDateTimeIn[sc.Index];
+        int timeInSeconds = currentTime.GetTimeInSeconds();
+        
+        if (timeInSeconds >= HMS_TIME(9, 30, 0) && timeInSeconds < HMS_TIME(10, 30, 0))
+            return SessionType::RTH_OPEN;
+        if (timeInSeconds >= HMS_TIME(10, 30, 0) && timeInSeconds < HMS_TIME(15, 0, 0))
+            return SessionType::RTH_MID;
+        if (timeInSeconds >= HMS_TIME(15, 0, 0) && timeInSeconds < HMS_TIME(16, 0, 0))
+            return SessionType::RTH_CLOSE;
+        
+        return SessionType::ETH;
+    };
+    
+    auto GetSessionMultiplier = [&](SessionType session) -> float {
+        switch (session) {
+            case SessionType::RTH_OPEN: return RTHOpenMultiplier.GetFloat();
+            case SessionType::RTH_MID: return RTHMidMultiplier.GetFloat();
+            case SessionType::RTH_CLOSE: return RTHCloseMultiplier.GetFloat();
+            case SessionType::ETH: return ETHMultiplier.GetFloat();
+            default: return 1.0f;
+        }
+    };
+    
+    auto IsNearSessionEnd = [&]() -> bool {
+        if (DisableLastMinutes.GetInt() == 0) return false;
+        
+        SCDateTime currentTime = sc.BaseDateTimeIn[sc.Index];
+        int timeInSeconds = currentTime.GetTimeInSeconds();
+        int RTHEnd = HMS_TIME(16, 0, 0);
+        int cutoffTime = RTHEnd - (DisableLastMinutes.GetInt() * 60);
+        
+        return timeInSeconds >= cutoffTime && timeInSeconds < RTHEnd;
+    };
+    
+    auto GetVolumeAtPrice = [&](int barIndex, float price, bool getBid) -> float {
+        if (barIndex < 0 || barIndex >= sc.ArraySize) return 0;
+        
+        s_VolumeAtPriceV2 VAPData;
+        int priceLevel = 0;
+        
+        while (sc.VolumeAtPriceForBars->GetVAPDataAtIndex(barIndex, priceLevel++, VAPData)) {
+            if (fabs(VAPData.PriceInTicks * sc.TickSize - price) < Constants::TICK_EPSILON) {
+                return getBid ? static_cast<float>(VAPData.BidVolume) : 
+                               static_cast<float>(VAPData.AskVolume);
+            }
+        }
+        return 0;
+    };
+    
+    auto CalculateATR = [&](int period) -> float {
+        if (sc.Index < period) return 0;
+        
+        float sumTR = 0;
+        for (int i = sc.Index - period + 1; i <= sc.Index; i++) {
+            float high = sc.High[i];
+            float low = sc.Low[i];
+            float prevClose = i > 0 ? sc.Close[i-1] : sc.Close[i];
+            
+            float tr = std::max({
+                high - low,
+                fabs(high - prevClose),
+                fabs(low - prevClose)
+            });
+            
+            sumTR += tr;
+        }
+        
+        return sumTR / period;
+    };
+    
+    // ========================================================================
+    // MODULE: MARKET CONTEXT & BIAS
+    // ========================================================================
+    
+    auto UpdateMarketContext = [&]() -> MarketContext {
+        MarketContext ctx;
+        
+        // Session type
+        ctx.session = GetSessionType();
+        
+        // ATR and volatility
+        ctx.currentATR = CalculateATR(ATRLookbackPeriod.GetInt());
+        volatility.UpdateATR(ctx.currentATR);
+        ctx.medianATR = volatility.GetMedianATR();
+        ctx.volatility = volatility.GetRegime(ctx.currentATR);
+        
+        // Get VWAP
+        if (sc.GetStudyIDByName(sc.ChartNumber, "VWAP", 0) > 0) {
+            SCFloatArray VWAPArray;
+            sc.GetStudyArrayUsingID(sc.GetStudyIDByName(sc.ChartNumber, "VWAP", 0), 0, VWAPArray);
+            if (VWAPArray.GetArraySize() > sc.Index) {
+                ctx.vwapPrice = VWAPArray[sc.Index];
+                
+                // Calculate VWAP slope
+                if (sc.Index >= 5) {
+                    float vwap5BarsAgo = VWAPArray[sc.Index - 5];
+                    ctx.vwapSlope = (ctx.vwapPrice - vwap5BarsAgo) / 5.0f;
+                }
+            }
+        }
+        
+        // Get POC
+        s_VolumeAtPriceV2 VAPData;
+        int priceLevel = 0;
+        float maxVolume = 0;
+        while (sc.VolumeAtPriceForBars->GetVAPDataAtIndex(sc.Index, priceLevel++, VAPData)) {
+            float totalVol = static_cast<float>(VAPData.AskVolume + VAPData.BidVolume);
+            if (totalVol > maxVolume) {
+                maxVolume = totalVol;
+                ctx.pocPrice = VAPData.PriceInTicks * sc.TickSize;
+            }
+        }
+        
+        // Calculate IB
+        SCDateTime currentDate = sc.BaseDateTimeIn[sc.Index].GetDate();
+        for (int i = sc.Index; i >= 0 && sc.BaseDateTimeIn[i].GetDate() == currentDate; i--) {
+            int timeInSeconds = sc.BaseDateTimeIn[i].GetTimeInSeconds();
+            if (timeInSeconds >= HMS_TIME(9, 30, 0) && timeInSeconds <= HMS_TIME(10, 30, 0)) {
+                if (ctx.ibHigh == 0 || sc.High[i] > ctx.ibHigh)
+                    ctx.ibHigh = sc.High[i];
+                if (ctx.ibLow == 0 || sc.Low[i] < ctx.ibLow)
+                    ctx.ibLow = sc.Low[i];
+            }
+        }
+        
+        // Day high/low
+        ctx.dayHigh = sc.GetHighest(sc.High, sc.Index, 390);  // Approximate day
+        ctx.dayLow = sc.GetLowest(sc.Low, sc.Index, 390);
+        
+        return ctx;
+    };
+    
+    auto CalculateBias = [&](const MarketContext& ctx) -> float {
+        float biasScore = 0;
+        float currentPrice = sc.Close[sc.Index];
+        
+        // VWAP Component (30%)
+        float vwapBias = 0;
+        if (ctx.vwapPrice > 0) {
+            float vwapDistance = currentPrice - ctx.vwapPrice;
+            float vwapStdDev = ctx.currentATR * 0.5f;  // Approximate
+            vwapBias = (vwapDistance / vwapStdDev) * 10;  // Normalize to -30 to +30
+            vwapBias = std::max(-30.0f, std::min(30.0f, vwapBias));
+            
+            // Add slope component
+            if (ctx.vwapSlope > 0) vwapBias += 5;
+            if (ctx.vwapSlope < 0) vwapBias -= 5;
+        }
+        
+        // Session Structure Component (25%)
+        float structureBias = 0;
+        if (ctx.ibHigh > 0 && ctx.ibLow > 0) {
+            float ibRange = ctx.ibHigh - ctx.ibLow;
+            if (currentPrice > ctx.ibHigh)
+                structureBias = std::min(25.0f, (currentPrice - ctx.ibHigh) / ibRange * 25);
+            else if (currentPrice < ctx.ibLow)
+                structureBias = std::max(-25.0f, (currentPrice - ctx.ibLow) / ibRange * 25);
+        }
+        
+        // Delta Momentum Component (25%)
+        float deltaBias = 0;
+        if (sc.Index >= 5) {
+            float recentDelta = .0f;
+            for (int i = sc.Index - 4; i <= sc.Index; i++) {
+                s_VolumeAtPriceV2 VAPData;
+                int priceLevel = 0;
+                while (sc.VolumeAtPriceForBars->GetVAPDataAtIndex(i, priceLevel++, VAPData)) {
+                    recentDelta += (VAPData.AskVolume - VAPData.BidVolume);
+                }
+            }
+            deltaBias = std::max(-25.0f, std::min(25.0f, recentDelta / 100.0f));
+        }
+        
+        // Volume Profile Component (20%)
+        float profileBias = 0;
+        if (ctx.pocPrice > 0) {
+            if (currentPrice > ctx.pocPrice)
+                profileBias = std::min(20.0f, (currentPrice - ctx.pocPrice) / ctx.currentATR * 10);
+            else
+                profileBias = std::max(-20.0f, (currentPrice - ctx.pocPrice) / ctx.currentATR * 10);
+        }
+        
+        // Combine components
+        biasScore = vwapBias + structureBias + deltaBias + profileBias;
+        
+        return biasScore;
+    };
+    
+    auto GetBiasStrength = [&](float biasScore) -> BiasStrength {
+        if (biasScore <= -50) return BiasStrength::STRONG_BEARISH;
+        if (biasScore <= -20) return BiasStrength::BEARISH;
+        if (biasScore >= 50) return BiasStrength::STRONG_BULLISH;
+        if (biasScore >= 20) return BiasStrength::BULLISH;
+        return BiasStrength::NEUTRAL;
+    };
+    
+    // ========================================================================
+    // MODULE: CLUSTER DETECTION & ABSORPTION
+    // ========================================================================
+    
+    auto DetectClusters = [&]() -> std::vector<PriceCluster> {
+        std::vector<PriceCluster> clusters;
+        std::map<int, PriceCluster> priceMap;  // Price level to cluster
+        
+        // Collect volume data from recent bars
+        for (int barIdx = sc.Index - ClusterLookback.GetInt(); barIdx <= sc.Index; barIdx++) {
+            if (barIdx < 0) continue;
+            
+            s_VolumeAtPriceV2 VAPData;
+            int priceLevel = 0;
+            
+            while (sc.VolumeAtPriceForBars->GetVAPDataAtIndex(barIdx, priceLevel++, VAPData)) {
+                float price = VAPData.PriceInTicks * sc.TickSize;
+                int priceTick = static_cast<int>(price / sc.TickSize);
+                
+                // Add to existing cluster or create new one
+                if (priceMap.find(priceTick) == priceMap.end()) {
+                    priceMap[priceTick] = PriceCluster();
+                    priceMap[priceTick].centerPrice = price;
+                    priceMap[priceTick].topPrice = price;
+                    priceMap[priceTick].bottomPrice = price;
+                }
+                
+                PriceCluster& cluster = priceMap[priceTick];
+                cluster.totalVolume += VAPData.AskVolume + VAPData.BidVolume;
+                cluster.bidVolume += VAPData.BidVolume;
+                cluster.askVolume += VAPData.AskVolume;
+                cluster.delta += (VAPData.AskVolume - VAPData.BidVolume);
+                cluster.touchCount++;
+            }
+        }
+        
+        // Merge nearby price levels into clusters
+        std::vector<PriceCluster> rawClusters;
+        for (const auto& pair : priceMap) {
+            rawClusters.push_back(pair.second);
+        }
+        
+        // Sort by volume
+        std::sort(rawClusters.begin(), rawClusters.end(),
+                 [](const PriceCluster& a, const PriceCluster& b) {
+                     return a.totalVolume > b.totalVolume;
+                 });
+        
+        // Merge clusters within MaxClusterRange
+        float maxRange = MaxClusterRange.GetInt() * sc.TickSize;
+        
+        for (size_t i = 0; i < rawClusters.size() && clusters.size() < Constants::MAX_CLUSTERS; i++) {
+            bool merged = false;
+            
+            for (auto& existing : clusters) {
+                if (fabs(rawClusters[i].centerPrice - existing.centerPrice) <= maxRange) {
+                    // Merge into existing cluster
+                    existing.totalVolume += rawClusters[i].totalVolume;
+                    existing.bidVolume += rawClusters[i].bidVolume;
+                    existing.askVolume += rawClusters[i].askVolume;
+                    existing.delta += rawClusters[i].delta;
+                    existing.touchCount += rawClusters[i].touchCount;
+                    existing.topPrice = std::max(existing.topPrice, rawClusters[i].topPrice);
+                    existing.bottomPrice = std::min(existing.bottomPrice, rawClusters[i].bottomPrice);
+                    existing.centerPrice = (existing.topPrice + existing.bottomPrice) / 2;
+                    merged = true;
+                    break;
+                }
+            }
+            
+            if (!merged && rawClusters[i].totalVolume >= MinClusterVolume.GetInt()) {
+                // Calculate density
+                float range = rawClusters[i].GetRange();
+                if (range > 0) {
+                    rawClusters[i].density = rawClusters[i].totalVolume / (range / sc.TickSize);
+                } else {
+                    rawClusters[i].density = rawClusters[i].totalVolume;
+                }
+                clusters.push_back(rawClusters[i]);
+            }
+        }
+        
+        return clusters;
+    };
+    
+    auto CreateAbsorptionZone = [&](const std::vector<PriceCluster>& clusters) -> AbsorptionZoneV2 {
+        AbsorptionZoneV2 zone;
+        
+        if (clusters.empty()) return zone;
+        
+        zone.clusters = clusters;
+        zone.startBarIndex = sc.Index;
+        zone.creationTime = sc.BaseDateTimeIn[sc.Index];
+        zone.isActive = true;
+        
+        // Find boundaries
+        zone.topBoundary = clusters[0].topPrice;
+        zone.bottomBoundary = clusters[0].bottomPrice;
+        
+        for (const auto& cluster : clusters) {
+            zone.topBoundary = std::max(zone.topBoundary, cluster.topPrice);
+            zone.bottomBoundary = std::min(zone.bottomBoundary, cluster.bottomPrice);
+            zone.totalVolume += cluster.totalVolume;
+            zone.deltaAbsorbed += fabs(cluster.delta);
+        }
+        
+        // Find core (highest quality cluster)
+        float maxQuality = 0;
+        for (const auto& cluster : clusters) {
+            float quality = cluster.GetQualityScore(sc.TickSize);
+            if (quality > maxQuality) {
+                maxQuality = quality;
+                zone.corePrice = cluster.centerPrice;
+            }
+        }
+        
+        // Calculate zone quality score
+        float volumeConcentration = zone.totalVolume / (zone.clusters.size() * MinClusterVolume.GetInt());
+        float deltaEfficiency = zone.deltaAbsorbed / zone.totalVolume;
+        float clusterDensity = zone.clusters.size() > 1 ? zone.clusters[0].density : 0;
+        
+        zone.qualityScore = (volumeConcentration * 30) +
+                           (deltaEfficiency * 100 * 25) +
+                           (clusterDensity / 100 * 25) +
+                           (zone.clusters.size() * 4);  // Bonus for multiple clusters
+        
+        zone.qualityScore = std::min(100.0f, zone.qualityScore);
+        
+        return zone;
+    };
+    
+    auto CheckAbsorption = [&]() -> bool {
+        std::vector<PriceCluster> clusters = DetectClusters();
+        
+        if (clusters.empty()) return false;
+        
+        if (RequireMultipleClusters.GetYesNo() && clusters.size() < 2)
+            return false;
+        
+        // Create zone
+        AbsorptionZoneV2 zone = CreateAbsorptionZone(clusters);
+        
+        // Apply session and volatility adjustments
+        float qualityThreshold = MinClusterQuality.GetFloat();
+        float sessionMult = GetSessionMultiplier(state.context.session);
+        float volMult = volatility.GetThresholdMultiplier(state.context.volatility);
+        
+        qualityThreshold *= (sessionMult * volMult);
+        
+        if (zone.qualityScore < qualityThreshold)
+            return false;
+        
+        // Check for negative delta absorption (for longs)
+        bool deltaAbsorption = false;
+        if (state.isLongSetup) {
+            deltaAbsorption = zone.deltaAbsorbed > 500 && zone.clusters[0].delta < 0;
+        } else {
+            deltaAbsorption = zone.deltaAbsorbed > 500 && zone.clusters[0].delta > 0;
+        }
+        
+        if (!deltaAbsorption)
+            return false;
+        
+        state.activeZone = zone;
+        return true;
+    };
+    
+    // ========================================================================
+    // MODULE: EXHAUSTION DETECTION
+    // ========================================================================
+    
+    auto CheckExhaustion = [&]() -> bool {
+        if (!state.activeZone.isActive) return false;
+        
+        ExhaustionPoint exhaustion;
+        exhaustion.barIndex = sc.Index;
+        
+        // Find current extreme price
+        float extremePrice = state.isLongSetup ? sc.Low[sc.Index] : sc.High[sc.Index];
+        exhaustion.price = extremePrice;
+        
+        // Get volume at extreme
+        exhaustion.volume = GetVolumeAtPrice(sc.Index, extremePrice, state.isLongSetup);
+        
+        // Check sequential decay
+        bool hasDecay = false;
+        if (RequireSequentialDecay.GetYesNo()) {
+            std::vector<float> volumes;
+            for (int i = 0; i < 4 && sc.Index - i >= 0; i++) {
+                float price = state.isLongSetup ? sc.Low[sc.Index - i] : sc.High[sc.Index - i];
+                float vol = GetVolumeAtPrice(sc.Index - i, price, state.isLongSetup);
+                volumes.push_back(vol);
+            }
+            
+            hasDecay = true;
+            for (size_t i = 1; i < volumes.size(); i++) {
+                if (volumes[i] >= volumes[i-1] * 0.9f) {  // Allow 10% tolerance
+                    hasDecay = false;
+                    break;
+                }
+            }
+            
+            if (volumes.size() >= 2) {
+                exhaustion.decayRate = 1.0f - (volumes[0] / volumes[volumes.size()-1]);
+            }
+        }
+        
+        // Check volume exhaustion
+        float maxVolume = 0;
+        for (int i = state.activeZone.startBarIndex; i <= sc.Index; i++) {
+            float price = state.isLongSetup ? sc.Low[i] : sc.High[i];
+            float vol = GetVolumeAtPrice(i, price, state.isLongSetup);
+            maxVolume = std::max(maxVolume, vol);
+        }
+        
+        bool volumeExhausted = exhaustion.volume < maxVolume * ExhaustionVolumePercent.GetFloat();
+        
+        // Check tape velocity
+        tapeTracker.AddTick(sc.BaseDateTimeIn[sc.Index], extremePrice, exhaustion.volume);
+        float currentVelocity = tapeTracker.GetCurrentVelocity();
+        float velocityPercentile = tapeTracker.GetVelocityPercentile(currentVelocity);
+        exhaustion.tapeVelocity = velocityPercentile;
+        
+        bool tapeSlowing = velocityPercentile < TapeVelocityThreshold.GetFloat();
+        
+        // Check for double bottom/top
+        if (RequireDoubleButtom.GetYesNo()) {
+            int similarPriceCount = 0;
+            for (int i = 1; i <= 5 && sc.Index - i >= 0; i++) {
+                float pastPrice = state.isLongSetup ? sc.Low[sc.Index - i] : sc.High[sc.Index - i];
+                if (fabs(pastPrice - extremePrice) <= sc.TickSize) {
+                    similarPriceCount++;
+                }
+            }
+            exhaustion.hasDoubleButtom = similarPriceCount >= 1;
+        }
+        
+        // Calculate confidence
+        int conditionsMet = 0;
+        if (hasDecay || !RequireSequentialDecay.GetYesNo()) conditionsMet++;
+        if (volumeExhausted) conditionsMet++;
+        if (tapeSlowing) conditionsMet++;
+        if (exhaustion.hasDoubleButtom || !RequireDoubleButtom.GetYesNo()) conditionsMet++;
+        
+        exhaustion.confidence = (conditionsMet / 4.0f) * 100;
+        
+        if (exhaustion.confidence < ExhaustionConfidenceMin.GetFloat())
+            return false;
+        
+        state.exhaustion = exhaustion;
+        return true;
+    };
+    
+    // ========================================================================
+    // MODULE: AGGRESSION SHIFT DETECTION
+    // ========================================================================
+    
+    auto DetectImbalances = [&]() -> std::vector<ImbalanceLevel> {
+        std::vector<ImbalanceLevel> imbalances;
+        
+        s_VolumeAtPriceV2 VAPData;
+        int priceLevel = 0;
+        
+        while (sc.VolumeAtPriceForBars->GetVAPDataAtIndex(sc.Index, priceLevel++, VAPData)) {
+            ImbalanceLevel level;
+            level.price = VAPData.PriceInTicks * sc.TickSize;
+            level.askVolume = static_cast<float>(VAPData.AskVolume);
+            level.bidVolume = static_cast<float>(VAPData.BidVolume);
+            level.barIndex = sc.Index;
+            
+            if (level.bidVolume > 0) {
+                level.ratio = level.askVolume / level.bidVolume;
+            } else if (level.askVolume > 0) {
+                level.ratio = 999.0f;  // Max ratio
+            }
+            
+            if (state.isLongSetup) {
+                // For long setups, we want ask imbalances (buying)
+                if (level.ratio >= ImbalanceRatioMin.GetFloat()) {
+                    imbalances.push_back(level);
+                }
+            } else {
+                // For short setups, we want bid imbalances (selling)
+                if (level.bidVolume > 0) {
+                    level.ratio = level.bidVolume / (level.askVolume + 1);
+                    if (level.ratio >= ImbalanceRatioMin.GetFloat()) {
+                        imbalances.push_back(level);
+                    }
+                }
+            }
+        }
+        
+        return imbalances;
+    };
+    
+    auto CheckAggressionShift = [&]() -> bool {
+        if (state.exhaustion.price == 0) return false;
+        
+        // Detect imbalances
+        std::vector<ImbalanceLevel> imbalances = DetectImbalances();
+        
+        if (RequireImbalanceStack.GetYesNo()) {
+            if (imbalances.size() < static_cast<size_t>(StackedImbalanceCount.GetInt()))
+                return false;
+            
+            // Check if imbalances are stacked (consecutive price levels)
+            std::sort(imbalances.begin(), imbalances.end(),
+                     [](const ImbalanceLevel& a, const ImbalanceLevel& b) {
+                         return a.price < b.price;
+                     });
+            
+            int consecutiveCount = 1;
+            for (size_t i = 1; i < imbalances.size(); i++) {
+                float priceDiff = fabs(imbalances[i].price - imbalances[i-1].price);
+                if (priceDiff <= sc.TickSize * 1.5f) {
+                    consecutiveCount++;
+                } else {
+                    consecutiveCount = 1;
+                }
+                
+                if (consecutiveCount >= StackedImbalanceCount.GetInt()) {
+                    break;
+                }
+            }
+            
+            if (consecutiveCount < StackedImbalanceCount.GetInt())
+                return false;
+        }
+        
+        // Check delta velocity
+        float deltaVelocity = 0;
+        if (sc.Index >= 2) {
+            float currentDelta = 0, prevDelta = 0;
+            
+            // Current bar delta
+            s_VolumeAtPriceV2 VAPData;
+            int priceLevel = 0;
+            while (sc.VolumeAtPriceForBars->GetVAPDataAtIndex(sc.Index, priceLevel++, VAPData)) {
+                currentDelta += (VAPData.AskVolume - VAPData.BidVolume);
+            }
+            
+            // Previous bar delta
+            priceLevel = 0;
+            while (sc.VolumeAtPriceForBars->GetVAPDataAtIndex(sc.Index - 1, priceLevel++, VAPData)) {
+                prevDelta += (VAPData.AskVolume - VAPData.BidVolume);
+            }
+            
+            deltaVelocity = currentDelta - prevDelta;
+        }
+        
+        bool deltaFlip = false;
+        if (state.isLongSetup) {
+            deltaFlip = deltaVelocity > DeltaVelocityMin.GetFloat();
+        } else {
+            deltaFlip = deltaVelocity < -DeltaVelocityMin.GetFloat();
+        }
+        
+        if (!deltaFlip)
+            return false;
+        
+        // Determine aggression type
+        float totalImbalanceVolume = 0;
+        for (const auto& imb : imbalances) {
+            totalImbalanceVolume += (state.isLongSetup ? imb.askVolume : imb.bidVolume);
+        }
+        
+        if (totalImbalanceVolume > sc.Volume[sc.Index] * 0.7f) {
+            state.aggressionType = AggressionType::SWEEP;
+        } else if (imbalances.size() >= static_cast<size_t>(StackedImbalanceCount.GetInt())) {
+            state.aggressionType = AggressionType::LADDER;
+        } else {
+            state.aggressionType = AggressionType::ICEBERG;
+        }
+        
+        state.aggressionImbalances = imbalances;
+        state.aggressionBar = sc.Index;
+        
+        return true;
+    };
+    
+    // ========================================================================
+    // MODULE: TRAP CONFIRMATION
+    // ========================================================================
+    
+    auto CheckTrapConfirmation = [&]() -> bool {
+        if (state.aggressionBar == 0) return false;
+        
+        float confidence = 0;
+        int conditionsMet = 0;
+        int totalConditions = 0;
+        
+        // Check price reclaimed zone
+        bool priceReclaimedZone = false;
+        if (state.isLongSetup) {
+            priceReclaimedZone = sc.Close[sc.Index] > state.activeZone.topBoundary;
+        } else {
+            priceReclaimedZone = sc.Close[sc.Index] < state.activeZone.bottomBoundary;
+        }
+        
+        totalConditions++;
+        if (priceReclaimedZone) {
+            conditionsMet++;
+            confidence += 20;
+        }
+        
+        // Check for higher low / lower high
+        if (RequireHigherLow.GetYesNo()) {
+            totalConditions++;
+            bool structureConfirmed = false;
+            
+            if (state.isLongSetup) {
+                float recentLow = sc.GetLowest(sc.Low, sc.Index - RetestWindowBars.GetInt(), 
+                                              RetestWindowBars.GetInt());
+                structureConfirmed = recentLow > state.exhaustion.price;
+            } else {
+                float recentHigh = sc.GetHighest(sc.High, sc.Index - RetestWindowBars.GetInt(),
+                                                RetestWindowBars.GetInt());
+                structureConfirmed = recentHigh < state.exhaustion.price;
+            }
+            
+            if (structureConfirmed) {
+                conditionsMet++;
+                confidence += 25;
+            }
+        }
+        
+        // Check POC shift
+        if (RequirePOCShift.GetYesNo()) {
+            totalConditions++;
+            
+            // Get current POC
+            s_VolumeAtPriceV2 VAPData;
+            int priceLevel = 0;
+            float maxVolume = 0;
+            float currentPOC = 0;
+            
+            while (sc.VolumeAtPriceForBars->GetVAPDataAtIndex(sc.Index, priceLevel++, VAPData)) {
+                float totalVol = static_cast<float>(VAPData.AskVolume + VAPData.BidVolume);
+                if (totalVol > maxVolume) {
+                    maxVolume = totalVol;
+                    currentPOC = VAPData.PriceInTicks * sc.TickSize;
+                }
+            }
+            
+            bool pocShifted = false;
+            if (state.isLongSetup) {
+                pocShifted = currentPOC > state.exhaustion.price;
+            } else {
+                pocShifted = currentPOC < state.exhaustion.price;
+            }
+            
+            if (pocShifted) {
+                conditionsMet++;
+                confidence += 25;
+            }
+        }
+        
+        // Check footprint confirmation (bid/ask imbalances on retest)
+        if (RequireFootprintConfirmation.GetYesNo()) {
+            totalConditions++;
+            
+            // Look for supporting imbalances
+            std::vector<ImbalanceLevel> retestImbalances = DetectImbalances();
+            bool footprintConfirmed = !retestImbalances.empty();
+            
+            if (footprintConfirmed) {
+                conditionsMet++;
+                confidence += 20;
+            }
+        }
+        
+        // Check zone held on retest
+        totalConditions++;
+        bool zoneHeldRetest = false;
+        
+        for (int i = 1; i <= RetestWindowBars.GetInt() && sc.Index - i >= state.aggressionBar; i++) {
+            int barIdx = sc.Index - i;
+            
+            if (state.isLongSetup) {
+                if (sc.Low[barIdx] <= state.activeZone.topBoundary &&
+                    sc.Low[barIdx] >= state.activeZone.bottomBoundary &&
+                    sc.Close[barIdx] > state.activeZone.topBoundary) {
+                    zoneHeldRetest = true;
+                    break;
+                }
+            } else {
+                if (sc.High[barIdx] >= state.activeZone.bottomBoundary &&
+                    sc.High[barIdx] <= state.activeZone.topBoundary &&
+                    sc.Close[barIdx] < state.activeZone.bottomBoundary) {
+                    zoneHeldRetest = true;
+                    break;
+                }
+            }
+        }
+        
+        if (zoneHeldRetest) {
+            conditionsMet++;
+            confidence += 10;
+        }
+        
+        // Calculate final confidence
+        confidence = (static_cast<float>(conditionsMet) / totalConditions) * 100;
+        
+        if (confidence < MinTrapConfidence.GetFloat())
+            return false;
+        
+        state.confidence = confidence;
+        return true;
+    };
+    
+    // ========================================================================
+    // MODULE: INVALIDATION & ZONE MANAGEMENT
+    // ========================================================================
+    
+    auto CheckInvalidation = [&]() -> bool {
+        if (!state.activeZone.isActive) return false;
+        
+        // Check wick violation
+        bool wickViolation = false;
+        float violationDistance = WickViolationTicks.GetInt() * sc.TickSize;
+        
+        if (state.isLongSetup) {
+            wickViolation = sc.Low[sc.Index] < state.activeZone.bottomBoundary - violationDistance;
+        } else {
+            wickViolation = sc.High[sc.Index] > state.activeZone.topBoundary + violationDistance;
+        }
+        
+        // Check volume-weighted break
+        if (wickViolation) {
+            float volumeBelowZone = 0;
+            float totalVolume = 0;
+            
+            s_VolumeAtPriceV2 VAPData;
+            int priceLevel = 0;
+            
+            while (sc.VolumeAtPriceForBars->GetVAPDataAtIndex(sc.Index, priceLevel++, VAPData)) {
+                float price = VAPData.PriceInTicks * sc.TickSize;
+                float vol = static_cast<float>(VAPData.AskVolume + VAPData.BidVolume);
+                totalVolume += vol;
+                
+                if (state.isLongSetup && price < state.activeZone.bottomBoundary) {
+                    volumeBelowZone += vol;
+                } else if (!state.isLongSetup && price > state.activeZone.topBoundary) {
+                    volumeBelowZone += vol;
+                }
+            }
+            
+            float volumeRatio = totalVolume > 0 ? volumeBelowZone / totalVolume : 0;
+            
+            if (volumeRatio > VolumeWeightedBreakThreshold.GetFloat()) {
+                return true;  // Zone invalidated
+            }
+        }
+        
+        // Apply time decay
+        state.activeZone.ApplyTimeDecay(ZoneDecayRate.GetFloat());
+        
+        // Check minimum strength
+        if (state.activeZone.strength < MinZoneStrength.GetFloat()) {
+            return true;  // Zone too weak
+        }
+        
+        // Track defense attempts
+        if (state.activeZone.ContainsPrice(sc.Low[sc.Index]) ||
+            state.activeZone.ContainsPrice(sc.High[sc.Index])) {
+            state.activeZone.defenseAttempts++;
+            
+            // Check if defense was successful
+            if (sc.Close[sc.Index] > state.activeZone.bottomBoundary &&
+                sc.Close[sc.Index] < state.activeZone.topBoundary) {
+                state.activeZone.successfulDefenses++;
+                state.activeZone.strength *= 1.05f;  // Strengthen zone
+            } else {
+                state.activeZone.strength *= 0.95f;  // Weaken zone
+            }
+        }
+        
+        return false;
+    };
+    
+    // ========================================================================
+    // MAIN STATE MACHINE
+    // ========================================================================
+    
+    // Update market context
+    state.context = UpdateMarketContext();
+    
+    // Calculate bias
+    float biasScore = CalculateBias(state.context);
+    state.context.biasScore = biasScore;
+    state.context.biasStrength = GetBiasStrength(biasScore);
+    
+    // Update subgraphs
+    BiasIndicator[sc.Index] = biasScore;
+    ConfidenceLevel[sc.Index] = state.confidence;
+    
+    if (state.activeZone.isActive) {
+        ZoneStrength[sc.Index] = state.activeZone.strength;
+    }
+    
+    // Clear signals
+    LongSignal[sc.Index] = 0;
+    ShortSignal[sc.Index] = 0;
+    ExhaustionMarker[sc.Index] = 0;
+    AggressionMarker[sc.Index] = 0;
+    
+    // Check for extreme volatility pause
+    if (ExtremeVolPause.GetYesNo() && state.context.volatility == VolatilityRegime::EXTREME) {
+        state.Reset();
+        return;
+    }
+    
+    // Skip if near session end
+    if (IsNearSessionEnd()) {
+        state.Reset();
+        return;
+    }
+    
+    // State machine execution
+    switch (state.phase) {
+        case SignalPhase::IDLE: {
+            // Check context filter
+            if (!EnableContextFilter.GetYesNo() || 
+                fabs(state.context.biasScore) >= MinimumBiasScore.GetFloat()) {
+                
+                // Determine direction based on bias
+                state.isLongSetup = state.context.biasScore > 0;
+                
+                // Move to context active
+                state.phase = SignalPhase::CONTEXT_ACTIVE;
+                state.phaseStartBar = sc.Index;
+            }
+            break;
+        }
+        
+        case SignalPhase::CONTEXT_ACTIVE: {
+            // Check for absorption
+            if (CheckAbsorption()) {
+                state.phase = SignalPhase::ABSORPTION_CONFIRMED;
+                state.phaseStartBar = sc.Index;
+                
+                if (EnableAlerts.GetYesNo()) {
+                    SCString msg;
+                    msg.Format("Absorption Zone Created - Quality: %.1f", 
+                              state.activeZone.qualityScore);
+                    sc.AddAlertLine(msg);
+                }
+            }
+            
+            // Timeout check
+            if (state.PhaseTimeout(sc.Index, 30)) {
+                state.Reset();
+            }
+            break;
+        }
+        
+        case SignalPhase::ABSORPTION_CONFIRMED: {
+            // Check invalidation
+            if (CheckInvalidation()) {
+                state.Reset();
+                break;
+            }
+            
+            // Check exhaustion
+            if (CheckExhaustion()) {
+                state.phase = SignalPhase::EXHAUSTION_DETECTED;
+                state.phaseStartBar = sc.Index;
+                ExhaustionMarker[sc.Index] = state.exhaustion.price;
+            }
+            
+            // Timeout check
+            if (state.PhaseTimeout(sc.Index, 50)) {
+                state.Reset();
+            }
+            break;
+        }
+        
+        case SignalPhase::EXHAUSTION_DETECTED: {
+            // Check aggression shift
+            if (CheckAggressionShift()) {
+                state.phase = SignalPhase::AGGRESSION_CONFIRMED;
+                state.phaseStartBar = sc.Index;
+                AggressionMarker[sc.Index] = state.isLongSetup ? 
+                                            sc.High[sc.Index] : sc.Low[sc.Index];
+            }
+            
+            // Timeout check
+            if (state.PhaseTimeout(sc.Index, 20)) {
+                state.Reset();
+            }
+            break;
+        }
+        
+        case SignalPhase::AGGRESSION_CONFIRMED: {
+            // Check trap confirmation
+            if (CheckTrapConfirmation()) {
+                state.phase = SignalPhase::SIGNAL_ACTIVE;
+                
+                // Generate signal
+                if (state.isLongSetup) {
+                    LongSignal[sc.Index] = sc.Low[sc.Index] - 2 * sc.TickSize;
+                    state.entryPrice = sc.Close[sc.Index];
+                    state.stopPrice = state.exhaustion.price - 5 * sc.TickSize;
+                } else {
+                    ShortSignal[sc.Index] = sc.High[sc.Index] + 2 * sc.TickSize;
+                    state.entryPrice = sc.Close[sc.Index];
+                    state.stopPrice = state.exhaustion.price + 5 * sc.TickSize;
+                }
+                
+                // Alert
+                if (EnableAlerts.GetYesNo()) {
+                    SCString msg;
+                    msg.Format("%s TRAP CONFIRMED - Entry: %.2f Stop: %.2f Confidence: %.1f%%",
+                              state.isLongSetup ? "LONG" : "SHORT",
+                              state.entryPrice, state.stopPrice, state.confidence);
+                    sc.AddAlertLine(msg);
+                    sc.SetAlert(AlertSoundNumber.GetInt(), msg);
+                }
+                
+                // Log signal
+                if (EnableDetailedLogging.GetYesNo()) {
+                    SignalMetrics metrics;
+                    metrics.timestamp = sc.BaseDateTimeIn[sc.Index];
+                    metrics.signalType = state.isLongSetup ? "LONG" : "SHORT";
+                    metrics.finalPhase = state.phase;
+                    metrics.entryPrice = state.entryPrice;
+                    metrics.stopPrice = state.stopPrice;
+                    metrics.clusterCount = static_cast<int>(state.activeZone.clusters.size());
+                    metrics.absorptionDensity = state.activeZone.clusters[0].density;
+                    metrics.zoneQuality = state.activeZone.qualityScore;
+                    metrics.defenseAttempts = state.activeZone.defenseAttempts;
+                    metrics.exhaustionDecayRate = state.exhaustion.decayRate;
+                    metrics.tapeVelocityPercentile = state.exhaustion.tapeVelocity;
+                    metrics.hadDoubleButtom = state.exhaustion.hasDoubleButtom;
+                    metrics.imbalanceCount = static_cast<int>(state.aggressionImbalances.size());
+                    metrics.aggressionPattern = state.aggressionType;
+                    metrics.distanceToVWAP = state.entryPrice - state.context.vwapPrice;
+                    metrics.distanceToPOC = state.entryPrice - state.context.pocPrice;
+                    metrics.atrAtSignal = state.context.currentATR;
+                    metrics.marketBias = state.context.biasStrength;
+                    
+                    signalLog.push_back(metrics);
+                    
+                    SCString logMsg = metrics.ToString();
+                    sc.AddMessageToLog(logMsg, 0);
+                }
+                
+                // Reset state
+                state.Reset();
+            }
+            
+            // Timeout check
+            if (state.PhaseTimeout(sc.Index, 30)) {
+                state.Reset();
+            }
+            break;
+        }
+        
+        case SignalPhase::SIGNAL_ACTIVE: {
+            // Signal generated, reset
+            state.Reset();
+            break;
+        }
+    }
+    
+    // ========================================================================
+    // VISUAL RENDERING
+    // ========================================================================
+    
+    // Draw active zone
+    if (state.activeZone.isActive) {
+        for (int i = state.activeZone.startBarIndex; 
+             i <= sc.Index && i < state.activeZone.startBarIndex + ZonePersistenceBars.GetInt(); 
+             i++) {
+            if (i >= 0 && i < sc.ArraySize) {
+                AbsorptionZoneTop[i] = state.activeZone.topBoundary;
+                AbsorptionZoneBottom[i] = state.activeZone.bottomBoundary;
+                AbsorptionZoneCore[i] = state.activeZone.corePrice;
+            }
+        }
+    }
+    
+    // ========================================================================
+    // PERFORMANCE TRACKING (Last Bar)
+    // ========================================================================
+    
+    if (sc.Index == sc.ArraySize - 1 && LogPerformanceMetrics.GetYesNo()) {
+        if (!signalLog.empty()) {
+            // Calculate performance metrics
+            int totalSignals = static_cast<int>(signalLog.size());
+            int longSignals = 0, shortSignals = 0;
+            float avgConfidence = 0;
+            
+            std::map<SessionType, int> signalsBySession;
+            std::map<BiasStrength, int> signalsByBias;
+            
+            for (const auto& signal : signalLog) {
+                if (signal.signalType == "LONG") longSignals++;
+                else shortSignals++;
+                
+                avgConfidence += signal.zoneQuality;
+            }
+            
+            avgConfidence /= totalSignals;
+            
+            // Log summary
+            SCString summary;
+            summary.Format("=== Order Flow Reversal v2.0 Performance ===\n"
+                          "Total Signals: %d (Long: %d, Short: %d)\n"
+                          "Average Zone Quality: %.1f\n"
+                          "Session Distribution: Open=%d Mid=%d Close=%d ETH=%d",
+                          totalSignals, longSignals, shortSignals,
+                          avgConfidence,
+                          signalsBySession[SessionType::RTH_OPEN],
+                          signalsBySession[SessionType::RTH_MID],
+                          signalsBySession[SessionType::RTH_CLOSE],
+                          signalsBySession[SessionType::ETH]);
+            
+            sc.AddMessageToLog(summary, 0);
+        }
+    }
+}
+
+// ============================================================================
+// CLEANUP
+// ============================================================================
+
+void __stdcall scsf_OrderFlowReversalV2Cleanup(void* p_UserData)
+{
+    // Clean up all persistent pointers
+    SignalStateV2* pState = static_cast<SignalStateV2*>(p_UserData);
+    if (pState != nullptr) delete pState;
+    
+    std::vector<AbsorptionZoneV2>* pZones = static_cast<std::vector<AbsorptionZoneV2>*>(p_UserData);
+    if (pZones != nullptr) delete pZones;
+    
+    std::vector<SignalMetrics>* pLog = static_cast<std::vector<SignalMetrics>*>(p_UserData);
+    if (pLog != nullptr) delete pLog;
+    
+    VolatilityModule* pVol = static_cast<VolatilityModule*>(p_UserData);
+    if (pVol != nullptr) delete pVol;
+    
+    TapeVelocityTracker* pTape = static_cast<TapeVelocityTracker*>(p_UserData);
+    if (pTape != nullptr) delete pTape;
+}

@@ -1,0 +1,80 @@
+# ============================
+# PYTHON BASICS
+# ============================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ============================
+# VIRTUAL ENVIRONMENTS
+# ============================
+.venv/
+venv/
+ENV/
+env/
+
+# ============================
+# BUILD / DIST
+# ============================
+build/
+dist/
+.eggs/
+*.egg-info/
+wheels/
+*.egg
+
+# ============================
+# EDITORS
+# ============================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ============================
+# OS / SYSTEM JUNK
+# ============================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============================
+# LOGS
+# ============================
+*.log
+logs/
+
+# ============================
+# DATABASE / CACHE
+# ============================
+*.db
+*.sqlite
+*.sqlite3
+.cache/
+.balance_cache/
+
+# ============================
+# ENVIRONMENT
+# ============================
+.env
+.env.local
+
+# ============================
+# TESTING
+# ============================
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ============================
+# APPSIERRA / APPV4 SPECIAL CASE
+# ============================
+.codex/
+.claude/
+.claude.json
+.claude.json.backup
+.config/
+.mypy_cache/
+.ruff_cache/
