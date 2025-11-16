@@ -3,7 +3,7 @@ from __future__ import annotations
 import contextlib
 
 # File: widgets/dev_toolbar.py
-# Block 11/??  DevToolbar (stub + interface)
+# Block 11/?? Ã¢â‚¬â€ DevToolbar (stub + interface)
 from PyQt6 import QtCore, QtWidgets
 
 from config.theme import THEME
@@ -61,15 +61,17 @@ class DevToolbar(QtWidgets.QWidget):
         self.changed.emit()
 
     def _font_up(self):
-        try:
-            THEME["font_base_size"] = int(THEME.get("font_base_size", 13) + 1)
-        except Exception:
-            THEME["font_base_size"] = 14
-        self.changed.emit()
+        # DISABLED: Direct THEME mutation is incorrect
+        # Font size changes should be persisted to source themes (DEBUG/SIM/LIVE)
+        # or stored separately and reapplied after theme switches
+        # For now, font size adjustment is disabled to prevent data corruption
+        print("[DevToolbar] Font size adjustment disabled (would corrupt theme state)")
+        pass
 
     def _font_down(self):
-        try:
-            THEME["font_base_size"] = max(10, int(THEME.get("font_base_size", 13) - 1))
-        except Exception:
-            THEME["font_base_size"] = 12
-        self.changed.emit()
+        # DISABLED: Direct THEME mutation is incorrect
+        # Font size changes should be persisted to source themes (DEBUG/SIM/LIVE)
+        # or stored separately and reapplied after theme switches
+        # For now, font size adjustment is disabled to prevent data corruption
+        print("[DevToolbar] Font size adjustment disabled (would corrupt theme state)")
+        pass

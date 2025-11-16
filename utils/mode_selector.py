@@ -84,23 +84,12 @@ def setup_mode_hotkey(window):
 
         # Apply trading mode theme
         try:
-            print(f"[MODE DEBUG] About to apply theme for mode: {new_mode}")
+            from config.theme import apply_trading_mode_theme
 
-            # CRITICAL: Use MainWindow's _set_theme_mode to emit signals
-            if hasattr(window, '_set_theme_mode'):
-                print(f"[MODE DEBUG] Found _set_theme_mode method, calling it")
-                window._set_theme_mode(new_mode)
-                info("ui", f"Theme applied via _set_theme_mode: {new_mode}")
-            else:
-                print(f"[MODE DEBUG] _set_theme_mode not found, using fallback")
-                from config.theme import apply_trading_mode_theme
-                apply_trading_mode_theme(new_mode)
-                info("ui", f"Theme applied via apply_trading_mode_theme: {new_mode}")
-                print(f"[MODE DEBUG] WARNING: Theme dict updated but panels may not refresh (no signal emitted)")
+            apply_trading_mode_theme(new_mode)
+            info("ui", f"Theme applied: {new_mode}")
         except Exception as e:
             print(f"[MODE] Warning: Could not apply theme: {e}")
-            import traceback
-            traceback.print_exc()
 
         # Refresh timeframe pill colors in Panel 2 and Panel 3
         try:
@@ -162,22 +151,18 @@ def setup_mode_hotkey(window):
     if hasattr(window, "statusBar"):
         window.statusBar().showMessage(f"Mode: {settings.TRADING_MODE} | Press Ctrl+Shift+M to cycle modes", 8000)
 
-    # FIX: Do NOT apply trading mode theme during startup
-    # The theme is already set by MainWindow._setup_theme() to LIVE (line 179 in app_manager.py)
-    # Trading mode (SIM/LIVE/DEBUG) should NOT control the display theme.
-    # The hotkey only cycles the mode, it does NOT change the theme.
-    # Theme changes are controlled by MainWindow._set_theme_mode() or the toolbar.
+    # Apply initial theme and badge
+    try:
+        from config.theme import apply_trading_mode_theme
 
-    # OLD CODE (REMOVED - WAS CAUSING THEME MISMATCH):
-    # try:
-    #     from config.theme import apply_trading_mode_theme
-    #     apply_trading_mode_theme(settings.TRADING_MODE)
-    #     if hasattr(window, "panel_balance"):
-    #         panel1 = window.panel_balance
-    #         if hasattr(panel1, "set_trading_mode"):
-    #             panel1.set_trading_mode(settings.TRADING_MODE, "")
-    # except Exception:
-    #     pass
+        apply_trading_mode_theme(settings.TRADING_MODE)
+        if hasattr(window, "panel_balance"):
+            panel1 = window.panel_balance
+            if hasattr(panel1, "set_trading_mode"):
+                # Note: account parameter is empty string for manual mode switching
+                panel1.set_trading_mode(settings.TRADING_MODE, "")
+    except Exception:
+        pass
 
 
 # Theme definitions (for reference)

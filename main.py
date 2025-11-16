@@ -6,10 +6,6 @@ from PyQt6 import QtWidgets
 
 from config.theme import THEME, ColorTheme, validate_theme_system
 from core.app_manager import MainWindow
-from utils.logger import get_logger
-
-# Initialize logger system early (including structlog configuration)
-get_logger()
 
 
 # Cosmetic UI feature flags (only visible in debug mode)

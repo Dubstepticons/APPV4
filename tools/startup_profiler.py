@@ -128,7 +128,7 @@ def main(argv: list[str]) -> int:
     out_path = Path(args.out)
     write_json(results, out_path)
     if not args.quiet:
-        print(f" Performance timings written to {out_path}")
+        print(f"✅ Performance timings written to {out_path}")
     return 0
 
 

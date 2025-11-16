@@ -42,15 +42,15 @@ def test_badge_colors():
         # Check badge color would be correct
         if mode == "DEBUG":
             assert expected_colors[mode] == "#808080", "DEBUG badge color mismatch"
-            print(f"   Badge color: {expected_colors[mode]} (Grey)")
+            print(f"  ✓ Badge color: {expected_colors[mode]} (Grey)")
         elif mode == "SIM":
             assert expected_colors[mode] == "#00D4FF", "SIM badge color mismatch"
-            print(f"   Badge color: {expected_colors[mode]} (Neon Blue)")
+            print(f"  ✓ Badge color: {expected_colors[mode]} (Neon Blue)")
         else:  # LIVE
             assert expected_colors[mode] == "#FFD700", "LIVE badge color mismatch"
-            print(f"   Badge color: {expected_colors[mode]} (Gold)")
+            print(f"  ✓ Badge color: {expected_colors[mode]} (Gold)")
 
-    print("\n All badge color tests passed!")
+    print("\n✓ All badge color tests passed!")
 
 
 def test_theme_switching():
@@ -67,24 +67,24 @@ def test_theme_switching():
         if mode == "DEBUG":
             assert THEME["bg_primary"] == "#1E1E1E", "DEBUG bg_primary incorrect"
             assert THEME["ink"] == "#C0C0C0", "DEBUG ink incorrect"
-            print(f"   Background: {THEME['bg_primary']} (Dark charcoal)")
-            print(f"   Text: {THEME['ink']} (Silver)")
+            print(f"  ✓ Background: {THEME['bg_primary']} (Dark charcoal)")
+            print(f"  ✓ Text: {THEME['ink']} (Silver)")
 
         elif mode == "SIM":
             assert THEME["bg_primary"] == "#FFFFFF", "SIM bg_primary incorrect"
             assert THEME["ink"] == "#000000", "SIM ink incorrect"
-            assert THEME["border"] == "#00D4FF", "SIM border incorrect"
-            print(f"   Background: {THEME['bg_primary']} (White)")
-            print(f"   Text: {THEME['ink']} (Black)")
-            print(f"   Border: {THEME['border']} (Neon Blue)")
+            assert THEME["border"] == "#E5E7EB", "SIM border incorrect"
+            print(f"  ✓ Background: {THEME['bg_primary']} (White)")
+            print(f"  ✓ Text: {THEME['ink']} (Black)")
+            print(f"  ✓ Border: {THEME['border']} (Light gray)")
 
         else:  # LIVE
             assert THEME["bg_primary"] == "#000000", "LIVE bg_primary incorrect"
             assert THEME["ink"] == "#FFD700", "LIVE ink incorrect"
-            print(f"   Background: {THEME['bg_primary']} (Black)")
-            print(f"   Text: {THEME['ink']} (Gold)")
+            print(f"  ✓ Background: {THEME['bg_primary']} (Black)")
+            print(f"  ✓ Text: {THEME['ink']} (Gold)")
 
-    print("\n All theme switching tests passed!")
+    print("\n✓ All theme switching tests passed!")
 
 
 def test_mode_cycling():
@@ -101,13 +101,13 @@ def test_mode_cycling():
         expected_mode = cycle_order[current_idx]
         assert expected_mode == settings.TRADING_MODE, f"Expected {expected_mode}, got {settings.TRADING_MODE}"
 
-        print(f"  Cycle {i+1}: {settings.TRADING_MODE} ")
+        print(f"  Cycle {i+1}: {settings.TRADING_MODE} ✓")
 
         # Simulate cycling
         current_idx = (current_idx + 1) % len(cycle_order)
         settings.TRADING_MODE = cycle_order[current_idx]
 
-    print("\n Mode cycling test passed!")
+    print("\n✓ Mode cycling test passed!")
 
 
 def test_ui_integration():
@@ -125,23 +125,23 @@ def test_ui_integration():
 
         # Check that panel_balance exists
         assert hasattr(window, "panel_balance"), "MainWindow missing panel_balance"
-        print("   MainWindow has panel_balance")
+        print("  ✓ MainWindow has panel_balance")
 
         # Check that badge exists
         panel1 = window.panel_balance
         assert hasattr(panel1, "mode_badge"), "Panel1 missing mode_badge"
-        print("   Panel1 has mode_badge")
+        print("  ✓ Panel1 has mode_badge")
 
         # Check that set_trading_mode method exists
         assert hasattr(panel1, "set_trading_mode"), "Panel1 missing set_trading_mode method"
-        print("   Panel1 has set_trading_mode method")
+        print("  ✓ Panel1 has set_trading_mode method")
 
         # Test badge update for each mode
         for mode in ["DEBUG", "SIM", "LIVE"]:
             panel1.set_trading_mode(mode)
             badge_text = panel1.mode_badge.text()
             assert badge_text == mode, f"Badge text should be {mode}, got {badge_text}"
-            print(f"   Badge updates to: {mode}")
+            print(f"  ✓ Badge updates to: {mode}")
 
         # Show the window briefly
         window.show()
@@ -154,10 +154,10 @@ def test_ui_integration():
 
         app.exec()
 
-        print("\n UI integration test passed!")
+        print("\n✓ UI integration test passed!")
 
     except Exception as e:
-        print(f"\n UI integration test failed: {e}")
+        print(f"\n✗ UI integration test failed: {e}")
         import traceback
 
         traceback.print_exc()
@@ -183,12 +183,12 @@ def main():
 
         if success:
             print("\n" + "=" * 60)
-            print("ALL TESTS PASSED! ")
+            print("ALL TESTS PASSED! ✓")
             print("=" * 60)
             print("\nTo test in the app:")
             print("  1. Run: python main.py")
             print("  2. Press Ctrl+Shift+M to cycle modes")
-            print("  3. Watch the badge change: DEBUG  SIM  LIVE")
+            print("  3. Watch the badge change: DEBUG → SIM → LIVE")
             print("  4. Observe theme changes:")
             print("     - DEBUG: Grey/silver monochrome")
             print("     - SIM: White with neon blue")
@@ -196,12 +196,12 @@ def main():
             return 0
         else:
             print("\n" + "=" * 60)
-            print("SOME TESTS FAILED ")
+            print("SOME TESTS FAILED ✗")
             print("=" * 60)
             return 1
 
     except Exception as e:
-        print(f"\n Test suite failed: {e}")
+        print(f"\n✗ Test suite failed: {e}")
         import traceback
 
         traceback.print_exc()

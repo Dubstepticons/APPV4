@@ -532,8 +532,8 @@ def mode_detector():
             "SIM", "LIVE", or "DEBUG"
 
         Expected accounts:
-            - "SIM1"  SIM mode
-            - "120005"  LIVE mode
+            - "SIM1" → SIM mode
+            - "120005" → LIVE mode
         """
         if not trade_account:
             return "DEBUG"

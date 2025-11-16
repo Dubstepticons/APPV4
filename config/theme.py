@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from typing import Optional, Union
 
-import os
-
 from PyQt6 import QtGui
 
 
@@ -244,11 +242,6 @@ _BASE_THEME: dict[str, Union[int, float, str, bool]] = {
     "badge_radius": 8,
     "badge_width": 50,
     "badge_gap": 4,
-    "badge_live_bg": "#00C97A",  # Live mode badge background
-    "badge_live_fg": "#FFFFFF",  # Live mode badge foreground
-    "badge_sim_bg": "#60A5FA",   # SIM mode badge background
-    "badge_sim_fg": "#000000",   # SIM mode badge foreground
-    "badge_border_radius": 12,   # Badge border radius
     # Glow effect
     "glow_blur_radius": 12,
     "glow_offset_x": 0,
@@ -285,11 +278,11 @@ DEBUG_THEME: dict[str, Union[int, float, str, bool]] = {
     "text_dim": "#5B6C7A",
     # Backgrounds
     "bg_primary": "#1E1E1E",
-    "bg_secondary": "#1E1E1E",
-    "bg_panel": "#1E1E1E",
-    "bg_elevated": "#2A2A2A",
+    "bg_secondary": "#000000",
+    "bg_panel": "#000000",
+    "bg_elevated": "#000000",
     "bg_tertiary": "#0F0F1A",
-    "card_bg": "#3A3A3A",  # Grey for metric cards in DEBUG mode
+    "card_bg": "#1A1F2E",
     # Borders
     "border": "#374151",
     "cell_border": "none",
@@ -342,70 +335,134 @@ DEBUG_THEME: dict[str, Union[int, float, str, bool]] = {
 # LIVE THEME (High saturation, vivid)
 # ========================================================================
 LIVE_THEME: dict[str, Union[int, float, str, bool]] = {
-    **DEBUG_THEME,
+    **_BASE_THEME,
     # Typography - Lato for headings
     "heading_font_family": "Lato, Inter, sans-serif",
+    # Core palette (inherit from DEBUG, override gold)
+    "ink": "#FFD700",
+    "subtle_ink": "#9CA3AF",
+    "fg_primary": "#E5E7EB",
+    "fg_muted": "#C8CDD3",
+    "text_primary": "#E6F6FF",
+    "text_dim": "#5B6C7A",
+    # Backgrounds (pure black for LIVE)
+    "bg_primary": "#000000",
+    "bg_secondary": "#000000",
+    "bg_panel": "#000000",
+    "bg_elevated": "#000000",
+    "bg_tertiary": "#0F0F1A",
+    "card_bg": "#1A1F2E",
+    # Borders (gold)
+    "border": "#FFD700",
+    "cell_border": "2px solid #FFD700",  # Gold borders for LIVE mode
+    # Accents
+    "accent": "#60A5FA",
+    "accent_warning": "#F5B342",
+    "accent_alert": "#C7463D",
+    # Connection status
+    "conn_status_green": "oklch(74% 0.21 150)",
+    "conn_status_yellow": "oklch(82% 0.19 95)",
+    "conn_status_red": "oklch(62% 0.23 25)",
+    # Pill widget
+    "pill_text_active_color": "#000000",
+    "live_dot_fill": "#20B36F",
+    "live_dot_border": "#188E5B",
     # PnL colors (full saturation)
     "pnl_pos_color": "oklch(65% 0.20 140)",  # Intense green
     "pnl_neg_color": "oklch(58% 0.21 25)",  # Intense red
+    "pnl_neu_color": "#C9CDD0",
     "pnl_pos_color_weak": "rgba(32, 179, 111, 0.35)",
     "pnl_neg_color_weak": "rgba(199, 70, 61, 0.35)",
+    "pnl_neu_color_weak": "rgba(201, 205, 208, 0.35)",
     # Flash colors (vivid)
     "flash_pos_color": "oklch(65% 0.20 140)",
     "flash_neg_color": "oklch(58% 0.21 25)",
+    "flash_neu_color": "#C9CDD0",
+    # Sharpe bar
+    "sharpe_track_pen": "rgba(255,255,255,0.16)",
+    "sharpe_track_bg": "rgba(255,255,255,0.10)",
+    # Graph grid
+    "grid_color": "#464646",
     # Badge styling (vibrant green - active)
+    "investing_text_color": "#FFD700",
     "badge_bg_color": "#00C97A",
     "badge_border_color": "#00C97A",
     "badge_text_color": "#FFFFFF",
     "glow_color": "#00C97A",
-    # Live palette overrides - CRITICAL FIX: Update panel backgrounds too
-    "bg_primary": "#000000",
-    "bg_secondary": "#000000",
-    "bg_panel": "#000000",
-    "bg_elevated": "#1A1A1A",
-    "card_bg": "#0F2540",  # Dark blue for metric cards in LIVE mode
-    "ink": "#FFD700",
-    "border": "#FFD700",
+    # Mode indicators
+    "mode_indicator_live": "#FF0000",
+    "mode_indicator_sim": "#00FFFF",
 }
 
 
 # ========================================================================
-# SIM THEME (Balanced saturation, calm)
+# SIM THEME (Balanced saturation, calm, LIGHT MODE)
 # ========================================================================
 SIM_THEME: dict[str, Union[int, float, str, bool]] = {
-    **DEBUG_THEME,
+    **_BASE_THEME,
     # Typography - Lato for headings
     "heading_font_family": "Lato, Inter, sans-serif",
+    # Core palette (light mode - dark text on white)
+    "ink": "#000000",           # Black text (primary)
+    "subtle_ink": "#4B5563",    # Medium-dark gray (subtle text)
+    "fg_primary": "#111827",    # Very dark gray (foreground)
+    "fg_muted": "#6B7280",      # Medium gray (muted foreground)
+    "text_primary": "#1F2937",  # Dark gray text (readable on white)
+    "text_dim": "#6B7280",      # Medium gray (dimmed text on white)
+    # Backgrounds (white for light mode)
+    "bg_primary": "#FFFFFF",    # White main background
+    "bg_panel": "#FFFFFF",      # White panels (NOT black!)
+    "bg_secondary": "#F5F5F5",  # Light gray secondary bg
+    "bg_elevated": "#FFFFFF",   # White elevated
+    "bg_tertiary": "#FAFAFA",   # Very light gray
+    "card_bg": "#FFFFFF",       # White cards
+    # Borders (light gray)
+    "border": "#E5E7EB",        # Light gray borders
+    "cell_border": "2px solid #4DA7FF",  # Neon blue for SIM mode (light panels need visible borders)
+    # Accents (balanced for SIM)
+    "accent": "#60A5FA",
+    "accent_warning": "#F5B342",
+    "accent_alert": "#C7463D",
+    # Connection status
+    "conn_status_green": "oklch(74% 0.21 150)",
+    "conn_status_yellow": "oklch(82% 0.19 95)",
+    "conn_status_red": "oklch(62% 0.23 25)",
+    # Pill widget
+    "pill_text_active_color": "#FFFFFF",
+    "live_dot_fill": "#20B36F",
+    "live_dot_border": "#188E5B",
     # PnL colors (reduced saturation)
     "pnl_pos_color": "oklch(65% 0.12 140)",  # Muted green
     "pnl_neg_color": "oklch(58% 0.12 25)",  # Muted red
+    "pnl_neu_color": "#C9CDD0",
     "pnl_pos_color_weak": "rgba(32, 179, 111, 0.30)",
     "pnl_neg_color_weak": "rgba(199, 70, 61, 0.30)",
+    "pnl_neu_color_weak": "rgba(201, 205, 208, 0.35)",
     # Flash colors (balanced)
     "flash_pos_color": "oklch(65% 0.12 140)",
     "flash_neg_color": "oklch(58% 0.12 25)",
+    "flash_neu_color": "#C9CDD0",
+    # Sharpe bar
+    "sharpe_track_pen": "rgba(255,255,255,0.16)",
+    "sharpe_track_bg": "rgba(255,255,255,0.10)",
+    # Graph grid
+    "grid_color": "#EAEAEA",  # Light gray for light mode
     # Badge styling (gentle blue - sandbox)
+    "investing_text_color": "#000000",
     "badge_bg_color": "#4DA7FF",
     "badge_border_color": "#4DA7FF",
     "badge_text_color": "#000000",
     "glow_color": "#4DA7FF",
-    # Sim palette overrides - CRITICAL FIX: Update panel backgrounds too
-    "bg_primary": "#FFFFFF",
-    "bg_secondary": "#F5F5F5",
-    "bg_panel": "#FFFFFF",
-    "bg_elevated": "#E8E8E8",
-    "card_bg": "#E3F2FD",  # Light blue for metric cards in SIM mode
-    "ink": "#000000",
-    "border": "#00D4FF",
+    # Mode indicators
+    "mode_indicator_live": "#FF0000",
+    "mode_indicator_sim": "#00FFFF",
 }
 
 
 # ========================================================================
-# ACTIVE THEME (Points to current theme, default: LIVE)
+# ACTIVE THEME (Points to current theme, default: SIM)
 # ========================================================================
-# FIX: Initialize to LIVE instead of SIM to match app default mode
-# This prevents initial render with wrong colors before switch_theme() is called
-THEME: dict[str, Union[int, float, str, bool]] = LIVE_THEME.copy()
+THEME: dict[str, Union[int, float, str, bool]] = SIM_THEME.copy()
 
 
 # ========================================================================
@@ -523,17 +580,6 @@ _THEME_MAP = {
     "sim": SIM_THEME,
 }
 
-THEME_SWITCH_DEBUG_ENABLED = (
-    os.getenv("APPSIERRA_THEME_SWITCH_DEBUG")
-    or os.getenv("APPSIERRA_THEME_DEBUG")
-    or "0"
-).strip().lower() in ("1", "true", "yes", "on")
-
-
-def _theme_switch_print(message: str) -> None:
-    if THEME_SWITCH_DEBUG_ENABLED:
-        print(message)
-
 
 def switch_theme(theme_name: str) -> None:
     """
@@ -542,47 +588,68 @@ def switch_theme(theme_name: str) -> None:
     Args:
         theme_name: One of "debug", "live", or "sim"
     """
-    from utils.logger import get_logger
     global THEME
 
-    log = get_logger(__name__)
+    try:
+        from utils.logger import get_logger
+        log = get_logger(__name__)
+        log.info(f"[switch_theme] START - theme_name={theme_name}")
+    except:
+        pass
 
-    theme_name_original = theme_name
     theme_name = theme_name.lower().strip()
-
-    _theme_switch_print(f"[THEME SWITCH] Starting switch_theme('{theme_name_original}') -> normalized: '{theme_name}'")
-    log.debug(f"[THEME SWITCH] Starting switch_theme('{theme_name_original}') -> normalized: '{theme_name}'")
-
     new_theme = _THEME_MAP.get(theme_name, DEBUG_THEME)
 
-    if theme_name not in _THEME_MAP:
-        _theme_switch_print(f"[THEME SWITCH] WARNING: Unknown theme '{theme_name}', falling back to DEBUG_THEME")
-        log.warning(f"[THEME SWITCH] Unknown theme '{theme_name}', falling back to DEBUG_THEME")
-    else:
-        _theme_switch_print(f"[THEME SWITCH] Found theme '{theme_name}' in _THEME_MAP")
-        log.debug(f"[THEME SWITCH] Found theme '{theme_name}' in _THEME_MAP")
+    try:
+        from utils.logger import get_logger
+        log = get_logger(__name__)
 
-    _theme_switch_print(f"[THEME SWITCH] THEME dict before clear: {len(THEME)} keys, bg_primary={THEME.get('bg_primary', 'N/A')}")
-    log.debug(f"[THEME SWITCH] THEME dict before clear: {len(THEME)} keys")
-    log.debug(f"[THEME SWITCH] new_theme dict size: {len(new_theme)} keys")
+        # CRITICAL: Check which theme object we actually got
+        if new_theme is DEBUG_THEME:
+            log.info(f"[switch_theme] THEME LOOKUP: {theme_name} -> DEBUG_THEME")
+        elif new_theme is LIVE_THEME:
+            log.info(f"[switch_theme] THEME LOOKUP: {theme_name} -> LIVE_THEME")
+        elif new_theme is SIM_THEME:
+            log.info(f"[switch_theme] THEME LOOKUP: {theme_name} -> SIM_THEME")
+        else:
+            log.warning(f"[switch_theme] THEME LOOKUP: {theme_name} -> UNKNOWN THEME OBJECT!")
+
+        log.info(f"[switch_theme] Found theme: {theme_name} -> {len(new_theme)} keys")
+        log.info(f"[switch_theme] NEW bg_panel = {new_theme.get('bg_panel', 'NOT_SET')}")
+        log.info(f"[switch_theme] NEW cell_border = {new_theme.get('cell_border', 'NOT_SET')}")
+    except Exception as e:
+        try:
+            from utils.logger import get_logger
+            log = get_logger(__name__)
+            log.error(f"[switch_theme] Error logging theme lookup: {e}")
+        except:
+            pass
+
+    log_before = f"BEFORE clear: THEME.bg_panel={THEME.get('bg_panel', 'NOT_SET')}"
+    try:
+        from utils.logger import get_logger
+        log = get_logger(__name__)
+        log.info(f"[switch_theme] {log_before}")
+    except:
+        pass
 
     THEME.clear()
-    log.debug(f"[THEME SWITCH] THEME dict after clear: {len(THEME)} keys")
-
     THEME.update(new_theme)
-    _theme_switch_print(f"[THEME SWITCH] THEME dict after update: {len(THEME)} keys, bg_primary={THEME.get('bg_primary', 'N/A')}")
-    log.debug(f"[THEME SWITCH] THEME dict after update: {len(THEME)} keys")
 
-    # Verify critical keys are present
-    critical_keys = ['bg_primary', 'bg_panel', 'card_bg', 'pnl_pos_color', 'pnl_neg_color', 'text_primary']
-    _theme_switch_print(f"[THEME SWITCH] Verifying critical theme keys:")
-    for key in critical_keys:
-        value = THEME.get(key)
-        _theme_switch_print(f"[THEME SWITCH]   {key} = {value}")
-        log.debug(f"[THEME SWITCH] THEME['{key}'] = {value}")
-
-    _theme_switch_print(f"[THEME SWITCH] [OK] Successfully switched to theme: '{theme_name.upper()}'")
-    log.info(f"[THEME SWITCH] Successfully switched to theme: '{theme_name.upper()}'")
+    try:
+        from utils.logger import get_logger
+        log = get_logger(__name__)
+        log.info(f"[switch_theme] AFTER update: THEME dict now has {len(THEME)} keys")
+        log.info(f"[switch_theme] AFTER update: THEME.bg_panel = {THEME.get('bg_panel', 'NOT_SET')}")
+        log.info(f"[switch_theme] AFTER update: THEME.cell_border = {THEME.get('cell_border', 'NOT_SET')}")
+        log.info(f"[switch_theme] END - theme switched to {theme_name}")
+    except Exception as e:
+        try:
+            from utils.logger import get_logger
+            log = get_logger(__name__)
+            log.error(f"[switch_theme] Error logging after update: {e}")
+        except:
+            pass
 
 
 def apply_trading_mode_theme(mode: str) -> None:
@@ -694,6 +761,205 @@ def export_theme_json() -> dict:
             },
         },
     }
+
+
+# ========================================================================
+# Theme Validation
+# ========================================================================
+
+# All theme keys that must be present in every theme mode
+# Extracted from actual usage across the codebase
+_REQUIRED_THEME_KEYS = [
+    # Core colors
+    "ink", "bg_panel", "bg_primary", "bg_secondary", "bg_tertiary",
+    "fg_primary", "fg_muted", "text_primary", "text_dim", "border",
+    # Card/widget styling
+    "card_bg", "card_radius", "cell_border",
+    # PnL colors
+    "pnl_pos_color", "pnl_neg_color", "pnl_neu_color",
+    # Accent colors
+    "accent", "accent_warning", "accent_alert",
+    # Typography
+    "font_family", "font_size", "font_weight",
+    "title_font_size", "title_font_weight",
+    "balance_font_size", "balance_font_weight",
+    "pnl_font_size", "pnl_font_weight",
+    "investing_font_size", "investing_font_weight",
+    # Badge/pill styling
+    "badge_bg_color", "badge_border_color", "badge_text_color",
+    "badge_font_size", "badge_font_weight",
+    "badge_height", "badge_radius", "badge_width", "badge_gap",
+    "pill_font_size", "pill_font_weight", "pill_radius", "pill_text_active_color",
+    # Connection status
+    "conn_status_green", "conn_status_yellow", "conn_status_red",
+    # Graph/chart
+    "grid_color", "sharpe_track_pen", "sharpe_track_bg",
+    # Mode indicators
+    "mode_indicator_live", "mode_indicator_sim",
+    # Misc
+    "glow_color", "glow_blur_radius", "perf_safe",
+    "chip_height", "investing_text_color",
+    "live_dot_fill", "live_dot_border",
+]
+
+
+def _get_luminance(color: str) -> float:
+    """
+    Calculate relative luminance of a color (0.0 = black, 1.0 = white).
+
+    Args:
+        color: Hex color string like "#FFFFFF" or "#000000"
+
+    Returns:
+        Luminance value 0.0-1.0
+    """
+    # Handle oklch colors (just return 0.5 as approximation)
+    if color.startswith("oklch"):
+        return 0.5
+
+    # Parse hex color
+    hex_color = color.lstrip("#")
+    if len(hex_color) != 6:
+        return 0.5  # Default mid-luminance for invalid colors
+
+    r = int(hex_color[0:2], 16) / 255.0
+    g = int(hex_color[2:4], 16) / 255.0
+    b = int(hex_color[4:6], 16) / 255.0
+
+    # Apply gamma correction
+    def gamma(c):
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+
+    r, g, b = gamma(r), gamma(g), gamma(b)
+
+    # Calculate relative luminance (ITU-R BT.709)
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def validate_theme(theme_dict: dict, theme_name: str) -> list[str]:
+    """
+    Validate that a theme dict contains all required keys.
+
+    Args:
+        theme_dict: Theme dictionary to validate
+        theme_name: Name of theme (for error messages)
+
+    Returns:
+        List of missing keys (empty if valid)
+    """
+    missing = [key for key in _REQUIRED_THEME_KEYS if key not in theme_dict]
+    return missing
+
+
+def validate_theme_colors(theme_dict: dict, theme_name: str) -> list[str]:
+    """
+    Validate that theme colors are semantically correct for the mode.
+
+    Checks:
+    - Light mode (white bg) should have dark text
+    - Dark mode (dark bg) should have light text
+
+    Args:
+        theme_dict: Theme dictionary to validate
+        theme_name: Name of theme (for error messages)
+
+    Returns:
+        List of color problems (empty if valid)
+    """
+    problems = []
+
+    # Get background color
+    bg_primary = theme_dict.get("bg_primary", "#000000")
+    bg_lum = _get_luminance(str(bg_primary))
+
+    # Determine if this is a light or dark mode
+    is_light_mode = bg_lum > 0.5  # White/light backgrounds
+    mode_type = "LIGHT" if is_light_mode else "DARK"
+
+    # Colors that should contrast with background
+    text_colors = {
+        "ink": theme_dict.get("ink"),
+        "text_primary": theme_dict.get("text_primary"),
+        "fg_primary": theme_dict.get("fg_primary"),
+        "fg_muted": theme_dict.get("fg_muted"),
+    }
+
+    background_colors = {
+        "bg_panel": theme_dict.get("bg_panel"),
+        "bg_secondary": theme_dict.get("bg_secondary"),
+        "card_bg": theme_dict.get("card_bg"),
+    }
+
+    # Check text colors have proper contrast
+    for key, color in text_colors.items():
+        if color and isinstance(color, str):
+            text_lum = _get_luminance(color)
+
+            # Light mode should have dark text (low luminance)
+            # Dark mode should have light text (high luminance)
+            if is_light_mode and text_lum > 0.7:
+                problems.append(f"{key}={color} (light text on light bg - invisible!)")
+            elif not is_light_mode and text_lum < 0.3:
+                problems.append(f"{key}={color} (dark text on dark bg - invisible!)")
+
+    # Check background colors match mode
+    for key, color in background_colors.items():
+        if color and isinstance(color, str):
+            bg_color_lum = _get_luminance(color)
+
+            # In light mode, backgrounds should be light
+            # In dark mode, backgrounds should be dark
+            if is_light_mode and bg_color_lum < 0.3:
+                problems.append(f"{key}={color} (dark bg in light mode - wrong!)")
+            elif not is_light_mode and bg_color_lum > 0.7:
+                problems.append(f"{key}={color} (light bg in dark mode - wrong!)")
+
+    if problems:
+        problems.insert(0, f"Mode type: {mode_type} (bg_primary={bg_primary}, luminance={bg_lum:.2f})")
+
+    return problems
+
+
+def validate_all_themes() -> None:
+    """
+    Validate all theme modes have required keys and correct colors.
+
+    Raises:
+        ValueError: If any theme is missing required keys or has color problems
+    """
+    themes_to_check = [
+        (DEBUG_THEME, "DEBUG_THEME"),
+        (SIM_THEME, "SIM_THEME"),
+        (LIVE_THEME, "LIVE_THEME"),
+    ]
+
+    all_errors = []
+
+    # Check for missing keys
+    for theme_dict, theme_name in themes_to_check:
+        missing = validate_theme(theme_dict, theme_name)
+        if missing:
+            all_errors.append(f"{theme_name} missing {len(missing)} keys: {missing}")
+
+    # Check for color problems (semantic validation)
+    for theme_dict, theme_name in themes_to_check:
+        color_problems = validate_theme_colors(theme_dict, theme_name)
+        if color_problems:
+            all_errors.append(f"{theme_name} color problems:\n    " + "\n    ".join(color_problems))
+
+    if all_errors:
+        error_msg = "Theme validation failed:\n  " + "\n  ".join(all_errors)
+        raise ValueError(error_msg)
+
+
+# Run validation at module load time
+# This ensures themes are complete before any UI code runs
+try:
+    validate_all_themes()
+except ValueError as e:
+    # Print error but don't crash - allows app to start with warnings
+    print(f"[THEME WARNING] {e}")
+    print("[THEME WARNING] Some UI elements may use fallback colors")
 
 
 # -------------------- config/theme.py (end)

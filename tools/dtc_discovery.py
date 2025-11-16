@@ -2,7 +2,7 @@
 # -------------------- [DTC Discovery Tool] (start)
 
 """
-DTC MESSAGE DISCOVERY TOOL    Unified Version
+DTC MESSAGE DISCOVERY TOOL  —  Unified Version
 ----------------------------------------------
 Combines 'discover_all_dtc_messages.py' (baseline) and
 'discover_extended_dtc_messages.py' (aggressive discovery)
@@ -23,7 +23,7 @@ Modes
 --mode extended
     Adds exploratory requests covering market depth, statistics,
     security definitions, and simulated order flows.
-      Use only on SIM accounts.
+    ⚠️  Use only on SIM accounts.
 
 Outputs
 -------

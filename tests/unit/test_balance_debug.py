@@ -87,15 +87,15 @@ class BalanceDebugWindow(QWidget):
             log.info(f"[DEBUG] Emitting signal_balance with payload: {payload}")
             signal_balance.send(payload)
 
-            self.status_label.setText(f" Sent: ${balance:,.2f}")
+            self.status_label.setText(f"✅ Sent: ${balance:,.2f}")
             self.status_label.setStyleSheet("color: green;")
 
         except ValueError as e:
-            self.status_label.setText(" Error: Invalid number")
+            self.status_label.setText("❌ Error: Invalid number")
             self.status_label.setStyleSheet("color: red;")
             log.error(f"[DEBUG] Invalid balance input: {e}")
         except Exception as e:
-            self.status_label.setText(f" Error: {e}")
+            self.status_label.setText(f"❌ Error: {e}")
             self.status_label.setStyleSheet("color: red;")
             log.error(f"[DEBUG] Error sending balance: {e}", exc_info=True)
 
@@ -107,8 +107,8 @@ class BalanceDebugWindow(QWidget):
     def on_balance_received(self, msg: dict):
         """Callback when balance signal is received (echo back)"""
         balance = msg.get("balance")
-        log.info(f"[DEBUG]  Received balance signal echo: {balance}")
-        print(f" Balance signal received: ${balance:,.2f}" if balance else " Balance is None!")
+        log.info(f"[DEBUG] ✅ Received balance signal echo: {balance}")
+        print(f"✅ Balance signal received: ${balance:,.2f}" if balance else "❌ Balance is None!")
 
 
 if __name__ == "__main__":

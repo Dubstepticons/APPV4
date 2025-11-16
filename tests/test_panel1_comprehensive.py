@@ -21,7 +21,6 @@ import pytest
 # ============================================================================
 
 
-@pytest.mark.core_regression
 class TestPanel1TradingMode:
     """Test trading mode switching functionality"""
 
@@ -103,7 +102,6 @@ class TestPanel1TradingMode:
 # ============================================================================
 
 
-@pytest.mark.core_regression
 class TestPanel1BalanceUpdates:
     """Test account balance update functionality"""
 

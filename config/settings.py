@@ -35,23 +35,10 @@ DEBUG_NETWORK: bool = bool(int(os.getenv("DEBUG_NETWORK", "0")))  # Socket conne
 DEBUG_ANALYTICS: bool = bool(int(os.getenv("DEBUG_ANALYTICS", "0")))  # Metrics, performance calculations
 DEBUG_PERF: bool = bool(int(os.getenv("DEBUG_PERF", "0")))  # Latency, CPU, memory measurements
 
-# --- Migration feature flags (can be overridden by environment variables) ---
-# See config/feature_flags.py for full documentation
-FEATURE_FLAGS: Dict[str, bool] = {
-    "USE_TYPED_EVENTS": False,  # Default: use dict events (gradual migration)
-    "ENABLE_MIGRATION_LOGS": True,  # Default: enable migration logging
-    "ENABLE_PERF_TRACKING": True,  # Default: enable performance tracking
-}
-
-# NOTE: Environment variables override these values.
-
 # Trading mode selection (DEBUG/LIVE/SIM)
 # Can be set via: environment variable, config.json, or command-line arg
 # Eventually will be auto-detected from DTC LogonResponse message
 TRADING_MODE: str = os.getenv("TRADING_MODE", "SIM").upper()  # Default to SIM for safety
-DEFAULT_THEME_MODE: str = os.getenv("DEFAULT_THEME_MODE", "LIVE").strip().upper() or "LIVE"
-if DEFAULT_THEME_MODE not in {"DEBUG", "SIM", "LIVE"}:
-    DEFAULT_THEME_MODE = "LIVE"
 
 # -------------------- LIVE Arming Gate --------------------
 # Safety mechanism: LIVE trading requires explicit arming
@@ -297,7 +284,7 @@ SNAPSHOT_CSV_PATH: str = str(
     Path(
         _env_str("SNAPSHOT_CSV_PATH")
         or _env_str("CSV_MARKET_FEED_PATH")
-        or f"C:/Users/{os.getenv('USERNAME', 'user')}/Desktop/APPV4/data/snapshot.csv"
+        or f"C:/Users/{os.getenv('USERNAME', 'user')}/Desktop/APPSIERRA/data/snapshot.csv"
     )
 )
 
@@ -356,7 +343,6 @@ __all__ = [
     "DEBUG_PERF",
     # Trading mode
     "TRADING_MODE",
-    "DEFAULT_THEME_MODE",
     # LIVE arming gate
     "arm_live_trading",
     "disarm_live_trading",

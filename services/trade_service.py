@@ -92,7 +92,7 @@ class TradeManager:
             print(f"  [WARNING] Position qty-0 detected, but NOT recording trade here!")
             print(f"  [INFO] Panel2.notify_trade_closed() will handle the record_closed_trade() call\n")
 
-            #  DO NOT call record_closed_trade() here!
+            # ⚠ DO NOT call record_closed_trade() here!
             # Panel2.notify_trade_closed() will call it with full exit price data
             # Calling it here would:
             # 1. Create duplicate trade records
@@ -104,7 +104,7 @@ class TradeManager:
         # UPDATE: qty changed but didn't close
         elif qty > 0 and current_pos:
             if qty != current_pos["qty"]:
-                log.debug("trade.partial_close", symbol=symbol, old_qty=current_pos["qty"], new_qty=qty)
+                log.debug(f"trade.partial_close: symbol={symbol}, old_qty={current_pos['qty']}, new_qty={qty}")
                 self._open_positions[symbol]["qty"] = qty
 
     def on_order_fill(self, payload: dict[str, Any]) -> None:
@@ -217,8 +217,7 @@ class TradeManager:
                     mode = detect_mode_from_account(account)
 
 
-            # ARCHITECTURE FIX (Step 1): Update balance for the mode
-            # StateManager is the ONLY place where balances are updated
+            # Update balance for the mode if state manager provided
             new_balance = None  # Initialize to None for later use
             if self.state and realized_pnl is not None:
                 current_balance = self.state.get_balance_for_mode(mode)
@@ -226,47 +225,18 @@ class TradeManager:
 
                 # CLEANUP FIX: Use structured logging
                 log.info(
-                    f"balance.updated.{mode}",
-                    old_balance=current_balance,
-                    new_balance=new_balance,
-                    pnl=realized_pnl
+                    f"balance.updated.{mode}: old={current_balance:.2f}, new={new_balance:.2f}, pnl={realized_pnl:+.2f}"
                 )
 
                 self.state.set_balance_for_mode(mode, new_balance)
             else:
-                # CRITICAL: Balance updates should ALWAYS happen for closed trades
-                # Missing state or pnl indicates a problem in the trade closure pipeline
-                if mode == "SIM" and not self.state:
-                    log.error(
-                        "trade_manager.balance_update_failed",
-                        reason="StateManager not available",
-                        mode=mode,
-                        pnl=realized_pnl,
-                        message="SIM balance NOT updated - StateManager missing!"
-                    )
-                elif realized_pnl is None:
-                    log.warning(
-                        "trade_manager.balance_skip",
-                        reason="realized_pnl is None",
-                        has_state=bool(self.state)
-                    )
-                else:
-                    log.debug(
-                        "trade_manager.balance_skip",
-                        has_state=bool(self.state),
-                        has_pnl=realized_pnl is not None
-                    )
+                log.debug(
+                    f"trade_manager.balance_skip: has_state={bool(self.state)}, has_pnl={realized_pnl is not None}"
+                )
 
             # CLEANUP FIX: Use structured logging for trade details
             log.debug(
-                "trade_manager.trade_details",
-                symbol=symbol,
-                qty=int(abs(qty)),
-                mode=mode,
-                entry_price=entry_price,
-                exit_price=exit_price,
-                realized_pnl=realized_pnl,
-                account=account
+                f"trade_manager.trade_details: symbol={symbol}, qty={int(abs(qty))}, mode={mode}, entry={entry_price}, exit={exit_price}, pnl={realized_pnl}, account={account}"
             )
 
             trade = TradeRecord(
@@ -301,15 +271,7 @@ class TradeManager:
                     # CLEANUP FIX: Use structured logging
                     pnl_str = f"{realized_pnl:+,.2f}" if realized_pnl is not None else "N/A"
                     log.info(
-                        f"trade.recorded: {symbol} | PnL={pnl_str} | Mode={mode} | ID={trade.id}",
-                        trade_id=trade.id,
-                        symbol=symbol,
-                        mode=mode,
-                        pnl=realized_pnl,
-                        entry=entry_price,
-                        exit=exit_price,
-                        qty=int(abs(qty)),
-                        new_balance=new_balance
+                        f"trade.recorded: {symbol} | PnL={pnl_str} | Mode={mode} | ID={trade.id} | entry={entry_price}, exit={exit_price}, qty={int(abs(qty))}, new_balance={new_balance}"
                     )
 
             # CRITICAL FIX: Invalidate stats cache when new trade recorded
@@ -325,10 +287,7 @@ class TradeManager:
             import traceback
             # CLEANUP FIX: Use structured logging for errors
             log.error(
-                f"trade_manager.db_write_failed for {symbol}: {str(e)}",
-                error_type=type(e).__name__,
-                symbol=symbol,
-                traceback=traceback.format_exc()
+                f"trade_manager.db_write_failed for {symbol}: {str(e)} | error_type={type(e).__name__}\n{traceback.format_exc()}"
             )
             return False
 

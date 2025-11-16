@@ -70,9 +70,9 @@ for mode in ["DEBUG", "SIM", "LIVE"]:
     diagnostics.error("system", f"Test error event in {mode} mode")
 
     if mode == "DEBUG":
-        print("\n Console output shown above (expected in DEBUG mode)")
+        print("\n✓ Console output shown above (expected in DEBUG mode)")
     else:
-        print(f"\n Terminal is clean (expected in {mode} mode)")
+        print(f"\n✓ Terminal is clean (expected in {mode} mode)")
         print("  Events logged to file: logs/app.log")
 
     print()
@@ -82,9 +82,9 @@ print("Terminal Output Test Complete")
 print("=" * 70)
 print()
 print("Summary:")
-print("  DEBUG mode:  Verbose terminal output ")
-print("  SIM mode:    Clean terminal ")
-print("  LIVE mode:   Clean terminal ")
+print("  DEBUG mode:  Verbose terminal output ✓")
+print("  SIM mode:    Clean terminal ✓")
+print("  LIVE mode:   Clean terminal ✓")
 print()
 print("All events are still logged to: logs/app.log")
 print("All events still visible in: Debug Console (Ctrl+Shift+D)")

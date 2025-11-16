@@ -251,9 +251,9 @@ class PersistenceMonitor:
         print("SUMMARY")
         print("=" * 70)
         print("\nAll persistence layers are being monitored.")
-        print(" SIM Balance: Persists to JSON file (fast, reliable)")
-        print(" Trade Records: Persists to database (comprehensive, queryable)")
-        print(" Statistics: Computed on-demand from trade records")
+        print("✓ SIM Balance: Persists to JSON file (fast, reliable)")
+        print("✓ Trade Records: Persists to database (comprehensive, queryable)")
+        print("✓ Statistics: Computed on-demand from trade records")
         print("\nFor any issues, check the error messages above.")
         print("=" * 70 + "\n")
 
@@ -262,14 +262,14 @@ class PersistenceMonitor:
         """Pretty print a result"""
         status = result.get("status", "unknown")
         status_symbol = {
-            "ok": "",
-            "error": "",
-            "missing": "",
-            "disconnected": "",
-            "corrupted": "",
-            "consistent": "",
-            "inconsistent": "",
-            "no_data": "",
+            "ok": "✓",
+            "error": "✗",
+            "missing": "⚠",
+            "disconnected": "✗",
+            "corrupted": "✗",
+            "consistent": "✓",
+            "inconsistent": "⚠",
+            "no_data": "ℹ",
         }.get(status, "?")
 
         print(f"{status_symbol} Status: {status.upper()}")
@@ -282,7 +282,7 @@ class PersistenceMonitor:
         if "errors" in result and result["errors"]:
             print(f"  Errors:")
             for error in result["errors"]:
-                print(f"     {error}")
+                print(f"    ✗ {error}")
 
     def watch_changes(self, interval: int = 5) -> None:
         """Watch for changes in persistence layers"""

@@ -50,9 +50,9 @@ def get_callable_name(func: Callable) -> str:
     Extract fully qualified name from a callable.
 
     Examples:
-        function  module.function_name
-        method  module.ClassName.method_name
-        lambda  module.<lambda at file.py:123>
+        function → module.function_name
+        method → module.ClassName.method_name
+        lambda → module.<lambda at file.py:123>
     """
     try:
         # Handle bound methods

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 # File: utils/format_utils.py
-# Block 16/??  Formatting helpers (prices, money, durations)
+# Block 16/?? Ã¢â‚¬â€ Formatting helpers (prices, money, durations)
 from typing import Optional
 
 from config.trading_specs import match_spec
@@ -12,21 +12,21 @@ def format_money(v: float) -> str:
     try:
         return f"{sign}${abs(float(v)):, .2f}".replace(" ,", ",")
     except Exception:
-        return ""
+        return "Ã¢â‚¬â€"
 
 
 def format_price(symbol: Optional[str], price: Optional[float]) -> str:
     """Format price to the instrument's tick precision."""
     try:
         if price is None:
-            return ""
+            return "Ã¢â‚¬â€"
         tick = match_spec(symbol).get("tick", 0.25)
         # determine decimals from tick size (e.g., 0.25 -> 2)
         s = f"{tick:.10f}".rstrip("0").rstrip(".")
         dec = len(s.split(".")[1]) if "." in s else 0
         return f"{float(price):.{dec}f}"
     except Exception:
-        return ""
+        return "Ã¢â‚¬â€"
 
 
 def hms(seconds: float) -> str:
@@ -50,3 +50,38 @@ def mmss(seconds: float) -> str:
         return f"{m:02d}:{s:02d}"
     except Exception:
         return "00:00"
+
+
+def extract_symbol_display(full_symbol: str) -> str:
+    """
+    Extract 3-letter display symbol from full DTC symbol.
+
+    Args:
+        full_symbol: Full DTC symbol (e.g., "F.US.MESZ25")
+
+    Returns:
+        3-letter symbol (e.g., "MES")
+
+    Examples:
+        extract_symbol_display("F.US.MESZ25") -> "MES"
+        extract_symbol_display("F.US.ESH25") -> "ESH"
+        extract_symbol_display("UNKNOWN") -> "UNKNOWN"
+
+    Note:
+        Looks for pattern: *.US.XXX* where XXX are the 3 letters we want.
+        If format doesn't match, returns full symbol as-is.
+    """
+    try:
+        # Look for pattern: *.US.XXX* where XXX are the 3 letters we want
+        parts = full_symbol.split(".")
+        for i, part in enumerate(parts):
+            if part == "US" and i + 1 < len(parts):
+                # Get the next part after 'US'
+                next_part = parts[i + 1]
+                if len(next_part) >= 3:
+                    # Extract first 3 letters
+                    return next_part[:3].upper()
+        # Fallback: return as-is
+        return full_symbol.strip().upper()
+    except Exception:
+        return full_symbol.strip().upper()

@@ -259,11 +259,11 @@ def quick_connect_test(host: str = None, port: int = None) -> bool:
 
     conn = DTCTestConnection(host=host, port=port)
     if conn.connect():
-        print("[] TCP connection successful")
+        print("[✓] TCP connection successful")
         conn.disconnect()
         return True
     else:
-        print("[] TCP connection failed")
+        print("[✗] TCP connection failed")
         return False
 
 
@@ -288,15 +288,15 @@ def verify_handshake(host: str = None, port: int = None, verbose: bool = True) -
         with DTCTestConnection(host=host, port=port) as conn:
             if conn.logged_in:
                 if verbose:
-                    print("[] Handshake successful")
+                    print("[✓] Handshake successful")
                 return True
             else:
                 if verbose:
-                    print("[] Handshake failed")
+                    print("[✗] Handshake failed")
                 return False
     except Exception as e:
         if verbose:
-            print(f"[] Handshake error: {e}")
+            print(f"[✗] Handshake error: {e}")
         return False
 
 
@@ -341,13 +341,13 @@ def capture_messages(
             )
 
             if verbose:
-                print(f"\n[] Captured {len(messages)} messages")
+                print(f"\n[✓] Captured {len(messages)} messages")
 
             return messages
 
     except Exception as e:
         if verbose:
-            print(f"[] Capture error: {e}")
+            print(f"[✗] Capture error: {e}")
         return []
 
 

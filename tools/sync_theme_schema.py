@@ -101,7 +101,7 @@ if "--report" in sys.argv:
         print(" Missing filename after --report flag.")
         sys.exit(1)
     out_file.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    print(f" Wrote JSON audit report  {out_file.resolve()}\n")
+    print(f" Wrote JSON audit report → {out_file.resolve()}\n")
 
 # --------------------------------------------------------------------
 # Schema generation

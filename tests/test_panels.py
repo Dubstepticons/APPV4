@@ -29,16 +29,16 @@ def test_metrics_config():
         panel2_count = len(PANEL2_METRICS)
         panel3_count = len(PANEL3_METRICS)
 
-        print(f" PANEL2_METRICS: {panel2_count} metrics")
-        print(f" PANEL3_METRICS: {panel3_count} metrics")
+        print(f"✓ PANEL2_METRICS: {panel2_count} metrics")
+        print(f"✓ PANEL3_METRICS: {panel3_count} metrics")
 
         assert panel2_count == 15, f"Expected 15 Panel2 metrics, got {panel2_count}"
-        assert panel3_count == 15, f"Expected 15 Panel3 metrics, got {panel3_count}"
+        assert panel3_count == 18, f"Expected 18 Panel3 metrics, got {panel3_count}"
 
-        print(" All metric counts correct")
+        print("✓ All metric counts correct")
         assert True
     except Exception as e:
-        print(f" FAILED: {e}")
+        print(f"✗ FAILED: {e}")
         assert False
 
 
@@ -55,16 +55,16 @@ def test_metric_grid():
 
         for method in required_methods:
             has_method = hasattr(MetricGrid, method)
-            status = "" if has_method else ""
+            status = "✓" if has_method else "✗"
             print(f"{status} MetricGrid.{method}: {has_method}")
 
             if not has_method:
                 print(f"  WARNING: Missing method {method}")
 
-        print(" MetricGrid methods validated")
+        print("✓ MetricGrid methods validated")
         assert True
     except Exception as e:
-        print(f" FAILED: {e}")
+        print(f"✗ FAILED: {e}")
         assert False
 
 
@@ -89,7 +89,7 @@ def test_panel1_no_pyqtgraph():
         has_graph_method = hasattr(panel, "has_graph")
         plot_attr = getattr(panel, "_plot", "MISSING")
 
-        print(" Panel1 instantiated without pyqtgraph")
+        print("✓ Panel1 instantiated without pyqtgraph")
         print(f"  - has_graph() method: {has_graph_method}")
         print(f"  - _plot attribute: {plot_attr}")
 
@@ -104,10 +104,10 @@ def test_panel1_no_pyqtgraph():
         if "panels.panel1" in sys.modules:
             del sys.modules["panels.panel1"]
 
-        print(" Panel1 gracefully handles missing pyqtgraph")
+        print("✓ Panel1 gracefully handles missing pyqtgraph")
         assert True
     except Exception as e:
-        print(f" FAILED: {e}")
+        print(f"✗ FAILED: {e}")
         import traceback
 
         traceback.print_exc()
@@ -151,7 +151,7 @@ def test_panel1_with_broken_pyqtgraph():
 
         plot_attr = getattr(panel, "_plot", "MISSING")
 
-        print(" Panel1 instantiated with broken pyqtgraph")
+        print("✓ Panel1 instantiated with broken pyqtgraph")
         print(f"  - _plot attribute: {plot_attr}")
 
         if hasattr(panel, "has_graph"):
@@ -165,10 +165,10 @@ def test_panel1_with_broken_pyqtgraph():
         if "panels.panel1" in sys.modules:
             del sys.modules["panels.panel1"]
 
-        print(" Panel1 gracefully handles pyqtgraph initialization failure")
+        print("✓ Panel1 gracefully handles pyqtgraph initialization failure")
         assert True
     except Exception as e:
-        print(f" FAILED: {e}")
+        print(f"✗ FAILED: {e}")
         import traceback
 
         traceback.print_exc()
@@ -195,13 +195,13 @@ def test_all_panels_instantiate():
         from panels.panel3 import Panel3
 
         panel1 = Panel1()
-        print(" Panel1 instantiated")
+        print("✓ Panel1 instantiated")
 
         panel2 = Panel2()
-        print(" Panel2 instantiated")
+        print("✓ Panel2 instantiated")
 
         panel3 = Panel3()
-        print(" Panel3 instantiated")
+        print("✓ Panel3 instantiated")
 
         # Test basic methods exist
         assert hasattr(panel1, "set_account_balance"), "Panel1 missing set_account_balance"
@@ -214,10 +214,10 @@ def test_all_panels_instantiate():
         assert hasattr(panel3, "set_timeframe"), "Panel3 missing set_timeframe"
         assert hasattr(panel3, "update_metrics"), "Panel3 missing update_metrics"
 
-        print(" All panels have required methods")
+        print("✓ All panels have required methods")
         assert True
     except Exception as e:
-        print(f" FAILED: {e}")
+        print(f"✗ FAILED: {e}")
         import traceback
 
         traceback.print_exc()
@@ -227,9 +227,9 @@ def test_all_panels_instantiate():
 def main():
     """Run all tests."""
     print("\n")
-    print("" + "=" * 58 + "")
-    print("" + " " * 15 + "PANEL TEST SUITE" + " " * 27 + "")
-    print("" + "=" * 58 + "")
+    print("╔" + "=" * 58 + "╗")
+    print("║" + " " * 15 + "PANEL TEST SUITE" + " " * 27 + "║")
+    print("╚" + "=" * 58 + "╝")
 
     tests = [
         test_metrics_config,
@@ -245,7 +245,7 @@ def main():
             result = test_func()
             results.append(result)
         except Exception as e:
-            print(f"\n TEST CRASHED: {e}")
+            print(f"\n✗ TEST CRASHED: {e}")
             import traceback
 
             traceback.print_exc()
@@ -260,10 +260,10 @@ def main():
     print(f"Passed: {passed}/{total}")
 
     if passed == total:
-        print("\n ALL TESTS PASSED!")
+        print("\n✓ ALL TESTS PASSED!")
         return 0
     else:
-        print(f"\n {total - passed} TEST(S) FAILED")
+        print(f"\n✗ {total - passed} TEST(S) FAILED")
         return 1
 
 

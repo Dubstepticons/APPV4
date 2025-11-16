@@ -14,10 +14,10 @@ Usage:
     python tools/dtc_probe.py --mode positions
 
 Modes:
-    health       runs complete connection + data + heartbeat audit
-    live         connects and streams all messages continuously
-    order-test   submits and cancels a test order in SIM account
-    positions    queries and displays positions for all accounts
+    health      → runs complete connection + data + heartbeat audit
+    live        → connects and streams all messages continuously
+    order-test  → submits and cancels a test order in SIM account
+    positions   → queries and displays positions for all accounts
 
 Environment Variables:
     DTC_HOST=127.0.0.1
@@ -123,7 +123,7 @@ class DTCClient:
             raw = json.dumps(msg).encode("utf-8") + b"\x00"
             self.sock.sendall(raw)
             if os.getenv("DEBUG_DTC"):
-                log(f" {msg}", Color.CYAN)
+                log(f"→ {msg}", Color.CYAN)
         except Exception as e:
             log(f"Send failed: {e}", Color.RED)
 
@@ -144,7 +144,7 @@ class DTCClient:
                             msg = json.loads(chunk.decode("utf-8"))
                             self.q.put(msg)
                             if os.getenv("DEBUG_DTC"):
-                                log(f" {msg}", Color.BLUE)
+                                log(f"← {msg}", Color.BLUE)
                         except json.JSONDecodeError:
                             continue
             except (socket.timeout, OSError):
@@ -377,7 +377,7 @@ def run_live(client: DTCClient) -> None:
             msg = client.recv_any(5.0)
             if msg:
                 t = msg.get("Type")
-                log(f"Type={t}  {msg}", Color.CYAN)
+                log(f"Type={t} → {msg}", Color.CYAN)
     except KeyboardInterrupt:
         pass
     finally:

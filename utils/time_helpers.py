@@ -129,7 +129,7 @@ def elapsed_since(epoch: Union[int, float]) -> str:
 
 
 def midnight_epoch(offset_days: int = 0) -> float:
-    """Return epoch of local midnight  offset days.
+    """Return epoch of local midnight ± offset days.
 
     Args:
         offset_days: Number of days to offset from today (0 = today's midnight)

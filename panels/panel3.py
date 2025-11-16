@@ -7,11 +7,8 @@ from typing import Any, Dict, List, Optional
 from PyQt6 import QtCore, QtWidgets
 
 from config.theme import THEME, ColorTheme
-from utils.logger import get_logger
 from utils.theme_mixin import ThemeAwareMixin
 from utils.ui_helpers import centered_row
-
-log = get_logger(__name__)
 
 
 # --- Externalized metric set (with safe fallback) ----------------------------
@@ -68,82 +65,24 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
         with contextlib.suppress(Exception):
             self._load_metrics_for_timeframe(self._tf)
 
-        # ARCHITECTURE FIX (Step 2): Connect to mode changes via SignalBus
-        # SignalBus is now the ONLY event bus (StateManager.modeChanged is bridged to SignalBus)
+        # Connect to mode changes so we reload metrics when switching SIM/LIVE
         try:
-            from core.signal_bus import get_signal_bus
-            signal_bus = get_signal_bus()
-            signal_bus.modeChanged.connect(
-                lambda mode: self._on_mode_changed(mode),
-                QtCore.Qt.ConnectionType.QueuedConnection
-            )
+            from core.app_state import get_state_manager
+            state = get_state_manager()
+            if state and hasattr(state, 'modeChanged'):
+                state.modeChanged.connect(self._on_mode_changed)
         except Exception as e:
             pass
 
         # Apply current theme colors (in case theme was switched before this panel was created)
         self.refresh_theme()
 
-        # PHASE 4: Connect to SignalBus for command signals
-        self._connect_signal_bus()
-
-    def _connect_signal_bus(self) -> None:
-        """
-        Connect to SignalBus for event-driven updates.
-
-        PHASE 4: This replaces direct method calls from app_manager.
-
-        Connected signals:
-        - themeChangeRequested  refresh_theme()
-        - tradeClosedForAnalytics  on_trade_closed()
-        - metricsReloadRequested  _load_metrics_for_timeframe()
-        - snapshotAnalysisRequested  analyze_and_store_trade_snapshot()
-        """
-        try:
-            log.info("[Panel3 DEBUG] ========== CONNECTING TO SIGNAL BUS ==========")
-            from core.signal_bus import get_signal_bus
-
-            signal_bus = get_signal_bus()
-            log.info(f"[Panel3 DEBUG] SignalBus instance obtained: {signal_bus}")
-
-            # Theme change requests (replaces direct calls from app_manager)
-            signal_bus.themeChangeRequested.connect(
-                lambda: self.refresh_theme() if hasattr(self, 'refresh_theme') else None,
-                QtCore.Qt.ConnectionType.QueuedConnection
-            )
-
-            # Trade closed event for analytics (replaces direct on_trade_closed call)
-            log.info("[Panel3 DEBUG] Connecting tradeClosedForAnalytics signal...")
-            signal_bus.tradeClosedForAnalytics.connect(
-                lambda trade: self.on_trade_closed(trade) if hasattr(self, 'on_trade_closed') else None,
-                QtCore.Qt.ConnectionType.QueuedConnection
-            )
-            log.info("[Panel3 DEBUG] tradeClosedForAnalytics signal connected successfully")
-
-            # Metrics reload requested (replaces direct call)
-            signal_bus.metricsReloadRequested.connect(
-                lambda tf: self._load_metrics_for_timeframe(tf) if hasattr(self, '_load_metrics_for_timeframe') else None,
-                QtCore.Qt.ConnectionType.QueuedConnection
-            )
-
-            # Snapshot analysis requested (replaces direct call)
-            signal_bus.snapshotAnalysisRequested.connect(
-                lambda: self.analyze_and_store_trade_snapshot() if hasattr(self, 'analyze_and_store_trade_snapshot') else None,
-                QtCore.Qt.ConnectionType.QueuedConnection
-            )
-
-            log.info("[Panel3] Connected to SignalBus for Phase 4 command signals")
-            log.info("[Panel3 DEBUG] ========== SIGNAL BUS CONNECTION COMPLETE ==========")
-
-        except Exception as e:
-            log.error(f"[Panel3] Failed to connect to SignalBus: {e}")
-            import traceback
-            traceback.print_exc()
-
     # -------------------- UI BUILD -------------------------------------------
 
     def _build_ui(self) -> None:
         self.setObjectName("Panel3")
-        self.setStyleSheet(f"QWidget#Panel3 {{ background:{THEME.get('bg_panel', '#0B0F14')}; }}")
+        # NOTE: Stylesheet set by refresh_theme() via ThemeAwareMixin
+        # Do NOT set here - it will override theme changes!
 
         root = QtWidgets.QVBoxLayout(self)
         # Match Panel 2 margins/spacing
@@ -203,17 +142,18 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
         Force timeframe pills to refresh their colors from THEME.
         Called when trading mode switches (DEBUG/SIM/LIVE) to update pill colors.
         """
-        with contextlib.suppress(Exception):
-            if not hasattr(self.tf_pills, "set_active_color"):
-                return
-            # Clear cached color to force refresh
-            if hasattr(self.tf_pills, "_last_active_hex"):
-                delattr(self.tf_pills, "_last_active_hex")
-            # Re-read color from THEME based on Total PnL (done in _load_metrics_for_timeframe)
-            # For now, just force a re-application by calling set_active_color with neutral
-            from config.theme import ColorTheme
+        try:
+            if hasattr(self.tf_pills, "set_active_color"):
+                # Clear cached color to force refresh
+                if hasattr(self.tf_pills, "_last_active_hex"):
+                    delattr(self.tf_pills, "_last_active_hex")
+                # Re-read color from THEME based on Total PnL (done in _load_metrics_for_timeframe)
+                # For now, just force a re-application by calling set_active_color with neutral
+                from config.theme import ColorTheme
 
-            self.tf_pills.set_active_color(THEME.get("pnl_neu_color", "#9CA3AF"))
+                self.tf_pills.set_active_color(THEME.get("pnl_neu_color", "#9CA3AF"))
+        except Exception:
+            pass
 
     # -------------------- Public API -----------------------------------------
     def update_metrics(self, data: dict[str, Any]) -> None:
@@ -279,33 +219,14 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
             combined = {**trade_data, **feed_data, **state_data}
             return combined
         except Exception as e:
-            with contextlib.suppress(Exception):
+            try:
                 from utils.logger import get_logger
 
                 log = get_logger(__name__)
                 log.warning(f"[panel3] Failed to grab data from Panel 2: {e}")
+            except Exception:
+                pass
             return None
-
-    def _get_active_account(self) -> Optional[str]:
-        """
-        Resolve the currently active trading account (mirrors Panel 2 scope).
-
-        Prefers StateManager (single source of truth) and falls back to Panel 2
-        if needed. Returns None when account context is not yet established.
-        """
-        try:
-            from core.app_state import get_state_manager
-
-            state = get_state_manager()
-            if state and getattr(state, "current_account", None):
-                return state.current_account
-        except Exception:
-            pass
-
-        if self._panel_live and hasattr(self._panel_live, "current_account"):
-            return getattr(self._panel_live, "current_account")
-
-        return None
 
     def register_order_event(self, payload: dict) -> None:
         """
@@ -315,7 +236,7 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
         Args:
             payload: Normalized order update dict from message_router
         """
-        with contextlib.suppress(Exception):
+        try:
             # Just log for now - Panel 3 updates via _load_metrics_for_timeframe
             from utils.logger import get_logger
 
@@ -323,6 +244,8 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
             order_status = payload.get("OrderStatus")
             if order_status in (3, 7):  # Filled status
                 log.debug("[panel3] Order filled detected - will refresh metrics on next timeframe check")
+        except Exception:
+            pass
 
     def analyze_and_store_trade_snapshot(self) -> None:
         """
@@ -372,61 +295,35 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
                 pass
 
     # -------------------- Data & Metrics (local to Panel 3) -----------------
-    def _load_metrics_for_timeframe(
-        self,
-        tf: str,
-        mode_override: Optional[str] = None,
-        account_override: Optional[str] = None,
-    ) -> None:
+    def _load_metrics_for_timeframe(self, tf: str) -> None:
         """Query closed trades within timeframe and update metric cells and Sharpe bar.
         Prefers TradeRecord.exit_time; falls back to timestamp if absent.
-        Filters by trading mode (SIM/LIVE). Uses mode_override when provided,
-        otherwise falls back to the active UI mode from StateManager.
-        Account scope mirrors Panel 2 (mode + account) so stats always match
-        the currently selected book.
+        Filters by active trading mode (SIM/LIVE).
         """
-        log.info(f"[Panel3 DEBUG] ========== _load_metrics_for_timeframe CALLED ==========")
-        log.info(f"[Panel3 DEBUG] Timeframe: {tf}")
-
         try:
             from services.stats_service import compute_trading_stats_for_timeframe
         except Exception as e:
-            log.error(f"[Panel3 DEBUG] Failed to import stats_service: {e}")
             return
 
-        # Determine mode to query
-        if mode_override:
-            mode = mode_override
-            log.info(f"[Panel3 DEBUG] Mode override from payload: {mode}")
-        else:
-            mode = None
-            try:
-                from core.app_state import get_state_manager
-                state = get_state_manager()
-                # Use current_mode (UI mode) when no explicit mode is provided
-                mode = state.current_mode if state else "SIM"
-                log.info(f"[Panel3 DEBUG] Current mode from state manager: {mode}")
-            except Exception as e:
-                mode = "SIM"  # Default fallback
-                log.error(f"[Panel3 DEBUG] Error getting mode, defaulting to SIM: {e}")
+        # Get active mode from state manager
+        mode = None
+        try:
+            from core.app_state import get_state_manager
+            state = get_state_manager()
+            # ALWAYS use current_mode (UI mode) not position_mode (open trade mode)
+            # Panel 3 should show stats for the mode the UI is displaying
+            mode = state.current_mode if state else "SIM"
+        except Exception as e:
+            mode = "SIM"  # Default fallback
 
-        # Determine account scope
-        if account_override is not None:
-            account = account_override
-            log.info(f"[Panel3 DEBUG] Account override from payload: {account}")
-        else:
-            account = self._get_active_account()
-            log.info(f"[Panel3 DEBUG] Active account from state manager: {account}")
-
-        log.info(f"[Panel3 DEBUG] Computing stats for timeframe={tf}, mode={mode}, account={account}...")
-        payload = compute_trading_stats_for_timeframe(tf, mode=mode, account=account)
-        log.info(f"[Panel3 DEBUG] Stats payload received: {payload}")
+        payload = compute_trading_stats_for_timeframe(tf, mode=mode)
 
         # Check if we have any trades for this mode in this timeframe
         trades_count = payload.get("_trade_count", 0)
-        log.info(f"[Panel3 DEBUG] Trades count: {trades_count}")
+        if trades_count == 0:
+            self.display_empty_metrics(mode, tf)
+            return
 
-        log.info("[Panel3 DEBUG] Updating metrics with payload...")
         self.update_metrics(payload)
 
         # Update Sharpe bar widget (Sharpe Ratio not in grid)
@@ -437,7 +334,7 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
         except Exception as e:
             pass
 
-        # Color the timeframe pills based on total PnL sign (ALWAYS update, even if no trades)
+        # Color the timeframe pills based on total PnL sign
         try:
             total_val = float(payload.get("_total_pnl_value", 0.0))
             up = True if total_val > 0 else False if total_val < 0 else None
@@ -475,15 +372,19 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
                 self.sharpe_bar.set_value(0.0)
 
             # Set pills to neutral color
-            with contextlib.suppress(Exception):
+            try:
                 if hasattr(self.tf_pills, "set_active_color"):
                     self.tf_pills.set_active_color(THEME.get("pnl_neu_color", "#9CA3AF"))
+            except Exception:
+                pass
 
         except Exception as e:
-            with contextlib.suppress(Exception):
+            try:
                 from utils.logger import get_logger
                 log = get_logger(__name__)
                 log.error(f"[panel3] Error displaying empty metrics: {e}")
+            except Exception:
+                pass
 
     def on_trade_closed(self, trade_payload: dict) -> None:
         """Called when Panel 2 reports a closed trade.
@@ -493,34 +394,20 @@ class Panel3(QtWidgets.QWidget, ThemeAwareMixin):
             from utils.logger import get_logger
             log = get_logger(__name__)
 
-            log.info("[Panel3 DEBUG] ========== on_trade_closed SIGNAL RECEIVED ==========")
-            log.info(f"[Panel3 DEBUG] Trade payload: {trade_payload}")
-            log.info(f"[Panel3 DEBUG] Current timeframe: {self._tf}")
-
-            # Refresh the metrics for current timeframe, using trade mode when available
-            log.info("[Panel3 DEBUG] Calling _load_metrics_for_timeframe...")
-            trade_mode = trade_payload.get("mode")
-            trade_account = trade_payload.get("account")
-            self._load_metrics_for_timeframe(
-                self._tf,
-                mode_override=trade_mode,
-                account_override=trade_account,
-            )
-            log.info("[Panel3 DEBUG] _load_metrics_for_timeframe completed")
+            # Refresh the metrics for current timeframe
+            self._load_metrics_for_timeframe(self._tf)
 
             # Grab live data from Panel 2 if available
             if hasattr(self, "analyze_and_store_trade_snapshot"):
-                log.info("[Panel3 DEBUG] Calling analyze_and_store_trade_snapshot...")
                 self.analyze_and_store_trade_snapshot()
-                log.info("[Panel3 DEBUG] analyze_and_store_trade_snapshot completed")
             else:
-                log.warning("[Panel3 DEBUG] analyze_and_store_trade_snapshot method not found")
+                pass
 
-            log.info("[Panel3 DEBUG] ========== on_trade_closed COMPLETE ==========")
+            log.debug(f"[panel3] Metrics refreshed on trade close")
         except Exception as e:
-            with contextlib.suppress(Exception):
+            try:
                 from utils.logger import get_logger
                 log = get_logger(__name__)
                 log.error(f"[panel3] Error handling trade close: {e}")
-                import traceback
-                traceback.print_exc()
+            except Exception:
+                pass

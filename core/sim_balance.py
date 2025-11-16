@@ -3,28 +3,6 @@
 SIM mode balance tracker with account-scoped balances.
 Tracks simulated account balance independently from live DTC balance.
 Uses ledger-based balance calculation (start + realized_pnl - fees).
-
-ARCHITECTURE DEPRECATION (Step 4): JSON balance persistence DEPRECATED
-================================================================================
-This module is DEPRECATED for runtime use. SIM balance should be managed by:
-  - Database (TradeRecord ledger) as source of truth
-  - StateManager as in-memory cache
-  - TradeManager for balance mutations
-
-JSON files (data/sim_balance_{account}.json) are NO LONGER used at runtime.
-
-ALLOWED USAGE:
-  - Offline tools/scripts (one-time migration from JSON to DB)
-  - Test fixtures (if needed)
-
-FORBIDDEN USAGE:
-  - Runtime balance reads (use StateManager.get_balance_for_mode() instead)
-  - Runtime balance writes (use TradeManager.record_closed_trade() instead)
-  - Hotkey reset (use StateManager.reset_sim_balance_to_10k() instead)
-
-This module will be removed entirely in a future cleanup once all references
-are verified to be offline-only.
-================================================================================
 """
 from __future__ import annotations
 

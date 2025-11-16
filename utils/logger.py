@@ -16,89 +16,11 @@ from typing import Optional
 
 from config.settings import DEBUG_MODE, TRADING_MODE
 
-# Import structlog for configuration
-try:
-    import structlog
-    STRUCTLOG_AVAILABLE = True
-except ImportError:
-    STRUCTLOG_AVAILABLE = False
-
-
-class SafeRotatingFileHandler(RotatingFileHandler):
-    """Custom RotatingFileHandler that gracefully handles rotation errors on Windows.
-
-    Windows file locking can prevent rotation. This handler catches those errors
-    and continues logging without crashing.
-    """
-
-    def doRollover(self) -> None:
-        """Override doRollover to handle Windows file locking gracefully."""
-        try:
-            super().doRollover()
-        except (OSError, PermissionError) as e:
-            # Windows file locking: log to the current file anyway
-            # Don't crash, just skip the rotation
-            if "being used by another process" in str(e) or "Permission" in str(e.__class__.__name__):
-                # Silently skip rotation - the file will continue to be written to
-                pass
-            else:
-                # Re-raise other OS errors
-                raise
-
-
-def _init_structlog() -> None:
-    """Configure structlog with log level filtering based on environment variables."""
-    if not STRUCTLOG_AVAILABLE:
-        return
-
-    if getattr(_init_structlog, "_initialized", False):
-        return
-
-    # Check for DEBUG_LOGS environment variable
-    debug_logs_enabled = os.getenv("DEBUG_LOGS", "0") == "1"
-
-    # Determine minimum log level
-    min_level = logging.DEBUG if debug_logs_enabled else logging.INFO
-
-    def filter_by_level(logger, method_name, event_dict):
-        """Filter log records by level."""
-        level_map = {
-            "debug": logging.DEBUG,
-            "info": logging.INFO,
-            "warning": logging.WARNING,
-            "error": logging.ERROR,
-            "critical": logging.CRITICAL,
-        }
-
-        record_level = level_map.get(method_name, logging.INFO)
-
-        if record_level < min_level:
-            raise structlog.DropEvent
-
-        return event_dict
-
-    # Configure structlog
-    structlog.configure(
-        processors=[
-            filter_by_level,
-            structlog.processors.TimeStamper(fmt="%Y-%m-%d %H:%M:%S", utc=False),
-            structlog.dev.ConsoleRenderer(),
-        ],
-        context_class=dict,
-        logger_factory=structlog.PrintLoggerFactory(),
-        cache_logger_on_first_use=True,
-    )
-
-    _init_structlog._initialized = True
-
 
 def _init_logger_system() -> None:
     """Initializes global logging handlers (console + rotating file)."""
     if getattr(_init_logger_system, "_initialized", False):
         return  # already initialized
-
-    # Initialize structlog first
-    _init_structlog()
 
     # QUIET_STARTUP mode: suppress DEBUG logs, only show INFO+
     quiet_startup = os.getenv("QUIET_STARTUP", "0") == "1"
@@ -115,8 +37,7 @@ def _init_logger_system() -> None:
     formatter = logging.Formatter(fmt, datefmt)
 
     # File handler with rotation (always enabled)
-    # SafeRotatingFileHandler gracefully handles Windows file locking on rotation
-    file_handler = SafeRotatingFileHandler(log_path, maxBytes=1_000_000, backupCount=3, encoding="utf-8", delay=True)
+    file_handler = RotatingFileHandler(log_path, maxBytes=1_000_000, backupCount=3, encoding="utf-8")
     file_handler.setFormatter(formatter)
     file_handler.setLevel(log_level)
 

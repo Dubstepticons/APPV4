@@ -1,80 +1,49 @@
-# ============================
-# PYTHON BASICS
-# ============================
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
 
-# ============================
-# VIRTUAL ENVIRONMENTS
-# ============================
-.venv/
+# Virtual environments
 venv/
 ENV/
 env/
 
-# ============================
-# BUILD / DIST
-# ============================
-build/
-dist/
-.eggs/
-*.egg-info/
-wheels/
-*.egg
-
-# ============================
-# EDITORS
-# ============================
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# ============================
-# OS / SYSTEM JUNK
-# ============================
+# OS
 .DS_Store
 Thumbs.db
-desktop.ini
 
-# ============================
-# LOGS
-# ============================
+# Logs
 *.log
-logs/
 
-# ============================
-# DATABASE / CACHE
-# ============================
+# Database
 *.db
 *.sqlite
 *.sqlite3
-.cache/
-.balance_cache/
 
-# ============================
-# ENVIRONMENT
-# ============================
+# Environment variables
 .env
 .env.local
-
-# ============================
-# TESTING
-# ============================
-.pytest_cache/
-.coverage
-htmlcov/
-
-# ============================
-# APPSIERRA / APPV4 SPECIAL CASE
-# ============================
-.codex/
-.claude/
-.claude.json
-.claude.json.backup
-.config/
-.mypy_cache/
-.ruff_cache/

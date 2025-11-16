@@ -1,7 +1,7 @@
 """
 Integration Tests - UI Data Flow & Panel Synchronization
 
-Tests the complete data pipeline from DTC terminal  data_bridge  state_manager  UI panels.
+Tests the complete data pipeline from DTC terminal → data_bridge → state_manager → UI panels.
 Validates signal connections, panel state synchronization, and end-to-end data propagation.
 
 Coverage:
@@ -29,7 +29,7 @@ class TestUIDataPipeline:
     """
     Verify that DTC messages flow through the entire stack and update UI.
 
-    Pipeline: Sierra Chart  DTC  data_bridge  state_manager  signals  panels
+    Pipeline: Sierra Chart → DTC → data_bridge → state_manager → signals → panels
     """
 
     def test_position_update_reaches_all_panels(self, qtbot, all_panels, dtc_message_factory, diagnostic_recorder):
@@ -391,9 +391,9 @@ class TestEndToEndPerformance:
         self, qtbot, all_panels, dtc_message_factory, perf_timer, diagnostic_recorder
     ):
         """
-        Verify total latency (message  UI) is under 50ms.
+        Verify total latency (message → UI) is under 50ms.
 
-        Pipeline: DTC recv  parse  bridge  state  signal  UI paint
+        Pipeline: DTC recv → parse → bridge → state → signal → UI paint
         """
         panel2 = all_panels["panel2"]
         order_msg = dtc_message_factory["order_update"]()

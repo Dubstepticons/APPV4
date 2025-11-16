@@ -297,7 +297,7 @@ def main():
         print("\n[9] Component health status:")
         print("-" * 70)
         for name, status in watchdog.get_all_statuses().items():
-            health_str = " HEALTHY" if status.is_healthy else " UNHEALTHY"
+            health_str = "✓ HEALTHY" if status.is_healthy else "✗ UNHEALTHY"
             print(f"  {name}: {health_str}")
             print(f"    Last heartbeat: {time.time() - status.last_heartbeat:.1f}s ago")
             print(f"    Total failures: {status.total_failures}")

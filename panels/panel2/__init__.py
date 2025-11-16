@@ -1,34 +1,27 @@
 """
-panels/panel2/__init__.py
+Panel2 Package
 
-Panel2 module - Live trading metrics and position display.
+Live trading metrics panel with 3x5 grid layout.
+Decomposed from monolithic panel2.py for modularity.
 
-This module provides the decomposed Panel2 implementation with clear
-separation of concerns and focused submodules.
+Architecture:
+- state_manager: State persistence and mode management
+- trade_handlers: Trade notifications and DTC message handling
+- metrics_updater: Cell calculation engine
+- live_panel: Main Panel2 class with UI and delegation
 
-Public API:
-    Panel2: Main panel class (backwards compatible with original)
-
-Submodules:
-    position_state: Immutable position state snapshots
-    metrics_calculator: Pure P&L calculation functions
-    csv_feed_handler: Market data CSV polling
-    state_persistence: JSON/DB serialization
-    visual_indicators: Heat timers and proximity alerts
-    position_display: 3x5 grid rendering
-    order_flow: DTC order handling
-    panel2_main: Thin orchestrator
+Utilities:
+- TradeMath (services/trade_math.py): Trade calculations including MAE/MFE
+- extract_symbol_display (utils/format_utils.py): Symbol formatting
 
 Usage:
     from panels.panel2 import Panel2
 
     panel = Panel2()
-    panel.on_order_update(order_payload)
+    panel.set_position(qty=2, entry_price=5800.25, is_long=True)
+    panel.set_targets(target_price=5850.00, stop_price=5775.00)
 """
 
-from __future__ import annotations
-
-# Import from panel2_main orchestrator
-from .panel2_main import Panel2
+from panels.panel2.live_panel import Panel2
 
 __all__ = ["Panel2"]

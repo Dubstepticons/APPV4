@@ -1,58 +1,34 @@
 """
-panels/panel1/masked_frame.py
+Masked Frame Module
 
-Custom QFrame with rounded background and automatic clipping.
+Provides a reusable rounded frame widget with theme-aware background painting.
+Used as container for the equity graph in Panel1.
 
-This module provides MaskedFrame - a QFrame that paints a themed background
-and automatically masks itself (and its children) to the painted geometry.
-
-Architecture:
-- Extends QtWidgets.QFrame
-- Theme-aware background
-- Automatic child clipping
-
-Usage:
-    from panels.panel1.masked_frame import MaskedFrame
-
-    frame = MaskedFrame(parent=widget)
-    frame.set_background_color("#1a1a1a")
-
-    # Children (like PlotWidget) are automatically clipped to rounded rect
-    plot = pg.PlotWidget(parent=frame)
+Extracted from panels/panel1.py for modularity.
 """
 
-from __future__ import annotations
-
-from typing import Optional
-
 from PyQt6 import QtCore, QtGui, QtWidgets
-
 from config.theme import THEME
 
 
 class MaskedFrame(QtWidgets.QFrame):
     """
     A QFrame that paints a theme background and automatically masks itself
-    to the painted geometry.
-
-    Children (like PlotWidget) are clipped to this shape, creating rounded
-    corners without manual clipping.
+    to the painted geometry. Children (like PlotWidget) are clipped to this shape.
 
     Features:
+    - Rounded corners (radius from theme)
     - Theme-aware background color
-    - Rounded rect geometry (configurable radius)
-    - Automatic child clipping
-    - Antialiased painting
-    - No border
+    - Automatic child widget clipping
+    - Dynamic color updates
+
+    Usage:
+        frame = MaskedFrame(parent)
+        frame.set_background_color("#1a1a1a")
+        plot_widget.setParent(frame)
     """
 
-    def __init__(self, parent: Optional[QtWidgets.QWidget] = None):
-        """
-        Initialize masked frame.
-
-        Args:
-            parent: Parent widget (optional)
-        """
+    def __init__(self, parent=None):
         super().__init__(parent)
         self._bg_color = THEME.get("bg_secondary", "#000000")
 
@@ -61,20 +37,20 @@ class MaskedFrame(QtWidgets.QFrame):
         Update the background color dynamically.
 
         Args:
-            color: Color hex string (e.g., "#1a1a1a")
+            color: Hex color string (e.g., "#1a1a1a")
         """
         self._bg_color = color
         self.update()  # Trigger repaint
 
     def _shape_path(self) -> QtGui.QPainterPath:
         """
-        Define the shape geometry.
-
-        Currently creates a rounded rectangle. Can be changed to any
-        geometry later (waves, polygons, etc.).
+        Define the shape path for the frame.
 
         Returns:
-            QPainterPath defining the frame shape
+            QPainterPath with rounded rectangle
+
+        Note:
+            Change this to any geometry later (waves, polygons, etc.)
         """
         rect = QtCore.QRectF(self.rect())  # Convert QRect -> QRectF
         r = float(THEME.get("card_radius", 8))
@@ -84,12 +60,7 @@ class MaskedFrame(QtWidgets.QFrame):
 
     def paintEvent(self, event: QtGui.QPaintEvent) -> None:
         """
-        Paint the frame background and apply mask.
-
-        Steps:
-        1. Paint background with themed color
-        2. Create mask region from painted shape
-        3. Apply mask to clip children
+        Paint the frame with rounded corners and mask.
 
         Args:
             event: Paint event

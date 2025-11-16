@@ -22,7 +22,6 @@ import pytest
 # ============================================================================
 
 
-@pytest.mark.core_regression
 class TestPanel3MetricsLoading:
     """Test Panel3 statistical metrics loading"""
 

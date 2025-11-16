@@ -2,7 +2,7 @@ from __future__ import annotations
 
 
 # File: fixtures/__init__.py
-# Block 23/??  Fixture registry initializer
+# Block 23/?? Ã¢â‚¬â€ Fixture registry initializer
 
 
 """

@@ -6,10 +6,10 @@
 # ============================================================================
 
 [tool.poetry]
-name = "APPV4"
+name = "appsierra"
 version = "0.1.0"
-description = "APPV4 - Sierra Chart Trading Monitor with PyQt6"
-authors = ["APPV4 Team"]
+description = "APPSIERRA - Sierra Chart Trading Monitor with PyQt6"
+authors = ["APPSIERRA Team"]
 readme = "README.md"
 license = "Proprietary"
 keywords = ["trading", "sierra-chart", "dtc", "pyqt6", "monitoring"]
@@ -43,7 +43,6 @@ colorspacious = "^1.1.2"
 psutil = "^7.0.0"
 numpy = "^2.0.0"
 pyyaml = "^6.0.0"
-psycopg2-binary = "^2.9.11"
 
 [tool.poetry.group.dev.dependencies]
 ruff = "^0.1.0"

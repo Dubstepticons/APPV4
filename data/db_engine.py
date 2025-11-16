@@ -77,16 +77,13 @@ def _run_migrations() -> None:
     if efficiency_migration.exists():
         try:
             sql = efficiency_migration.read_text()
-            if engine.dialect.name == "sqlite":
-                sql = sql.replace("ADD COLUMN IF NOT EXISTS", "ADD COLUMN")
             with engine.connect() as conn:
                 conn.execute(text(sql))
                 conn.commit()
                 print("[MIGRATION] [OK] Applied: add_efficiency_column.sql")
         except Exception as e:
             # If column already exists, skip silently
-            error_text = str(e).lower()
-            if "already exists" in error_text or "duplicate column" in error_text:
+            if "already exists" in str(e).lower() or "duplicate column" in str(e).lower():
                 pass  # Column exists, no action needed
             else:
                 print(f"[MIGRATION] Warning: {e}")
