@@ -15,6 +15,7 @@ from PyQt6 import QtCore, QtWidgets
 from config.settings import DEBUG_DATA
 from config.theme import THEME, ColorTheme, switch_theme
 from utils.logger import get_logger
+from services.trade_constants import SIM_STARTING_BALANCE
 
 # Import helper modules
 from core.app_manager import ui_builder, theme_manager, dtc_manager, signal_coordinator
@@ -100,12 +101,10 @@ class MainWindow(QtWidgets.QMainWindow):
             # Register globally for access throughout the app
             set_state_manager(self._state)
 
-            # Load SIM balance from database (sum of all trades' realized P&L)
-            loaded_balance = self._state.load_sim_balance_from_trades()
-            print(f"\n[INITIAL BALANCE] SIM Account Loaded")
-            print(f"  Starting Balance: $10,000.00")
-            print(f"  Loaded Balance: ${self._state.sim_balance:,.2f}")
-            print(f"  Total P&L from Trades: ${self._state.sim_balance - 10000.0:+,.2f}\n")
+            # Load SIM balance from database via UnifiedBalanceManager
+            from services.balance_service import load_sim_balance_from_trades
+            account = self._state.current_account or "Sim1"
+            loaded_balance = load_sim_balance_from_trades(account)
         except Exception as e:
             error_msg = str(e).replace('\u2705', '[OK]').replace('\u2717', '[FAIL]')
             import traceback
@@ -232,8 +231,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 print(f"{'='*80}")
                 print(f"  Final SIM Balance: ${final_balance:,.2f}")
                 print(f"  Starting Balance: $10,000.00")
-                print(f"  Session P&L: ${final_balance - 10000.0:+,.2f}")
-                print(f"  Status: {'PERSISTENT [OK]' if final_balance != 10000.0 else 'Default (no trades)'}")
+                print(f"  Session P&L: ${final_balance - SIM_STARTING_BALANCE:+,.2f}")
+                print(f"  Status: {'PERSISTENT [OK]' if final_balance != SIM_STARTING_BALANCE else 'Default (no trades)'}")
                 print(f"{'='*80}\n")
                 log.info(f"[Shutdown] App closing with SIM balance: ${final_balance:,.2f}")
         except Exception as e:

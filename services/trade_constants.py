@@ -18,3 +18,9 @@ COMM_PER_CONTRACT = float(os.getenv("APPSIERRA_COMM_PER_CONTRACT", "0.62"))
 # NOTE: For ES (E-mini S&P 500), use:
 # DOLLARS_PER_POINT = 50.0
 # COMM_PER_CONTRACT = 2.25
+
+# Account balance constants
+# SIM starting balance for all simulated accounts
+# This is the single source of truth - do not hardcode 10000.0 elsewhere
+SIM_STARTING_BALANCE = 10000.0
+DEBUG_STARTING_BALANCE = 10000.0

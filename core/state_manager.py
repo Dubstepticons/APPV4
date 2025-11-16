@@ -12,6 +12,9 @@ from PyQt6 import QtCore
 # CONSOLIDATION FIX: Import canonical mode detection (single source of truth)
 from utils.trade_mode import detect_mode_from_account
 
+# Balance management delegation
+from services.unified_balance_manager import get_balance_manager
+
 
 class StateManager(QtCore.QObject):
     """
@@ -44,10 +47,10 @@ class StateManager(QtCore.QObject):
         self._log_mode_change("INIT", self.current_mode)
         # -------------------- mode awareness (end)
 
-        # ===== MODE-SPECIFIC BALANCE =====
-        self.sim_balance: float = 10000.0  # SIM mode starting balance: $10K/month
-        self.sim_balance_start_of_month: float = 10000.0  # Track starting balance for reset
-        self.live_balance: float = 0.0
+        # ===== BALANCE MANAGEMENT =====
+        # Balance is now managed by UnifiedBalanceManager (single source of truth)
+        # Use get_balance_for_mode() / set_balance_for_mode() to access balances
+        self._balance_manager = get_balance_manager()
 
         # ===== POSITION TRACKING (MODE-AWARE) =====
         self.position_symbol: Optional[str] = None
@@ -65,49 +68,6 @@ class StateManager(QtCore.QObject):
 
         # Config (injected)
         self.live_account_id: str = "120005"  # Will be set from config
-
-    def load_sim_balance_from_trades(self) -> float:
-        """
-        Load the SIM balance from the database by summing all realized P&L trades.
-        This is called on app startup to restore the balance if the app was restarted.
-        """
-        try:
-            from data.db_engine import get_session
-            from data.schema import TradeRecord
-            from sqlalchemy import func
-
-            print(f"[DEBUG state_manager.load_sim_balance_from_trades] Loading SIM balance from database...")
-
-            with get_session() as session:
-                # Query all closed trades in SIM mode and sum their realized P&L
-                result = session.query(func.sum(TradeRecord.realized_pnl)).filter(
-                    TradeRecord.mode == "SIM",
-                    TradeRecord.realized_pnl != None,
-                    TradeRecord.is_closed == True
-                ).scalar()
-
-                # Also count how many trades we have
-                trade_count = session.query(TradeRecord).filter(
-                    TradeRecord.mode == "SIM",
-                    TradeRecord.is_closed == True
-                ).count()
-
-                total_pnl = float(result) if result else 0.0
-                self.sim_balance = 10000.0 + total_pnl
-
-                print(f"\n[DATABASE LOAD] SIM Balance Restored from Trades")
-                print(f"  Trades in Database: {trade_count}")
-                print(f"  Base Balance: $10,000.00")
-                print(f"  Total P&L: {total_pnl:+,.2f}")
-                print(f"  Current Balance: ${self.sim_balance:,.2f}\n")
-                print(f"[DEBUG state_manager.load_sim_balance_from_trades] Total PnL from trades: {total_pnl:+,.2f}, SIM balance: ${self.sim_balance:,.2f}")
-
-                return self.sim_balance
-        except Exception as e:
-            print(f"[DEBUG state_manager.load_sim_balance_from_trades] Error loading balance: {e}")
-            # Fall back to default 10k
-            self.sim_balance = 10000.0
-            return self.sim_balance
 
     # ---- Core API ----
     def set(self, key: str, value: Any) -> None:
@@ -302,43 +262,41 @@ class StateManager(QtCore.QObject):
     @property
     def active_balance(self) -> float:
         """Return balance for the currently OPEN trade (not current_mode)"""
-        if self.position_mode == "SIM":
-            return self.sim_balance
-        elif self.position_mode == "LIVE":
-            return self.live_balance
+        if self.position_mode:
+            account = self.current_account or ("Sim1" if self.position_mode == "SIM" else self.live_account_id)
+            return self._balance_manager.get_balance(self.position_mode, account)
         else:
             return self.get_balance_for_mode(self.current_mode)
 
     def get_balance_for_mode(self, mode: str) -> float:
-        """Get balance for a specific mode"""
-        return self.sim_balance if mode == "SIM" else self.live_balance
+        """Get balance for a specific mode (delegates to UnifiedBalanceManager)"""
+        account = self.current_account or ("Sim1" if mode == "SIM" else self.live_account_id)
+        return self._balance_manager.get_balance(mode, account)
 
     def set_balance_for_mode(self, mode: str, balance: float) -> None:
-        """Update balance for a specific mode"""
+        """Update balance for a specific mode (delegates to UnifiedBalanceManager)"""
         print(f"[DEBUG state_manager.set_balance_for_mode] STEP 1: Called with mode={mode}, balance={balance}")
-        if mode == "SIM":
-            old_balance = self.sim_balance
-            self.sim_balance = balance
-            print(f"[DEBUG state_manager.set_balance_for_mode] STEP 2: SIM balance updated from {old_balance} to {balance}")
-        else:
-            old_balance = self.live_balance
-            self.live_balance = balance
-            print(f"[DEBUG state_manager.set_balance_for_mode] STEP 2: LIVE balance updated from {old_balance} to {balance}")
+        account = self.current_account or ("Sim1" if mode == "SIM" else self.live_account_id)
 
-        # Emit signal so UI can update
+        # Delegate to UnifiedBalanceManager
+        self._balance_manager.set_balance(mode, account, balance)
+
+        print(f"[DEBUG state_manager.set_balance_for_mode] STEP 2: Balance updated via UnifiedBalanceManager")
+
+        # Emit signal so UI can update (for backwards compatibility)
         print(f"[DEBUG state_manager.set_balance_for_mode] STEP 3: Emitting balanceChanged signal with balance={balance}")
         self.balanceChanged.emit(balance)
         print(f"[DEBUG state_manager.set_balance_for_mode] STEP 4: Signal emitted successfully")
 
     def reset_sim_balance_to_10k(self) -> float:
-        """Reset SIM balance to $10,000 (for monthly reset or manual hotkey)"""
-        self.sim_balance = 10000.0
-        self.sim_balance_start_of_month = 10000.0
-        return self.sim_balance
+        """Reset SIM balance to starting balance (delegates to UnifiedBalanceManager)"""
+        account = self.current_account or "Sim1"
+        return self._balance_manager.reset_balance("SIM", account)
 
     def adjust_sim_balance_by_pnl(self, realized_pnl: float) -> float:
         """
         Adjust SIM balance by realized P&L from a closed trade.
+        (Delegates to UnifiedBalanceManager)
 
         Args:
             realized_pnl: The P&L from the closed trade (positive or negative)
@@ -348,18 +306,21 @@ class StateManager(QtCore.QObject):
         """
         try:
             realized_pnl_float = float(realized_pnl)
-            self.sim_balance += realized_pnl_float
+            account = self.current_account or "Sim1"
 
             from utils.logger import get_logger
             log = get_logger("StateManager")
-            log.info(f"[SIM Balance] Adjusted by {realized_pnl_float:+,.2f} - New balance: ${self.sim_balance:,.2f}")
 
-            return self.sim_balance
+            new_balance = self._balance_manager.adjust_balance("SIM", account, realized_pnl_float)
+            log.info(f"[SIM Balance] Adjusted by {realized_pnl_float:+,.2f} - New balance: ${new_balance:,.2f}")
+
+            return new_balance
         except (TypeError, ValueError) as e:
             from utils.logger import get_logger
             log = get_logger("StateManager")
-            log.error(f"[SIM Balance] Error adjusting balance: {e}")
-            return self.sim_balance
+            log.error(f"[SIM Balance] Error adjusting balance: {e}, realized_pnl={realized_pnl}")
+            account = self.current_account or "Sim1"
+            return self._balance_manager.get_balance("SIM", account)
 
     # ===== MODE DETECTION =====
     def detect_and_set_mode(self, account: str) -> str:

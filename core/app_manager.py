@@ -26,6 +26,7 @@ from PyQt6 import QtCore, QtWidgets
 from config.settings import DEBUG_DATA, DTC_HOST, DTC_PORT, LIVE_ACCOUNT, DEFAULT_THEME_MODE
 from config.theme import THEME, ColorTheme, set_theme  # noqa: F401  # theme tokens used by helpers
 from core.data_bridge import DTCClientJSON
+from services.trade_constants import SIM_STARTING_BALANCE
 # MIGRATION: MessageRouter removed - using SignalBus now
 from panels.panel3 import Panel3
 from utils.logger import get_logger
@@ -157,8 +158,9 @@ class MainWindow(QtWidgets.QMainWindow):
             )
 
             # ARCHITECTURE FIX (Balance Service):
-            # Load SIM balance from database via services layer (not from StateManager)
-            loaded_balance = load_sim_balance_from_trades(self._state)
+            # Load SIM balance from database via UnifiedBalanceManager
+            account = self._state.current_account or "Sim1"
+            loaded_balance = load_sim_balance_from_trades(account)
         except Exception as e:
             error_msg = str(e).replace('\u2705', '[OK]').replace('\u2717', '[FAIL]').replace('[OK]', '[OK]').replace('[X]', '[FAIL]')
             import traceback
@@ -1023,8 +1025,8 @@ class MainWindow(QtWidgets.QMainWindow):
                 print(f"  {''*70}")
                 print(f"  Final SIM Balance: ${final_balance:,.2f}")
                 print(f"  Starting Balance: $10,000.00")
-                print(f"  Session P&L: ${final_balance - 10000.0:+,.2f}")
-                print(f"  Status: {'PERSISTENT [OK]' if final_balance != 10000.0 else 'Default (no trades)'}")
+                print(f"  Session P&L: ${final_balance - SIM_STARTING_BALANCE:+,.2f}")
+                print(f"  Status: {'PERSISTENT [OK]' if final_balance != SIM_STARTING_BALANCE else 'Default (no trades)'}")
                 print(f"  {''*70}\n")
                 log.info(f"[Shutdown] App closing with SIM balance: ${final_balance:,.2f}")
             else:

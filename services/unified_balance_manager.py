@@ -40,6 +40,8 @@ from PyQt6 import QtCore
 
 import structlog
 
+from services.trade_constants import SIM_STARTING_BALANCE, DEBUG_STARTING_BALANCE
+
 log = structlog.get_logger(__name__)
 
 
@@ -65,10 +67,6 @@ class UnifiedBalanceManager(QtCore.QObject):
 
     # Signals
     balanceChanged = QtCore.pyqtSignal(float, str, str)  # balance, account, mode
-
-    # Constants
-    SIM_STARTING_BALANCE = 10000.0
-    DEBUG_STARTING_BALANCE = 10000.0
 
     def __init__(self):
         super().__init__()
@@ -104,45 +102,52 @@ class UnifiedBalanceManager(QtCore.QObject):
         Returns:
             Current balance for the mode/account pair
 
-        Thread-safe: Yes
+        Thread-safe: Yes (uses double-check pattern to avoid holding lock during DB query)
 
         Example:
             balance = manager.get_balance("SIM", "Sim1")
         """
         key = (mode, account)
 
+        # First check: Fast path for cached values (no lock needed for read)
         with self._lock:
-            # Return cached balance if already loaded
             if key in self._balances:
                 return self._balances[key]
 
-            # Load balance based on mode
-            if mode == "SIM":
-                balance = self._load_sim_balance_from_db(account)
-            elif mode == "LIVE":
-                balance = 0.0  # LIVE balance comes from DTC
-            elif mode == "DEBUG":
-                balance = self.DEBUG_STARTING_BALANCE
-            else:
-                log.warning(
-                    "[UnifiedBalanceManager] Unknown mode, using 0.0",
-                    mode=mode,
-                    account=account
-                )
-                balance = 0.0
+        # Cache miss - need to load balance
+        # Determine what balance to load based on mode (outside lock)
+        if mode == "SIM":
+            balance = self._load_sim_balance_from_db(account)
+        elif mode == "LIVE":
+            balance = 0.0  # LIVE balance comes from DTC
+        elif mode == "DEBUG":
+            balance = DEBUG_STARTING_BALANCE
+        else:
+            log.warning(
+                "[UnifiedBalanceManager] Unknown mode, using 0.0",
+                mode=mode,
+                account=account
+            )
+            balance = 0.0
 
-            # Cache and mark as initialized
+        # Second check: Another thread may have loaded it while we were querying
+        with self._lock:
+            if key in self._balances:
+                # Someone else loaded it, use their value
+                return self._balances[key]
+
+            # We're first - cache the value
             self._balances[key] = balance
             self._initialized.add(key)
 
-            log.debug(
-                "[UnifiedBalanceManager] Balance loaded",
-                mode=mode,
-                account=account,
-                balance=balance
-            )
+        log.debug(
+            "[UnifiedBalanceManager] Balance loaded",
+            mode=mode,
+            account=account,
+            balance=balance
+        )
 
-            return balance
+        return balance
 
     def set_balance(self, mode: str, account: str, balance: float) -> None:
         """
@@ -242,7 +247,7 @@ class UnifiedBalanceManager(QtCore.QObject):
             )
             return self.get_balance(mode, account)
 
-        starting_balance = self.SIM_STARTING_BALANCE if mode == "SIM" else self.DEBUG_STARTING_BALANCE
+        starting_balance = SIM_STARTING_BALANCE if mode == "SIM" else DEBUG_STARTING_BALANCE
 
         self.set_balance(mode, account, starting_balance)
 
@@ -313,7 +318,7 @@ class UnifiedBalanceManager(QtCore.QObject):
                 )
 
                 total_pnl = float(result) if result else 0.0
-                balance = self.SIM_STARTING_BALANCE + total_pnl
+                balance = SIM_STARTING_BALANCE + total_pnl
 
                 # Also count trades for logging
                 trade_count = (
@@ -331,7 +336,7 @@ class UnifiedBalanceManager(QtCore.QObject):
                     account=account,
                     trade_count=trade_count,
                     total_pnl=total_pnl,
-                    starting_balance=self.SIM_STARTING_BALANCE,
+                    starting_balance=SIM_STARTING_BALANCE,
                     current_balance=balance
                 )
 
@@ -345,7 +350,7 @@ class UnifiedBalanceManager(QtCore.QObject):
                 exc_info=True
             )
             # Fallback to starting balance on error
-            return self.SIM_STARTING_BALANCE
+            return SIM_STARTING_BALANCE
 
     # =========================================================================
     # MIGRATION HELPERS - Backwards Compatibility
